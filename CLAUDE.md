@@ -28,6 +28,7 @@ Vowed is an Android app (Kotlin + Jetpack Compose) built for the Solana Mobile "
 - **Security rule.** Every onchain instruction needs signer, owner, PDA-seed and mint checks, plus tests for the failure cases (SPEC section 4.5).
 - **Test as you go.** Each phase ships with tests that run from one command. Do not mark a phase done with failing tests.
 - **Commit small and often** with clear messages. Do not commit build output, keystores or `.env` files.
+- **Push after every phase gate** to `origin` (https://github.com/Im-2/Vowed, public, branch `main`). Before every push run `bash scripts/secret-scan.sh`; if it reports anything, stop, tell the user, and do not push. Judges read the commit history, so keep commits small.
 - **Prefer the emulator first.** Features that need real hardware (camera pose, step counter, usage stats) get an emulator-friendly fallback or a debug "inject test data" path, plus a manual real-device test checklist in `docs/device-tests.md`.
 
 ## Repo layout (create in Phase 0)
