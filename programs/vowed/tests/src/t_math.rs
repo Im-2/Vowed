@@ -20,8 +20,12 @@ fn load_vector(name: &str) -> Value {
     panic!("test vector {name} not found in {candidates:?}");
 }
 
+/// Amounts in the vectors are decimal strings (exact in every language); small fields may be plain numbers.
 fn u(v: &Value) -> u64 {
-    v.as_u64().unwrap()
+    match v {
+        Value::String(s) => s.parse().unwrap(),
+        _ => v.as_u64().unwrap(),
+    }
 }
 fn i(v: &Value) -> i64 {
     v.as_i64().unwrap()

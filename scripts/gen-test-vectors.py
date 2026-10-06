@@ -41,16 +41,17 @@ def payout(stakes, ok, penalty_bps, fee_bps):
             pays.append(s - p)
     treasury = sum(stakes) - sum(pays)
     assert treasury >= fee >= 0
+    # Amounts are decimal strings: values above 2^53 are not exact in JavaScript's JSON.parse.
     return {
-        "stakes": stakes,
+        "stakes": [str(x) for x in stakes],
         "succeeded": ok,
         "penalty_bps": penalty_bps,
         "fee_bps": fee_bps,
-        "total_forfeit": forfeit,
-        "fee": fee,
-        "distributable": dist,
-        "payouts": pays,
-        "treasury": treasury,
+        "total_forfeit": str(forfeit),
+        "fee": str(fee),
+        "distributable": str(dist),
+        "payouts": [str(x) for x in pays],
+        "treasury": str(treasury),
     }
 
 

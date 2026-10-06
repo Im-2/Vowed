@@ -1,0 +1,2534 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Vowed API",
+    "version": "0.1.0",
+    "description": "Backend for the Vowed Android app. All endpoints except /v1/health, /v1/meta and /v1/auth/* need `Authorization: Bearer <token>` from /v1/auth/verify. u64 amounts are decimal strings. Transaction builders return unsigned base64 transactions: the app must decode and check them before asking the wallet to sign."
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {}
+  },
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "summary": "Liveness",
+        "tags": [
+          "meta"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/v1/auth/nonce": {
+      "post": {
+        "summary": "Get a sign-in nonce and the exact payload to pass to the wallet's sign-in",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "wallet": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "wallet"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nonce": {
+                      "type": "string"
+                    },
+                    "domain": {
+                      "type": "string"
+                    },
+                    "statement": {
+                      "type": "string"
+                    },
+                    "uri": {
+                      "type": "string"
+                    },
+                    "issuedAt": {
+                      "type": "string"
+                    },
+                    "expirationTime": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "nonce",
+                    "domain",
+                    "statement",
+                    "uri",
+                    "issuedAt",
+                    "expirationTime"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/verify": {
+      "post": {
+        "summary": "Exchange the wallet's signed sign-in message for a short-lived token",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "wallet": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  "signature": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "wallet",
+                  "message",
+                  "signature"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "wallet": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "token",
+                    "expiresAt",
+                    "wallet"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/meta": {
+      "get": {
+        "summary": "Program and deployment facts the app needs (no secrets)",
+        "tags": [
+          "meta"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "programId": {
+                      "type": "string"
+                    },
+                    "network": {
+                      "type": "string"
+                    },
+                    "authDomain": {
+                      "type": "string"
+                    },
+                    "initialised": {
+                      "type": "boolean"
+                    },
+                    "config": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "oracle": {
+                          "type": "string"
+                        },
+                        "treasury": {
+                          "type": "string"
+                        },
+                        "feeBps": {
+                          "type": "number"
+                        },
+                        "paused": {
+                          "type": "boolean"
+                        },
+                        "maxStake": {
+                          "type": "string"
+                        },
+                        "settleGraceSecs": {
+                          "type": "string"
+                        },
+                        "allowedMints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "oracle",
+                        "treasury",
+                        "feeBps",
+                        "paused",
+                        "maxStake",
+                        "settleGraceSecs",
+                        "allowedMints"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "programId",
+                    "network",
+                    "authDomain",
+                    "initialised",
+                    "config"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/challenges": {
+      "get": {
+        "summary": "List challenges (mine=true: only those I joined or created)",
+        "tags": [
+          "challenges"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Open",
+                "Settling",
+                "Settled",
+                "Voided"
+              ]
+            },
+            "in": "query",
+            "name": "status",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": "false",
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "in": "query",
+            "name": "mine",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "pool": {
+                            "type": "string"
+                          },
+                          "creator": {
+                            "type": "string"
+                          },
+                          "mint": {
+                            "type": "string"
+                          },
+                          "vault": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "mode": {
+                            "type": "string"
+                          },
+                          "penaltyBps": {
+                            "type": "number"
+                          },
+                          "feeBps": {
+                            "type": "number"
+                          },
+                          "startTs": {
+                            "type": "number"
+                          },
+                          "endTs": {
+                            "type": "number"
+                          },
+                          "joinDeadlineTs": {
+                            "type": "number"
+                          },
+                          "settleAfterTs": {
+                            "type": "number"
+                          },
+                          "durationDays": {
+                            "type": "number"
+                          },
+                          "requiredDays": {
+                            "type": "number"
+                          },
+                          "goalHash": {
+                            "type": "string"
+                          },
+                          "participantCount": {
+                            "type": "number"
+                          },
+                          "maxParticipants": {
+                            "type": "number"
+                          },
+                          "settledCount": {
+                            "type": "number"
+                          },
+                          "pendingClaims": {
+                            "type": "number"
+                          },
+                          "totalDeposits": {
+                            "type": "string"
+                          },
+                          "totalForfeit": {
+                            "type": "string"
+                          },
+                          "totalSuccessStake": {
+                            "type": "string"
+                          },
+                          "distributable": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "squadId": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "trustTier": {
+                            "nullable": true,
+                            "type": "string",
+                            "enum": [
+                              "high",
+                              "medium",
+                              "low"
+                            ]
+                          },
+                          "plan": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "pool",
+                          "creator",
+                          "mint",
+                          "vault",
+                          "kind",
+                          "mode",
+                          "penaltyBps",
+                          "feeBps",
+                          "startTs",
+                          "endTs",
+                          "joinDeadlineTs",
+                          "settleAfterTs",
+                          "durationDays",
+                          "requiredDays",
+                          "goalHash",
+                          "participantCount",
+                          "maxParticipants",
+                          "settledCount",
+                          "pendingClaims",
+                          "totalDeposits",
+                          "totalForfeit",
+                          "totalSuccessStake",
+                          "distributable",
+                          "status",
+                          "squadId",
+                          "trustTier",
+                          "plan"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "challenges"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/challenges/{pool}": {
+      "get": {
+        "summary": "One challenge with its participants and my claimable amount",
+        "tags": [
+          "challenges"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "pool",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "object",
+                      "properties": {
+                        "pool": {
+                          "type": "string"
+                        },
+                        "creator": {
+                          "type": "string"
+                        },
+                        "mint": {
+                          "type": "string"
+                        },
+                        "vault": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "mode": {
+                          "type": "string"
+                        },
+                        "penaltyBps": {
+                          "type": "number"
+                        },
+                        "feeBps": {
+                          "type": "number"
+                        },
+                        "startTs": {
+                          "type": "number"
+                        },
+                        "endTs": {
+                          "type": "number"
+                        },
+                        "joinDeadlineTs": {
+                          "type": "number"
+                        },
+                        "settleAfterTs": {
+                          "type": "number"
+                        },
+                        "durationDays": {
+                          "type": "number"
+                        },
+                        "requiredDays": {
+                          "type": "number"
+                        },
+                        "goalHash": {
+                          "type": "string"
+                        },
+                        "participantCount": {
+                          "type": "number"
+                        },
+                        "maxParticipants": {
+                          "type": "number"
+                        },
+                        "settledCount": {
+                          "type": "number"
+                        },
+                        "pendingClaims": {
+                          "type": "number"
+                        },
+                        "totalDeposits": {
+                          "type": "string"
+                        },
+                        "totalForfeit": {
+                          "type": "string"
+                        },
+                        "totalSuccessStake": {
+                          "type": "string"
+                        },
+                        "distributable": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "squadId": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "trustTier": {
+                          "nullable": true,
+                          "type": "string",
+                          "enum": [
+                            "high",
+                            "medium",
+                            "low"
+                          ]
+                        },
+                        "plan": {
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "pool",
+                        "creator",
+                        "mint",
+                        "vault",
+                        "kind",
+                        "mode",
+                        "penaltyBps",
+                        "feeBps",
+                        "startTs",
+                        "endTs",
+                        "joinDeadlineTs",
+                        "settleAfterTs",
+                        "durationDays",
+                        "requiredDays",
+                        "goalHash",
+                        "participantCount",
+                        "maxParticipants",
+                        "settledCount",
+                        "pendingClaims",
+                        "totalDeposits",
+                        "totalForfeit",
+                        "totalSuccessStake",
+                        "distributable",
+                        "status",
+                        "squadId",
+                        "trustTier",
+                        "plan"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "participants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "wallet": {
+                            "type": "string"
+                          },
+                          "stake": {
+                            "type": "string"
+                          },
+                          "tzOffsetMinutes": {
+                            "type": "number"
+                          },
+                          "daysCompleted": {
+                            "type": "number"
+                          },
+                          "checkinBitmap": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "wallet",
+                          "stake",
+                          "tzOffsetMinutes",
+                          "daysCompleted",
+                          "checkinBitmap",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "me": {
+                      "type": "object",
+                      "properties": {
+                        "joined": {
+                          "type": "boolean"
+                        },
+                        "claimable": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "joined",
+                        "claimable"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "challenge",
+                    "participants",
+                    "me"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/challenges/tx/create": {
+      "post": {
+        "summary": "Build the unsigned create-pool transaction for a goal plan (send an Idempotency-Key header to make retries safe)",
+        "tags": [
+          "challenges"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mint": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "default": "Squad",
+                    "type": "string",
+                    "enum": [
+                      "Squad",
+                      "Open"
+                    ]
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "Soft",
+                      "Hard"
+                    ]
+                  },
+                  "penaltyBps": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "startTs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991
+                  },
+                  "joinWindowSecs": {
+                    "default": 3600,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 86400
+                  },
+                  "maxParticipants": {
+                    "default": 50,
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "plan": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "category": {
+                        "type": "string",
+                        "enum": [
+                          "fitness",
+                          "study",
+                          "detox",
+                          "sleep",
+                          "steps",
+                          "location",
+                          "custom"
+                        ]
+                      },
+                      "cadence": {
+                        "type": "object",
+                        "properties": {
+                          "periodDays": {
+                            "type": "number",
+                            "enum": [
+                              1
+                            ]
+                          },
+                          "totalDays": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 60
+                          },
+                          "requiredDays": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 60
+                          }
+                        },
+                        "required": [
+                          "periodDays",
+                          "totalDays",
+                          "requiredDays"
+                        ]
+                      },
+                      "target": {
+                        "type": "object",
+                        "properties": {
+                          "metric": {
+                            "type": "string",
+                            "maxLength": 60
+                          },
+                          "value": {
+                            "type": "number"
+                          },
+                          "unit": {
+                            "type": "string",
+                            "maxLength": 30
+                          },
+                          "direction": {
+                            "type": "string",
+                            "enum": [
+                              "atLeast",
+                              "atMost"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "metric",
+                          "value",
+                          "unit",
+                          "direction"
+                        ]
+                      },
+                      "proofMethods": {
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "CAMERA_POSE",
+                                "USAGE_LIMIT",
+                                "NO_USE_WINDOW",
+                                "STEPS",
+                                "GEOFENCE",
+                                "FOCUS_TIMER",
+                                "SELF_ATTEST"
+                              ]
+                            },
+                            "params": {
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "trustTier": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "params",
+                            "trustTier"
+                          ]
+                        }
+                      },
+                      "window": {
+                        "nullable": true,
+                        "type": "object",
+                        "properties": {
+                          "startLocalTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          },
+                          "endLocalTime": {
+                            "type": "string",
+                            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                          }
+                        },
+                        "required": [
+                          "startLocalTime",
+                          "endLocalTime"
+                        ]
+                      },
+                      "difficulty": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
+                      },
+                      "verifiable": {
+                        "type": "boolean"
+                      },
+                      "unverifiableReason": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "suggestedAlternative": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "clarifyingQuestions": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "category",
+                      "cadence",
+                      "target",
+                      "proofMethods",
+                      "window",
+                      "difficulty",
+                      "verifiable",
+                      "unverifiableReason",
+                      "suggestedAlternative",
+                      "clarifyingQuestions"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "poolId": {
+                    "type": "string",
+                    "pattern": "^\\d{1,20}$"
+                  }
+                },
+                "required": [
+                  "mint",
+                  "mode",
+                  "startTs",
+                  "plan"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transaction": {
+                      "type": "string"
+                    },
+                    "blockhash": {
+                      "type": "string"
+                    },
+                    "lastValidBlockHeight": {
+                      "type": "number"
+                    },
+                    "pool": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "transaction",
+                    "blockhash",
+                    "lastValidBlockHeight",
+                    "pool",
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/challenges/tx/join": {
+      "post": {
+        "summary": "Build the unsigned join transaction (commits the stake to the device key you registered)",
+        "tags": [
+          "challenges"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pool": {
+                    "type": "string"
+                  },
+                  "stake": {
+                    "type": "string",
+                    "pattern": "^\\d{1,20}$"
+                  },
+                  "tzOffsetMinutes": {
+                    "type": "integer",
+                    "minimum": -720,
+                    "maximum": 840
+                  },
+                  "deviceId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                },
+                "required": [
+                  "pool",
+                  "stake",
+                  "tzOffsetMinutes",
+                  "deviceId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transaction": {
+                      "type": "string"
+                    },
+                    "blockhash": {
+                      "type": "string"
+                    },
+                    "lastValidBlockHeight": {
+                      "type": "number"
+                    },
+                    "pool": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "transaction",
+                    "blockhash",
+                    "lastValidBlockHeight",
+                    "pool",
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/challenges/tx/claim": {
+      "post": {
+        "summary": "Build the unsigned claim transaction for a settled or voided challenge",
+        "tags": [
+          "challenges"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pool": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pool"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transaction": {
+                      "type": "string"
+                    },
+                    "blockhash": {
+                      "type": "string"
+                    },
+                    "lastValidBlockHeight": {
+                      "type": "number"
+                    },
+                    "pool": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "transaction",
+                    "blockhash",
+                    "lastValidBlockHeight",
+                    "pool",
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/challenges/sync": {
+      "post": {
+        "summary": "Tell the backend about a transaction you sent so the mirror updates immediately (it re-reads the chain; nothing is trusted from the request)",
+        "tags": [
+          "challenges"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "signature": {
+                    "type": "string",
+                    "minLength": 80,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "signature"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/challenge": {
+      "post": {
+        "summary": "Get the challenge to pass to Android Keystore when generating the device key",
+        "tags": [
+          "devices"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "challenge",
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices/register": {
+      "post": {
+        "summary": "Register the device proof key (P-256) with its Android key attestation",
+        "tags": [
+          "devices"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "devicePublicKey": {
+                    "type": "string",
+                    "maxLength": 400
+                  },
+                  "attestationChain": {
+                    "maxItems": 6,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 6000
+                    }
+                  },
+                  "challenge": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "walletSignature": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "devicePublicKey",
+                  "challenge",
+                  "walletSignature"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deviceId": {
+                      "type": "string"
+                    },
+                    "trustCap": {
+                      "type": "string",
+                      "enum": [
+                        "high",
+                        "medium",
+                        "low"
+                      ]
+                    },
+                    "attestation": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "string"
+                        },
+                        "verifiedBoot": {
+                          "type": "string"
+                        },
+                        "note": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "verifiedBoot",
+                        "note"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "deviceId",
+                    "trustCap",
+                    "attestation"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/devices": {
+      "get": {
+        "summary": "List my registered devices",
+        "tags": [
+          "devices"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "devices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "deviceId": {
+                            "type": "string"
+                          },
+                          "attestationLevel": {
+                            "type": "string"
+                          },
+                          "trustCap": {
+                            "type": "string"
+                          },
+                          "note": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "deviceId",
+                          "attestationLevel",
+                          "trustCap",
+                          "note",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "devices"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/proofs/session": {
+      "post": {
+        "summary": "Start a proof session: returns the nonce the device must sign into the proof",
+        "tags": [
+          "proofs"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pool": {
+                    "type": "string"
+                  },
+                  "dayIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 59
+                  },
+                  "proofType": {
+                    "type": "string",
+                    "enum": [
+                      "CAMERA_POSE",
+                      "USAGE_LIMIT",
+                      "NO_USE_WINDOW",
+                      "STEPS",
+                      "GEOFENCE",
+                      "FOCUS_TIMER",
+                      "SELF_ATTEST"
+                    ]
+                  }
+                },
+                "required": [
+                  "pool",
+                  "dayIndex",
+                  "proofType"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "nonce": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "proofType": {
+                      "type": "string",
+                      "enum": [
+                        "CAMERA_POSE",
+                        "USAGE_LIMIT",
+                        "NO_USE_WINDOW",
+                        "STEPS",
+                        "GEOFENCE",
+                        "FOCUS_TIMER",
+                        "SELF_ATTEST"
+                      ]
+                    },
+                    "dayIndex": {
+                      "type": "number"
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "metric": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "number"
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "direction": {
+                          "type": "string",
+                          "enum": [
+                            "atLeast",
+                            "atMost"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "metric",
+                        "value",
+                        "unit",
+                        "direction"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "window": {
+                      "type": "object",
+                      "properties": {
+                        "opensAt": {
+                          "type": "number"
+                        },
+                        "closesAt": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "opensAt",
+                        "closesAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "sessionId",
+                    "nonce",
+                    "expiresAt",
+                    "proofType",
+                    "dayIndex",
+                    "target",
+                    "window"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/proofs/submit": {
+      "post": {
+        "summary": "Submit a device-signed proof package. Idempotent per session: a retry returns the same result",
+        "tags": [
+          "proofs"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionId": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 64
+                  },
+                  "nonce": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 128
+                  },
+                  "challengeId": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 44
+                  },
+                  "dayIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 59
+                  },
+                  "proofType": {
+                    "type": "string",
+                    "enum": [
+                      "CAMERA_POSE",
+                      "USAGE_LIMIT",
+                      "NO_USE_WINDOW",
+                      "STEPS",
+                      "GEOFENCE",
+                      "FOCUS_TIMER",
+                      "SELF_ATTEST"
+                    ]
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "startedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991
+                  },
+                  "endedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991
+                  },
+                  "evidenceHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "deviceKeyId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "signature": {
+                    "type": "string",
+                    "minLength": 80,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "sessionId",
+                  "nonce",
+                  "challengeId",
+                  "dayIndex",
+                  "proofType",
+                  "metrics",
+                  "startedAt",
+                  "endedAt",
+                  "evidenceHash",
+                  "deviceKeyId",
+                  "signature"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "trustTier": {
+                      "type": "string",
+                      "enum": [
+                        "high",
+                        "medium",
+                        "low"
+                      ]
+                    },
+                    "daysCompleted": {
+                      "type": "number"
+                    },
+                    "streak": {
+                      "type": "number"
+                    },
+                    "checkin": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "confirmed",
+                            "pending",
+                            "failed"
+                          ]
+                        },
+                        "signature": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "accepted",
+                    "trustTier",
+                    "daysCompleted",
+                    "streak",
+                    "checkin"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/squads": {
+      "post": {
+        "summary": "Create a squad",
+        "tags": [
+          "squads"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "owner": {
+                      "type": "string"
+                    },
+                    "inviteCode": {
+                      "type": "string"
+                    },
+                    "deepLink": {
+                      "type": "string"
+                    },
+                    "memberCount": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "owner",
+                    "inviteCode",
+                    "deepLink",
+                    "memberCount"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "My squads",
+        "tags": [
+          "squads"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "squads": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "owner": {
+                            "type": "string"
+                          },
+                          "inviteCode": {
+                            "type": "string"
+                          },
+                          "deepLink": {
+                            "type": "string"
+                          },
+                          "memberCount": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "owner",
+                          "inviteCode",
+                          "deepLink",
+                          "memberCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "squads"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/squads/join": {
+      "post": {
+        "summary": "Join a squad with an invite code",
+        "tags": [
+          "squads"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[A-Z0-9]{8}$"
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "owner": {
+                      "type": "string"
+                    },
+                    "inviteCode": {
+                      "type": "string"
+                    },
+                    "deepLink": {
+                      "type": "string"
+                    },
+                    "memberCount": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "owner",
+                    "inviteCode",
+                    "deepLink",
+                    "memberCount"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/squads/{id}": {
+      "get": {
+        "summary": "Squad details with members and linked challenges",
+        "tags": [
+          "squads"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "squad": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "owner": {
+                          "type": "string"
+                        },
+                        "inviteCode": {
+                          "type": "string"
+                        },
+                        "deepLink": {
+                          "type": "string"
+                        },
+                        "memberCount": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "owner",
+                        "inviteCode",
+                        "deepLink",
+                        "memberCount"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "wallet": {
+                            "type": "string"
+                          },
+                          "joinedAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "wallet",
+                          "joinedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "challenges": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "pool": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "startTs": {
+                            "type": "number"
+                          },
+                          "endTs": {
+                            "type": "number"
+                          },
+                          "durationDays": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "pool",
+                          "status",
+                          "startTs",
+                          "endTs",
+                          "durationDays"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "squad",
+                    "members",
+                    "challenges"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/squads/{id}/invite": {
+      "post": {
+        "summary": "Get the invite code and link (owner can rotate the code)",
+        "tags": [
+          "squads"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rotate": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "inviteCode": {
+                      "type": "string"
+                    },
+                    "deepLink": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "inviteCode",
+                    "deepLink"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/squads/{id}/challenges": {
+      "post": {
+        "summary": "Link a pool you created to this squad so members see it in the feed and leaderboard",
+        "tags": [
+          "squads"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pool": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pool"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pool": {
+                      "type": "string"
+                    },
+                    "squadId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "pool",
+                    "squadId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/squads/{id}/feed": {
+      "get": {
+        "summary": "Squad activity feed, newest first (use `before` for older pages)",
+        "tags": [
+          "squads"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "before",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "number"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "wallet": {
+                            "type": "string"
+                          },
+                          "pool": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "data": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "wallet",
+                          "pool",
+                          "data",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/squads/{id}/leaderboard": {
+      "get": {
+        "summary": "Leaderboard across the squad's linked challenges",
+        "tags": [
+          "squads"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rank": {
+                            "type": "number"
+                          },
+                          "wallet": {
+                            "type": "string"
+                          },
+                          "daysCompleted": {
+                            "type": "number"
+                          },
+                          "bestStreak": {
+                            "type": "number"
+                          },
+                          "checkedInToday": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "rank",
+                          "wallet",
+                          "daysCompleted",
+                          "bestStreak",
+                          "checkedInToday"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "rows"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/squads/{id}/nudge": {
+      "post": {
+        "summary": "Nudge a squad mate who has not checked in today (rate limited per pair, per sender and per recipient)",
+        "tags": [
+          "squads"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipient": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "recipient"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "delivered": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "delivered"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/push/register": {
+      "post": {
+        "summary": "Register this device's push token",
+        "tags": [
+          "push"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 4096
+                  },
+                  "platform": {
+                    "default": "android",
+                    "type": "string",
+                    "enum": [
+                      "android"
+                    ]
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/push/unregister": {
+      "post": {
+        "summary": "Remove a push token",
+        "tags": [
+          "push"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/coach/suggestions": {
+      "get": {
+        "summary": "Deterministic difficulty suggestions for the next challenge (never changes an active one)",
+        "tags": [
+          "coach"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "suggestions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "category": {
+                            "type": "string"
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "collect_more_data",
+                              "easier",
+                              "keep",
+                              "harder"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "successRate": {
+                            "nullable": true,
+                            "type": "number"
+                          },
+                          "suggestedDifficulty": {
+                            "nullable": true,
+                            "type": "number"
+                          },
+                          "targetScale": {
+                            "type": "number"
+                          },
+                          "hints": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "appliesTo": {
+                            "type": "string",
+                            "enum": [
+                              "next_challenge"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "action",
+                          "reason",
+                          "successRate",
+                          "suggestedDifficulty",
+                          "targetScale",
+                          "hints",
+                          "appliesTo",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "suggestions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth"
+    },
+    {
+      "name": "meta"
+    },
+    {
+      "name": "challenges"
+    },
+    {
+      "name": "devices"
+    },
+    {
+      "name": "proofs"
+    },
+    {
+      "name": "squads"
+    },
+    {
+      "name": "push"
+    },
+    {
+      "name": "coach"
+    }
+  ]
+}
