@@ -10,6 +10,8 @@ export VOWED_SHARED="$HOME/vowed-shared"
 mkdir -p "$W"
 run_mutant() {
   name="$1"; file="$2"; from="$3"; to="$4"
+  # optional filter: ONLY="day window" runs just the mutants whose name contains that text
+  if [ -n "$ONLY" ] && [[ "$name" != *"$ONLY"* ]]; then return; fi
   rsync -a --delete --exclude node_modules --exclude '*.sqlite*' --exclude .devnet "$SRC"/ "$W"/
   ln -sfn "$BASE/node_modules" "$W/node_modules"
   python3 - "$W/$file" "$from" "$to" <<'PY'
@@ -29,5 +31,5 @@ run_mutant "auth nonce reusable" src/http/auth.ts 'if (Number(used.changes) !== 
 run_mutant "squad membership not enforced" src/http/squads.ts 'if (!m) throw forbidden("not_member", "you are not a member of this squad");' ''
 run_mutant "wallet signature on device registration not checked" src/http/devices.ts '!nacl.sign.detached.verify(msg, sig, new PublicKey(wallet).toBytes())' 'false'
 run_mutant "attestation challenge not compared" src/devices/attestation.ts 'if (a.length !== b.length || !timingSafeEqual(a, b)) return fail("attestation challenge does not match");' ''
-run_mutant "day window not enforced for sessions" src/proofs/service.ts 'if (!checkinWindowOk(now, c.start_ts, p.tz_offset_minutes, day))' 'if (false)'
+run_mutant "day window not enforced for sessions" src/proofs/service.ts 'if (!windowOkFor(c, p.tz_offset_minutes, day, now))' 'if (false)'
 run_mutant "proof session never marked in-flight (race)" src/proofs/service.ts "UPDATE proof_sessions SET status='processing' WHERE id = ? AND status = 'open'" "UPDATE proof_sessions SET status='open' WHERE id = ? AND status = 'open'"

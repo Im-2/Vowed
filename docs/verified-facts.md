@@ -146,3 +146,22 @@ Never hardcode these from memory; re-check before mainnet.
 - **JSON vectors:** integers above 2^53 are not exact in JavaScript's `JSON.parse`; the shared vectors now carry all amounts as decimal strings (caught by the vector test).
 - **Devnet faucet:** unreliable for scripted use (HTTP 429). The gate script never calls it; funding is moved from the deployer or provided by hand.
 - **Devnet timing:** real 24-hour days plus `settle_grace_secs` mean a pool can be settled about 26 hours after its start, so the gate script is resumable in two stages. See `docs/progress.md` for the recommendation about demo pools.
+
+## Phase 2 gate on devnet, 2026-10-06 / 07
+- **Program upgraded in place, same program id** `BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL` (nothing to update anywhere; `init_config` had never been run, so there was no state to migrate).
+  Upgrade tx `5rrULz4HxpyEHTihFRjDs7KoLVmKeAcgap1QQyJXRiHZY7nGN8MSwLRHNCAcgrB1DRBejocPjvEPbapLTW9QHGfS`, slot 508239912, 398,280 bytes, SHA-256 `fe9470fbd3ee52fbb4e61b45b46d08ba01c86ae6cf2b5362acc1677dca1ff47d`, identical to the local build (`scripts/program-finish-upgrade.sh`).
+  The first deploy (387,640 bytes, hash `7f787026...`) is superseded; the account was extended to 398,280 bytes (`solana program extend`).
+- **`init_config` on devnet** (irreversible for this id): tx `4wr96hBinaD2TdDVwenY2aeTWiaMVTj22TPztuvWA8Z8aq9UXdbYX6hSE22JRjT3H2PmkiG5GpnfTC5KBrugX8d5`. Oracle `8SvB51yoFX4DPA3YS3FfbYL8ZgbwJ7aL9hFVG1cMfEuE`, treasury `HgQyATNJjsPYHVpCuTs9uG5AaYJrPbpSmuhSgxCLBvFj`, fee 0, max stake 100 tokens, settle grace 2 h.
+  Allowed tokens: Circle devnet USDC `4zMMC9...` (normal pools only), **USDC (test)** `C6pXRRmoHsf7Mqa1ZrW3JfspyknhSR1cRqHMUqao63Hv`, **SKR (test)** `J6X9udvWis7jYpVHic3Kn5iTG3ac6gbBeFixnYKPUkHB` (both our own 6-decimal test mints, mint authority = the deployer). **Demo pools enabled for the two test mints only**, demo stake cap 20 tokens.
+  This configuration cannot be changed except `set_paused`, `set_demo_enabled`, `update_oracle`; other changes need a new program id.
+- **Gate result** (`backend/scripts/devnet-gate.ts`, 389 s from start to verified end): two demo pools with 60-second days, alice and bob join pool A, alice proves both days (oracle check-ins confirmed on chain), bob does not; pool B has bob alone and no proofs.
+  Crank settled 3 participations and swept 1 pool; alice claimed 20 test USDC. Final balances matched the expectation exactly (alice 110, bob 85, treasury 5, both vaults 0).
+  Pools `HHS35UAnybrAv5G5N99xu2TKBs2GXYpBgCk6BzFeFdC7` and `6pHiEZDbUQR9jvV5bTw8FpSAt268NZ9fmXdAKWitN5DS`; check-ins `atezVZHq...` (day 0) and `3t27vA6w...` (day 1); alice's claim `2rfxSBbE...`.
+  **What this did not exercise:** the device key was a software P-256 key held by the script (no attestation), so proofs were capped at trust tier "low"; no phone, no Seeker; no normal 24-hour pool on devnet (those are covered by the VM tests only).
+- **Uploading a 400 KB program to the public devnet RPC is fragile.** `https://api.devnet.solana.com` rate-limits per IP (HTTP 429 "Too many requests from your IP"). Observed:
+  - default `solana program deploy` failed after a few minutes with "Max retries exceeded", leaving a 2 SOL upload buffer;
+  - `--use-rpc --max-sign-attempts 30` crawled for 40 minutes (and our own read-only calls competed for the same rate limit);
+  - resuming into the half-written buffer with the CLI **does not rewrite missing chunks**: the loader then rejects it ("Verifier error: unknown eBPF opcode 0x0").
+  What worked: `backend/scripts/fill-buffer.ts` reads the buffer, writes only the 900-byte chunks that differ at 5 tx/s with backoff, repeats until byte-identical (404 chunks in about 2 minutes), then `solana program upgrade <buffer>` (`scripts/program-finish-upgrade.sh`).
+  A buffer's rent (about 2 SOL) is refunded on upgrade or `solana program close --buffers`, so a failed attempt costs nothing but time. A paid RPC key would avoid this entirely; none was needed or created.
+- **Tooling lessons recorded for next time:** PowerShell expands `$HOME` inside double-quoted strings (use script files for WSL commands); WSL does not reliably keep orphaned background jobs alive after the launching command returns (run long jobs as a tool background task with a local log); Windows Python could not write a file while a WSL job was rsyncing it (retry).

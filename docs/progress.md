@@ -95,3 +95,22 @@ alice 6,200,000 lamports (0.0062 SOL), bob 7,700,000 (0.0077), oracle 800,000 (0
 Balances confirmed on chain. The deployer keeps about 0.510 SOL, far more than the roughly 0.007 SOL it still needs for the test mints, two token accounts and `init_config`.
 Transactions: alice `aAAWmW1M...`, bob `2sdx79KP...`, oracle `3UwTKKE8...`, crank `b2JWMYpT...` (full links were printed by `npm run gate:devnet -- --fund --fund-only`).
 `init_config` and the pools have **not** been run yet; the gate still waits for your go-ahead on `init_config` (irreversible for this program id) and for the 26-hour stage B.
+
+
+## Phase 2: Backend — GATE PASSED on devnet (2026-10-07), awaiting user review
+
+This supersedes the "devnet gate NOT yet run" status above. Gate: "an automated script creates a pool, joins with two test wallets, submits proofs, records check-ins, settles and claims on devnet."
+
+**Result:** `npm run gate:devnet` (in `backend/`) ran the whole loop against real devnet in **389 seconds** and verified the balances: pools created, alice and bob joined, alice's two device-signed proofs accepted and recorded on chain by the oracle, the crank settled three participations and swept one pool, alice claimed 20 test USDC. Final balances alice 110, bob 85, treasury 5, vaults 0, exactly as expected. Evidence and transaction ids: `docs/verified-facts.md` ("Phase 2 gate on devnet").
+
+**Demo pools (decided with you, built and tested):** minutes-long "days" for demos and tests only; normal pools keep real 24-hour days. Rules in SPEC 4.6. Labelled on chain (`is_demo`, `day_secs`, event field), in the API (`isDemo`, `daySecs`, `demoLabel`, `summary.label`) and to be shown in the app.
+They follow every normal rule and add tighter ones: need `demo_enabled`, a demo-eligible token (only our test mints on devnet), a lower stake cap (20 tokens vs 100), at most 20 participants, start within 24 h, join window within one demo day, a kill switch (`set_demo_enabled`), and a config that can only be stricter than the normal one. A real-money deployment should disable demo pools.
+Tests: 9 demo tests + shared demo vectors in the program suite (71 Rust tests), 18 more in the backend (100 backend tests: 82 run on Windows, 18 need the WSL VM). 10 of 10 deliberately broken program guards are caught, including the 7 demo rules (`scripts/program-mutation-check.sh`).
+
+**SOL:** you sent 2.5 SOL (deployer 3.0099 SOL when I re-checked). The upgrade needs a temporary 2.02 SOL upload buffer that is refunded; the deployer ended with about 2.95 SOL after the upgrade, mints, token accounts and `init_config`. No faucet or airdrop was called at any point.
+**Incident to be aware of:** the first upgrade attempt ran an older version of my deploy script because my edit of it was rejected (the old one had no faucet code either). It failed midway and left a 2 SOL upload buffer; no SOL was lost (refundable) but the upgrade took about two hours of wall clock because of public-RPC rate limits. Cause and fix are in `docs/verified-facts.md`.
+
+**Still not verified (unchanged):** real phone / Seeker attestation (`docs/device-tests.md`), live FCM (needs a Firebase project), Google's revocation endpoint (unreachable from this network), a normal 24-hour pool on devnet, the Android app calling the backend (Phase 3).
+**Next:** Phase 3 (Android skeleton and wallet) after your review. The IDL (`programs/vowed/idl/vowed.json`, copy in `backend/src/program/`) now includes demo pools; the app must show the DEMO label for pools with `isDemo`.
+
+**Balances after the gate (devnet, read back at the end):** deployer 2.9448 SOL; alice 0.00144, bob 0.00166, oracle 0.00079, crank 0.00099 SOL. A second gate round would need about 0.0123 SOL moved from the deployer to the test wallets (`npm run gate:devnet -- --fund --fund-only`; nothing was moved yet, no faucet involved).

@@ -9,7 +9,7 @@ Rules for this file (also in `CLAUDE.md`):
 3. Anything not yet proven goes in "Not verified yet" or "Do not claim", never in the feature tables.
 4. Commit ids are short hashes in this repository (https://github.com/Im-2/Vowed). A feature changed later keeps its first commit and lists the fix commit.
 
-Last updated: after Phase 2 (code and tests complete; devnet end-to-end run still pending).
+Last updated: after the Phase 2 gate (2026-10-07): the full loop has run on real devnet with demo pools. Still no real phone and no Android UI for it.
 
 ---
 
@@ -17,11 +17,12 @@ Last updated: after Phase 2 (code and tests complete; devnet end-to-end run stil
 
 | Feature | Status | What exists |
 |---|---|---|
-| F1 Stake on a goal | **Onchain and backend verified; no app UI yet** | Program + backend tx builders. Real stake custody in a program vault, tested in the VM. The Android app cannot create or join yet (Phase 3) |
+| F1 Stake on a goal | **Verified on devnet with test tokens; no app UI yet** | Program + backend tx builders. Real stake custody in a program vault, tested in the VM and run on devnet (demo pools, test USDC). The Android app cannot create or join yet (Phase 3) |
 | F2 Plain-language goals | **Not started** (only the GoalPlan schema, hashing and validation exist) | `backend/src/domain/plan.ts`; no parser, no templates, no AI yet (Phase 5) |
-| F3 Daily proof check-in | **Backend verified; no phone proofs yet** | Device-signed proof verification and onchain check-ins, tested with simulated devices. No camera, steps, usage, geofence or timer code on Android yet (Phases 4-5) |
+| F3 Daily proof check-in | **Backend verified (incl. devnet, with a script as the "device"); no phone proofs yet** | Device-signed proof verification and onchain check-ins, tested with simulated devices and on devnet with a software key (trust tier low). No camera, steps, usage, geofence or timer code on Android yet (Phases 4-5) |
 | F4 Squads | **Backend verified; no app UI** | Squads, invites, feed, leaderboard, nudges (tested). Push delivery needs a Firebase project (not created) |
-| F5 Streaks and payouts | **Onchain and backend verified** | Settlement, payout math, claims; streak calculation. No calendar heatmap or payout animation (app) |
+| F5 Streaks and payouts | **Verified on devnet (settlement, claim, treasury sweep); no app UI** | Settlement, payout math, claims; streak calculation. No calendar heatmap or payout animation (app) |
+| Demo pools (minutes-long "days") | **Built and verified on devnet** | For demos and tests only, clearly labelled, test tokens only; see the Phase 2 gate section |
 | F6 Yield / soft stakes | **Soft mode verified onchain. Yield not started** | Soft penalty (max 50%) works in tests. No yield integration; nothing simulated is shown anywhere yet |
 | F7 Adaptive coach | **Rules verified in backend; no app UI** | Deterministic suggestions with tests. No LLM wording (not planned for now) |
 | F8 Future-self letters | **Not started** | |
@@ -61,9 +62,9 @@ Program id `BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL`. Anchor 1.2.0 (pinned 
 
 Limits: the deployed program has **not been used live on devnet yet** (`init_config` not run). Unaudited; the oracle is a trusted backend key (see "Trust model" below). Token-2022 extension rejection has no integration test.
 
-### Phase 2: backend (code and tests complete; devnet gate pending)
+### Phase 2: backend (gate passed on devnet 2026-10-07)
 
-All of this is verified **in an in-process VM running the real program binary** (and in unit tests), not yet on devnet. Run: `wsl -d Ubuntu -u root -- bash scripts/backend-test.sh` (89 tests pass); `cd backend; npm test` runs 76 of them natively on Windows.
+Unless a row says "devnet", it is verified **in an in-process VM running the real program binary** (and in unit tests). Run: `wsl -d Ubuntu -u root -- bash scripts/backend-test.sh` (100 tests pass); `cd backend; npm test` runs 82 of them natively on Windows.
 
 | What works | Proof | Commit |
 |---|---|---|
@@ -80,7 +81,18 @@ All of this is verified **in an in-process VM running the real program binary** 
 | The tests catch real bugs: 10 of 10 deliberately broken guards fail the suite | `scripts/backend-mutation-check.sh` | `2c1fc10` |
 | Runs locally with SQLite and no outside account; no secrets in the repo; secret scan of the whole history is clean | `bash scripts/secret-scan.sh`; `docs/runbook.md` | `2c1fc10`, `7d0ce16` |
 
-Limits: no run on devnet yet; the app does not call the backend yet; Seeker and real-phone attestation unverified; Google's live revocation endpoint was unreachable from the development network (stub-tested only).
+Limits: the app does not call the backend yet; Seeker and real-phone attestation unverified; Google's live revocation endpoint was unreachable from the development network (stub-tested only).
+
+#### Phase 2 gate: demo pools and the full loop on real devnet (2026-10-07)
+
+| What works | Proof | Commit |
+|---|---|---|
+| **Demo pools:** pools whose "days" last 60 to 3600 seconds, so a whole challenge (stake, daily proofs, settlement, payout) can be shown in minutes. Normal pools keep real 24-hour days. Clearly labelled on chain (`is_demo`, `day_secs`), in the API (`isDemo`, `daySecs`, `demoLabel`) and, later, in the UI | `programs/vowed/tests/src/t_demo.rs` (9 tests) and shared demo vectors; `backend/test/demo.test.ts`, `backend/test/e2e/demo-pools.test.ts` (API lifecycle in about three minutes of cluster time) | program `a503b58`, backend `c34b9f6`, spec `5ad353c` |
+| **Demo pools cannot be looser than normal pools:** all normal rules still apply, plus: switched on in the program config, only for tokens flagged for demos, a lower stake cap (20 vs 100 tokens on devnet), at most 20 participants, start within 24 h, join window within one demo day, config can only be stricter, admin kill switch. A real-money deployment should disable demo pools | The same tests, including every refusal; 7 deliberately broken demo rules are all caught by `scripts/program-mutation-check.sh` (10 of 10 program mutations caught) | `a503b58`, `5ad353c` |
+| **The whole product loop ran on real Solana devnet in 389 seconds**: `init_config`; two demo pools created through the API; two wallets joined with test USDC; device-signed proofs accepted and recorded on chain by the oracle; crank settled three participations and swept one pool; the winner claimed 20 test USDC; every final balance matched (alice 110, bob 85, treasury 5, vaults 0) | `cd backend; npm run gate:devnet` (state and keys are throwaway files under `backend/.devnet`). Transaction ids and addresses: `docs/verified-facts.md` ("Phase 2 gate on devnet") | `c34b9f6` (gate script); run on 2026-10-06/07 |
+| The devnet program was **upgraded in place** to the demo-pool build (same program id) and the onchain bytes equal the local build | `scripts/program-finish-upgrade.sh` prints identical SHA-256 `fe9470fb...`; upgrade tx `5rrULz4H...` | `1309b5a` (upload tooling) |
+
+Honest limits of the devnet run: the "device" was a software key held by the script (no attestation, so proofs got trust tier **low**), not a phone; test tokens we minted ourselves; demo pools only (normal 24-hour pools are covered by the VM tests, not by a devnet run); the app was not involved.
 
 ---
 
@@ -99,7 +111,8 @@ Limits: no run on devnet yet; the app does not call the backend yet; Seeker and 
 - Plain-language goals or any AI (no parser exists).
 - Yield on stakes, SKR rewards or SKR perks, letters, widget, plug-ins.
 - That the app can stake, join or claim (the Android app only connects a wallet today).
-- A working end-to-end flow on devnet (the devnet gate script exists but has not been run), or on a real phone, or on a Seeker.
+- A working end-to-end flow **on a real phone or a Seeker**, or one driven from the Android app. What is true: the loop works on devnet driven by a script, with test tokens and demo pools.
+- That demo pools are "the product": they are a labelled demonstration mode. Normal pools use real 24-hour days.
 - Push notifications reaching a phone.
 - Audited, mainnet, or "first habit-staking app" (prior art exists; see SPEC 1.2).
 
@@ -107,12 +120,13 @@ Limits: no run on devnet yet; the app does not call the backend yet; Seeker and 
 
 | Item | Blocked on |
 |---|---|
-| Devnet end-to-end run (create, join, prove, check-in, settle, claim, sweep) | Funding approval for four throwaway wallets, then about 26 hours (24-hour day plus 2-hour settle grace) |
+| A normal (24-hour) pool run through settlement on devnet | About 26 hours of waiting and a little SOL; covered by VM tests until then |
 | Real phone and Seeker attestation | A physical device (`docs/device-tests.md`) |
 | Live FCM delivery | A Firebase project (free) |
-| Demo with settlement in real time | Decision on short-day "demo pools" (needs a program change and redeploy), or use labeled demo data per SPEC 8.5 |
+| The Android app staking, proving and claiming through the backend | Phase 3 onward |
 
 ## 6. Demo and pitch material that already exists
 
 - The lifecycle test is a faithful narrated script of the product loop (create, join, prove, miss, settle, claim) against the real program; its steps map to demo beats 3-6 of SPEC 13.3 once the app UI exists.
-- Verified numbers safe to quote (reproducible with the commands above): 60 program tests, 89 backend tests, 10/10 and 3/3 mutations caught, 6 real attestation chains verified, 1,135 shared vectors, 26 documented API endpoints.
+- The devnet gate log is a ready-made demo script: create, join, two proofs, settle, claim, sweep in about six minutes, with explorer links for every transaction (`docs/verified-facts.md`). With the app UI it becomes the 3-minute video, on a demo pool labelled as such.
+- Verified numbers safe to quote (reproducible with the commands above): 71 program tests, 100 backend tests, 10/10 program and 10/10 backend mutations caught, 6 real attestation chains verified, 1,391 shared vectors, 26 documented API endpoints, devnet loop in 389 s.

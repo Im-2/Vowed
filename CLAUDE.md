@@ -48,7 +48,9 @@ Vowed is an Android app (Kotlin + Jetpack Compose) built for the Solana Mobile "
 - Program build + tests (WSL Ubuntu as root): `wsl -d Ubuntu -u root -- bash /mnt/c/Users/hp/Vowed/scripts/program-build.sh`
 - Backend dev / fast tests (Windows): `cd backend; npm run dev` / `npm test` (13 VM tests are skipped there)
 - Backend full suite incl. real-program VM tests (WSL): `wsl -d Ubuntu -u root -- bash /mnt/c/Users/hp/Vowed/scripts/backend-test.sh` (run `program-build.sh` first)
-- Backend devnet gate (resumable, never uses a faucet): `cd backend; npm run gate:devnet -- --plan` then `-- --fund`, then no flag; see `docs/runbook.md`
+- Backend devnet gate (demo pools, about 6 minutes, resumable, never uses a faucet): `cd backend; npm run gate:devnet -- --plan` (read-only), `-- --fund --fund-only` (top up from the deployer), then no flag; delete `backend/.devnet/gate-state.json` to run a fresh round. See `docs/runbook.md`
+- Upgrade the devnet program (public RPC is rate limited; the CLI cannot resume a half-written buffer): `scripts/program-deploy-devnet.sh`; if it fails, `npx tsx backend/scripts/fill-buffer.ts <BUFFER> backend/.devnet/vowed.so` (copy the binary with `scripts/wsl-copy-so.sh`) then `scripts/program-finish-upgrade.sh <BUFFER>`
+- WSL gotchas: put WSL commands in script files (PowerShell expands `$HOME` in double quotes); run long jobs as tool background tasks with a log file, not as WSL-detached processes
 - Regenerate API docs: `cd backend; npm run openapi` (a test fails if `docs/openapi.json` is stale)
 - Android build: `cd android; .\gradlew.bat assembleDebug` (needs `JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot`; SDK at `C:\Users\hp\Android\Sdk`; `sdk.dir` in `android/local.properties` must use forward slashes)
 - Emulator + install: `scripts/emulator.ps1` (AVD `vowed_api36`; Mock MWA Wallet built at `C:\Users\hp\Android\tools\mock-mwa-wallet`; a test PIN is set on the emulator, needed to AUTHENTICATE the wallet)
