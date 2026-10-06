@@ -7,5 +7,5 @@ WORK="$HOME/vowed-program"
 mkdir -p "$WORK"
 rsync -a --delete --exclude target --exclude .anchor "$SRC"/ "$WORK"/
 cd "$WORK"
-anchor build
-cargo test
+[ -f "$HOME/.config/solana/id.json" ] || solana-keygen new --no-bip39-passphrase --silent -o "$HOME/.config/solana/id.json"  # throwaway local test key, lives outside the repo
+anchor test --validator legacy
