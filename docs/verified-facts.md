@@ -27,6 +27,7 @@ Never hardcode these from memory; re-check before mainnet.
 - Staking program id (informational, we do not integrate it): `SKRskrmtL83pcL4YqLWt6iPefDqwXQWHSw9S9vz94BZ` (same source).
 - Decimals **6**, token program **classic SPL Token** (`TokenkegQ...`), no freeze authority.
   Source: on-chain read via Solana mainnet RPC `getAccountInfo` on the mint, 2026-10-06.
+- Prize rule (see item 12): staking does not qualify; we use SKR for rewards and perks.
 - OPEN: no official SKR devnet mint exists that we know of. Plan: create our own devnet test mint labeled
   "SKR (test)" with 6 decimals. Mainnet SKR is never touched without approval.
 - OPEN: "community SKR integration thread" from the announcement not located; check solanamobile.com/skr and Discord.
@@ -87,8 +88,11 @@ Never hardcode these from memory; re-check before mainnet.
 - OPEN: RPC provider (public devnet RPC works for dev; pick Helius/other free tier) and DB host (SQLite for dev).
   Confirm limits in Phase 2.
 
-## 12. Hackathon portal: OPEN
-- https://solanamobile.com/hackathon redirects to https://docs.solanamobile.com/hackathon, then to https://solanamobile.radiant.nexus/
-  ("Clock In"). The page content did not expose form fields, deadline, APK file-vs-link or video limits to our fetcher.
-- **User action:** open the portal in a browser, confirm the current deadline (SPEC says original close 2026-10-08),
-  and tell us the form fields, APK link vs upload, and video limits.
+## 12. Hackathon portal: VERIFIED (supplied by the user from https://solanamobile.radiant.nexus, 2026-10-06; our fetcher could not read it)
+- Submissions close **Oct 12, 2026, 12:59 PM GMT+1**. Judging opens Oct 13; results Nov 10; winners must publish on the dApp Store within 30 days.
+- Demo video: **3 minutes**, must show the app on a **real device** (not only a simulator).
+- Repo: may be private; install the Radiants Align GitHub app, share the repo, register through Align. Must be cloneable and runnable by someone else.
+- Judges review GitHub commits up to the deadline.
+- **SKR prize: SKR staking integrations do NOT qualify.** Design changed: USDC main token; SKR = weekly rewards for top streaks + SKR-paid perks (e.g. streak freezes); SKR deposits optional. ORE prize out of scope.
+- Scoring: 25% each stickiness/PMF, UX, innovation, presentation/demo.
+- OPEN: APK link vs upload field on the form (the SPEC assumes link).

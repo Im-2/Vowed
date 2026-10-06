@@ -21,10 +21,12 @@ Version 1.0. Source of truth for the build. If something here conflicts with you
 ### 1.1 Hackathon context (verified from official sources)
 
 - Event: CLOCK IN, the Solana Mobile hackathon, run with RadiantsDAO. Source: https://solanamobile.com/blog/clock-in-the-solana-mobile-hackathon
-- Original submission close: October 8, 2026. The user reports the deadline has been extended; **confirm the current date in the submission portal** (https://solanamobile.com/hackathon).
-- Submit: (1) a functional Android APK (the form asks for a link), (2) a GitHub repo with source, (3) a demo video showing the app in use, (4) a pitch deck or short presentation.
+- **Submissions close Oct 12, 2026 at 12:59 PM GMT+1.** Judging opens Oct 13; results Nov 10; winners must publish on the dApp Store within 30 days. (Source: official portal https://solanamobile.radiant.nexus, supplied by the user.)
+- Submit: (1) a functional Android APK (the form asks for a link), (2) a GitHub repo with source (may be **private**: install the Radiants Align GitHub app, share the repo, and register through Align; the repo must be cloneable and runnable by someone else), (3) a **3-minute** demo video that must show the app running on a **real device**, not only a simulator, (4) a pitch deck or short presentation.
+- Judges review GitHub commits up to the deadline: commit small and often.
 - Prizes: $125k USDC across 10 teams (1st $30k ... 6th-10th $5k each), plus a separate optional $10k SKR integration prize. Winners must publish on the Solana dApp Store to claim.
-- Judging criteria: (a) Stickiness and product-market fit, (b) User experience, (c) Innovation, (d) Presentation and demo.
+- **SKR prize rule (official): SKR staking integrations do NOT qualify.** Our SKR integration is weekly SKR rewards for top streaks plus SKR-paid perks (for example streak freezes). USDC is the main deposit token; SKR deposits are optional and are not pitched as the SKR integration. The ORE prize is out of scope.
+- Judging criteria, 25% each: (a) Stickiness and product-market fit, (b) User experience, (c) Innovation, (d) Presentation and demo.
 - A Seeker device is not required. Any Android device or emulator works. Seeker behaves like a normal Android phone.
 - **Organizer requirements (from the official Event Info panel):** Android only, and the app must produce a functional APK; it **must integrate the Solana Mobile Stack and Mobile Wallet Adapter**; it must be designed for mobile from the ground up (direct ports and PWA wrappers score poorly); and it should interact meaningfully with the Solana network. Section 3.3 maps each of these to this design.
 
@@ -46,7 +48,7 @@ Version 1.0. Source of truth for the build. If something here conflicts with you
 | User experience | F2 plain-language goals, F3 one-tap proofs, widget, haptics, practice mode |
 | Innovation | F2 + F3 universal proof engine, F6 yield-backed stakes, F9 proof plug-ins |
 | Presentation / demo | Clear loop (type goal, stake, prove, get paid), F8 letter moment, demo mode |
-| SKR prize | F1 and F5 support SKR staking and SKR rewards (section 9.6) |
+| SKR prize | Weekly SKR rewards for top streaks and SKR-paid perks such as streak freezes (section 9.6); not SKR staking |
 
 ---
 
@@ -56,7 +58,7 @@ Each feature has acceptance criteria (AC). A feature is done only when all its A
 
 ### F1. Stake on a goal
 - Connect a wallet via Mobile Wallet Adapter (MWA). No keys inside the app.
-- Create or join a challenge by staking USDC or SKR (devnet test tokens on devnet).
+- Create or join a challenge by staking **USDC** (main token; devnet test tokens on devnet). SKR deposits are optional and secondary.
 - Three stake modes: **Practice** (no money, same flow), **Soft** (capped penalty), **Hard** (full forfeit on failure).
 - AC: stake is held in a program-owned vault; user can see the stake, the pool and the rules before signing; the signed transaction matches what the UI showed.
 
@@ -133,7 +135,7 @@ Solana program (Anchor, Rust)
 | Requirement | How Vowed meets it |
 |---|---|
 | Android only, functional APK | Native Kotlin + Jetpack Compose app; signed release APK (Phase 9). |
-| Integrate the Solana Mobile Stack (SMS) | Use SMS components, not just a generic wallet: **Mobile Wallet Adapter** for connect, sign-in and transaction signing (works with Seed Vault Wallet on Seeker); **Seed Vault** signing for high-assurance proofs (7.3); **SKR** staking and rewards (9.6); **Solana dApp Store** publishing readiness (13.2). Check docs.solanamobile.com for any other SMS pieces worth using (for example Seeker ID) and record them in `docs/verified-facts.md`. In the README, list exactly which SMS components are used and where. |
+| Integrate the Solana Mobile Stack (SMS) | Use SMS components, not just a generic wallet: **Mobile Wallet Adapter** for connect, sign-in and transaction signing (works with Seed Vault Wallet on Seeker); **Seed Vault** signing for high-assurance proofs (7.3); **SKR** weekly rewards and perks (9.6); **Solana dApp Store** publishing readiness (13.2). Check docs.solanamobile.com for any other SMS pieces worth using (for example Seeker ID) and record them in `docs/verified-facts.md`. In the README, list exactly which SMS components are used and where. |
 | Mobile Wallet Adapter | MWA is the only signing path for user funds (F1). Test with the Mock MWA Wallet and on a real device with a real MWA wallet. |
 | Designed for mobile from the ground up (no ports, no PWA/web wrappers) | No WebView-based UI and no web app wrapped in an APK. Phone-native features are central: camera pose, usage stats, step sensor, geofence, Keystore, widget, push, haptics. |
 | Interact meaningfully with the Solana network | Real onchain program: stake custody in vaults, per-day check-ins recorded onchain, settlement and payouts, SKR token use. Show transaction signatures and an explorer link in the app. |
@@ -392,8 +394,10 @@ Stake caps scale with the weakest trust tier in the plan (for example Low caps v
 - If real yield cannot be done safely, show an **illustrative** yield estimate labeled "simulated" and do not credit anyone with simulated yield. Never present it as earned.
 
 ### 9.6 SKR integration (for the $10k SKR prize)
-- Support SKR as a staking token and as the weekly reward token for top streakers.
-- Verify the SKR mint address, decimals and token program from official Solana Mobile docs before use; do not hardcode from memory.
+- **SKR staking integrations do not qualify for the prize** (official rule). USDC is the main deposit token. Optional SKR deposits exist but are not the pitched SKR integration.
+- The SKR integration is: (1) **weekly SKR rewards for top streaks**, paid from a rewards vault, and (2) **SKR-paid perks**, for example streak freezes bought with SKR.
+- Verified: mint `SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3`, 6 decimals, classic SPL Token (see `docs/verified-facts.md`). Re-verify before mainnet; use a devnet test mint on devnet.
+- Rewards and perks need design in Phase 8 (funding source, anti-abuse, who signs). Do not credit simulated SKR as real.
 - Document in the README and pitch exactly what SKR does in the app.
 
 ### 9.7 Open proof plug-ins (F9)
@@ -443,7 +447,7 @@ Gate: two accounts complete a squad challenge flow with live feed updates and a 
 Gate: coach suggestions change with test histories; a letter is delivered on a simulated milestone and on a broken streak; the widget updates.
 
 **Phase 8: Yield, SKR, plug-in interface.** Per sections 9.5-9.7.
-Gate: soft mode works; yield is either real or clearly labeled simulated; SKR staking/reward works on devnet test token; a sample provider's attestation is accepted by the backend.
+Gate: soft mode works; yield is either real or clearly labeled simulated; SKR weekly reward and a SKR-paid perk work on a devnet test token; a sample provider's attestation is accepted by the backend.
 
 **Phase 9: Polish and release.** UX pass, animations, accessibility, security review against section 4.5 and 10, demo mode, real-device test on a borrowed Android phone, signed release APK, README, demo video, deck.
 Gate: section 13 checklist complete.
@@ -468,16 +472,16 @@ If scope has to be cut, cut in this order: F9 plug-ins first, then F6 real yield
 - [ ] Android only; functional APK produced.
 - [ ] Solana Mobile Stack and Mobile Wallet Adapter integrated (see 3.3); README lists the SMS components used.
 - [ ] Native mobile design, no WebView/PWA wrapper; app interacts meaningfully with the Solana network.
-- [ ] Registered at https://solanamobile.com/hackathon and **current deadline confirmed in the portal**.
+- [ ] Registered through Radiants Align (GitHub app installed, repo shared); deadline is **Oct 12, 2026 12:59 PM GMT+1**.
 - [ ] Functional Android APK, signed release build, hosted at a stable download link (for example a GitHub Release or cloud storage link). Test the link on a clean phone.
 - [ ] Public GitHub repo with source, README (what it is, how to run, architecture, trust model, SKR integration, AI usage and costs), license, and no secrets in history.
-- [ ] Demo video recorded on a real Android phone showing the full loop.
+- [ ] Demo video, **max 3 minutes**, recorded on a real Android phone showing the full loop (simulator-only is not acceptable).
 - [ ] Pitch deck or short presentation.
 - [ ] Confirm whether the form wants an uploaded file or a link and whether there are video length limits.
 
 ### 13.2 For winning and publishing
 - [ ] Review the dApp Store publishing guide (https://docs.solanamobile.com/dapp-store/submit-new-app) and keep the app ready to publish after results; winners must publish to claim prizes.
-- [ ] Optional sponsor prizes (for example the reported ORE prize): read the official rules before relying on them.
+- [ ] ORE prize is out of scope.
 
 ### 13.3 Demo script (about 90 seconds)
 1. Hook: "Everyone fails their goals. What if failing cost something, and winning paid?"
@@ -508,7 +512,7 @@ Record each answer with its source in `docs/verified-facts.md`.
 9. Kamino or other lending integration path for vault deposits; risks and whether a program CPI is feasible.
 10. dApp Store publishing requirements (signing, assets, publisher setup).
 11. Free-tier limits for the chosen RPC provider, database host and FCM.
-12. Hackathon portal: submission form fields, file vs link for the APK, video limits, final deadline.
+12. Hackathon portal: deadline, video and repo rules are now recorded (see 1.1). Still confirm the APK link-vs-upload field on the form.
 
 ---
 
