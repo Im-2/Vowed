@@ -23,6 +23,9 @@ export interface ConfigAccount {
   settle_grace_secs: bigint;
   allowed_mints: string[];
   allowed_mint_count: number;
+  demo_enabled: boolean;
+  demo_max_stake: bigint;
+  demo_mints: boolean[];
   bump: number;
 }
 
@@ -33,6 +36,8 @@ export interface PoolAccount {
   vault: string;
   kind: "Squad" | "Open";
   mode: "Soft" | "Hard";
+  is_demo: boolean;
+  day_secs: number;
   penalty_bps: number;
   fee_bps: number;
   start_ts: bigint;
@@ -81,6 +86,8 @@ export interface CreatePoolParams {
   goal_hash: Uint8Array;
   join_window_secs: bigint;
   max_participants: number;
+  /** 0 = normal 24h pool; 60..3600 = DEMO POOL with that many seconds per "day". */
+  demo_day_secs: number;
 }
 
 export interface InitConfigParams {
@@ -90,6 +97,9 @@ export interface InitConfigParams {
   max_stake: bigint;
   settle_grace_secs: bigint;
   allowed_mints: string[];
+  demo_enabled: boolean;
+  demo_max_stake: bigint;
+  demo_mints: string[];
 }
 
 export type AccountMap = Record<string, PublicKey | string>;
@@ -238,6 +248,9 @@ export class VowedProgram {
   }
   ixSetPaused(admin: PublicKey, paused: boolean): TransactionInstruction {
     return this.buildIx("set_paused", { paused }, { admin, config: this.configPda() });
+  }
+  ixSetDemoEnabled(admin: PublicKey, enabled: boolean): TransactionInstruction {
+    return this.buildIx("set_demo_enabled", { enabled }, { admin, config: this.configPda() });
   }
   ixUpdateOracle(admin: PublicKey, newOracle: PublicKey | string): TransactionInstruction {
     return this.buildIx("update_oracle", { new_oracle: new PublicKey(newOracle).toBase58() }, {

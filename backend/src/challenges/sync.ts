@@ -31,6 +31,9 @@ export interface ChallengeRow {
   status: string;
   plan_json: string | null;
   squad_id: string | null;
+  /** 1 for a DEMO POOL (minutes-long days, test money only). */
+  is_demo: number;
+  day_secs: number;
   updated_at: number;
 }
 
@@ -64,8 +67,8 @@ export async function syncPool(s: Services, pool: string): Promise<PoolAccount |
     .prepare(
       `INSERT INTO challenges (pool, creator, pool_id, mint, vault, kind, mode, penalty_bps, fee_bps, start_ts, end_ts, join_deadline_ts,
          settle_after_ts, duration_days, required_days, goal_hash, max_participants, participant_count, settled_count, pending_claims,
-         total_deposits, total_forfeit, total_success_stake, distributable, status, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         total_deposits, total_forfeit, total_success_stake, distributable, status, is_demo, day_secs, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(pool) DO UPDATE SET participant_count=excluded.participant_count, settled_count=excluded.settled_count,
          pending_claims=excluded.pending_claims, total_deposits=excluded.total_deposits, total_forfeit=excluded.total_forfeit,
          total_success_stake=excluded.total_success_stake, distributable=excluded.distributable, status=excluded.status,
@@ -76,7 +79,7 @@ export async function syncPool(s: Services, pool: string): Promise<PoolAccount |
       Number(p.start_ts), Number(p.end_ts), Number(p.join_deadline_ts), Number(p.settle_after_ts),
       p.duration_days, p.required_days, goalHash, p.max_participants, p.participant_count, p.settled_count,
       p.pending_claims, p.total_deposits.toString(), p.total_forfeit.toString(), p.total_success_stake.toString(),
-      p.distributable.toString(), p.status, now,
+      p.distributable.toString(), p.status, p.is_demo ? 1 : 0, p.day_secs, now,
     );
   // attach the plan the creator uploaded when building the create transaction, if the hash matches
   s.db

@@ -1,7 +1,8 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { getChallenge, getParticipant, syncParticipation, syncPool } from "../challenges/sync.js";
 import { GoalPlanSchema, minTier, PROOF_TRUST, type ProofType, type TrustTier } from "../domain/plan.js";
-import { checkinWindowOk, currentStreak, dayIndex, windowBounds } from "../domain/time.js";
+import { dayIndexFor, windowFor, windowOkFor } from "../domain/schedule.js";
+import { currentStreak } from "../domain/time.js";
 import { ApiError, conflict, forbidden, notFound } from "../errors.js";
 import { submitCheckin, type CheckinOutcome } from "../oracle.js";
 import type { Services } from "../services.js";
@@ -22,6 +23,9 @@ export interface SessionInfo {
   /** What the plan asks for, so the app can show it. */
   target: { metric: string; value: number; unit: string; direction: "atLeast" | "atMost" };
   window: { opensAt: number; closesAt: number };
+  /** true for a DEMO POOL (short days); show the demo label in the UI. */
+  isDemo: boolean;
+  daySecs: number;
 }
 
 export interface SubmitResult {
@@ -57,7 +61,7 @@ export async function createSession(s: Services, wallet: string, pool: string, d
   if (p.status !== "Active") throw conflict("participation_inactive", `participation is ${p.status}`);
   if (day < 0 || day >= c.duration_days) throw new ApiError(400, "day_out_of_range", "day is outside this challenge");
   const now = s.now();
-  if (!checkinWindowOk(now, c.start_ts, p.tz_offset_minutes, day)) throw conflict("window_closed", "the check-in window for that day is not open");
+  if (!windowOkFor(c, p.tz_offset_minutes, day, now)) throw conflict("window_closed", "the check-in window for that day is not open");
   if (((BigInt(p.checkin_bitmap) >> BigInt(day)) & 1n) === 1n) throw conflict("already_recorded", "that day is already recorded");
   if (!plan.proofMethods.some((m) => m.type === type)) throw new ApiError(400, "proof_type_not_in_plan", "this proof type is not part of the goal's plan");
 
@@ -74,7 +78,7 @@ export async function createSession(s: Services, wallet: string, pool: string, d
   s.db
     .prepare("INSERT INTO proof_sessions (id, wallet, pool, day_index, proof_type, nonce, expires_at, status, created_at) VALUES (?,?,?,?,?,?,?, 'open', ?)")
     .run(sessionId, wallet, pool, day, type, nonce, expiresAt, s.wallNow());
-  return { sessionId, nonce, expiresAt, proofType: type, dayIndex: day, target: plan.target, window: windowBounds(c.start_ts, p.tz_offset_minutes, day) };
+  return { sessionId, nonce, expiresAt, proofType: type, dayIndex: day, target: plan.target, window: windowFor(c, p.tz_offset_minutes, day), isDemo: c.is_demo === 1, daySecs: c.day_secs };
 }
 
 
@@ -142,12 +146,13 @@ async function submitProofInner(s: Services, wallet: string, pkg: ProofPackage):
 
   // Time: evidence for this day, recent, not from the future.
   const now = s.now();
-  const { opensAt, closesAt } = windowBounds(c.start_ts, p.tz_offset_minutes, pkg.dayIndex);
+  const { opensAt, closesAt } = windowFor(c, p.tz_offset_minutes, pkg.dayIndex);
   if (pkg.endedAt < pkg.startedAt) return reject(s, session.id, pkg, wallet, "proof ends before it starts");
   if (pkg.endedAt > now + MAX_FUTURE_SKEW_SEC) return reject(s, session.id, pkg, wallet, "proof is timestamped in the future");
   if (now - pkg.endedAt > MAX_PROOF_AGE_SEC) return reject(s, session.id, pkg, wallet, "proof is too old");
   if (pkg.endedAt < opensAt || pkg.endedAt >= closesAt) return reject(s, session.id, pkg, wallet, "proof is outside the day's window");
-  if (pkg.startedAt < opensAt - 43_200) return reject(s, session.id, pkg, wallet, "proof starts too long before the day");
+  if (!windowOkFor(c, p.tz_offset_minutes, pkg.dayIndex, now)) return reject(s, session.id, pkg, wallet, "the check-in window for that day has closed");
+  if (pkg.startedAt < opensAt - Math.min(43_200, c.day_secs)) return reject(s, session.id, pkg, wallet, "proof starts too long before the day");
 
   const metric = evaluateProof(plan, pkg.proofType, pkg.metrics, pkg.startedAt, pkg.endedAt);
   if (!metric.ok) return reject(s, session.id, pkg, wallet, metric.reason);
@@ -164,7 +169,7 @@ async function submitProofInner(s: Services, wallet: string, pkg: ProofPackage):
   const checkin = await submitCheckin(s, session.pool, wallet, session.day_index);
   await syncParticipation(s, session.pool, wallet);
   const after = getParticipant(s, session.pool, wallet)!;
-  const today = dayIndex(now, c.start_ts, p.tz_offset_minutes);
+  const today = dayIndexFor(c, p.tz_offset_minutes, now);
   const result: SubmitResult = {
     accepted: true,
     trustTier,

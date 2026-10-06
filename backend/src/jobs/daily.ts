@@ -1,5 +1,5 @@
 import type { ChallengeRow, ParticipantRow } from "../challenges/sync.js";
-import { dayIndex, windowBounds } from "../domain/time.js";
+import { dayIndexFor, windowFor } from "../domain/schedule.js";
 import { pushToWallet } from "../push/service.js";
 import type { Services } from "../services.js";
 import { addFeed } from "../squads/feed.js";
@@ -17,7 +17,7 @@ export function recordMissedDays(s: Services): number {
     for (const p of parts) {
       const bitmap = BigInt(p.checkin_bitmap);
       for (let d = 0; d < c.duration_days; d++) {
-        const { closesAt } = windowBounds(c.start_ts, p.tz_offset_minutes, d);
+        const { closesAt } = windowFor(c, p.tz_offset_minutes, d);
         if (now < closesAt) break; // later days are still open
         if (((bitmap >> BigInt(d)) & 1n) === 1n) continue;
         const key = `missed:${c.pool}:${p.wallet}:${d}`;
@@ -38,12 +38,12 @@ export function recordMissedDays(s: Services): number {
  */
 export async function sendReminders(s: Services, hour = 18): Promise<number> {
   const now = s.now();
-  const challenges = s.db.prepare("SELECT * FROM challenges WHERE status = 'Open' AND start_ts <= ? AND end_ts > ?").all(now, now) as unknown as ChallengeRow[];
+  const challenges = s.db.prepare("SELECT * FROM challenges WHERE status = 'Open' AND is_demo = 0 AND start_ts <= ? AND end_ts > ?").all(now, now) as unknown as ChallengeRow[];
   let sent = 0;
   for (const c of challenges) {
     const parts = s.db.prepare("SELECT * FROM participants WHERE pool = ? AND status = 'Active'").all(c.pool) as unknown as ParticipantRow[];
     for (const p of parts) {
-      const d = dayIndex(now, c.start_ts, p.tz_offset_minutes);
+      const d = dayIndexFor(c, p.tz_offset_minutes, now);
       if (d < 0 || d >= c.duration_days) continue;
       const localHour = new Date((now + p.tz_offset_minutes * 60) * 1000).getUTCHours();
       if (localHour < hour) continue;

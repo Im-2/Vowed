@@ -17,6 +17,7 @@ export interface ChainWorld extends World {
   admin: Keypair;
   treasury: Keypair;
   mint: Keypair;
+  mintB: Keypair;
   program: VowedProgram;
 }
 
@@ -28,19 +29,21 @@ export interface Player {
   token: string;
 }
 
-export async function makeChainWorld(opts: { settleGraceSecs?: bigint; maxStake?: bigint; feeBps?: number } = {}): Promise<ChainWorld | null> {
+export async function makeChainWorld(opts: { settleGraceSecs?: bigint; maxStake?: bigint; feeBps?: number; demoEnabled?: boolean; demoMaxStake?: bigint } = {}): Promise<ChainWorld | null> {
   const lib = await loadLiteSvm();
   if (!lib) return null;
   const program = new VowedProgram();
   const admin = Keypair.generate();
   const treasury = Keypair.generate();
   const mint = Keypair.generate();
+  const mintB = Keypair.generate(); // allowed for normal pools but NOT for demo pools
   const chain = new LiteSvmChain(lib, program, undefined, admin.publicKey);
   const w = await makeWorld({ chain, attestation: fakeAttestation() });
   for (const k of [admin, w.oracle, w.crank, treasury]) chain.airdrop(k.publicKey, 20_000_000_000n);
   chain.setTime(BASE);
   const rent = await chain.minimumBalanceForRentExemption(82);
   await signAndSend(chain, ixsCreateMint(admin.publicKey, mint.publicKey, admin.publicKey, 6, rent), [admin, mint]);
+  await signAndSend(chain, ixsCreateMint(admin.publicKey, mintB.publicKey, admin.publicKey, 6, rent), [admin, mintB]);
   await signAndSend(
     chain,
     [
@@ -50,12 +53,15 @@ export async function makeChainWorld(opts: { settleGraceSecs?: bigint; maxStake?
         fee_bps: opts.feeBps ?? 0,
         max_stake: opts.maxStake ?? 100n * UNIT,
         settle_grace_secs: opts.settleGraceSecs ?? 7_200n,
-        allowed_mints: [mint.publicKey.toBase58()],
+        allowed_mints: [mint.publicKey.toBase58(), mintB.publicKey.toBase58()],
+        demo_enabled: opts.demoEnabled ?? true,
+        demo_max_stake: opts.demoMaxStake ?? 5n * UNIT,
+        demo_mints: [mint.publicKey.toBase58()],
       }),
     ],
     [admin],
   );
-  return { ...w, chain, admin, treasury, mint, program };
+  return { ...w, chain, admin, treasury, mint, mintB, program };
 }
 
 /** A funded wallet with a token balance, a registered (attested) device, and a signed-in session. */

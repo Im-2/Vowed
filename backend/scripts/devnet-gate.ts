@@ -6,12 +6,11 @@
  *   npm run gate:devnet -- --fund --fund-only   # only top up the test wallets from the deployer key (never from a faucet), then stop
  *   npm run gate:devnet -- --fund    # top up, then continue with the whole gate
  *
- * Why it runs in two stages: the program's days are real 24-hour days and settlement opens end_ts + 2h, so a pool created now
- * can only be settled about 26 hours later. Stage A (create, join, prove, check-in on chain) runs immediately; stage B (crank
- * settles, winner claims, treasury sweep, balance checks) runs when the script is invoked again after that time. State is kept
- * in backend/.devnet/gate-state.json and every step is idempotent.
+ * The gate uses DEMO pools (60-second "days"; normal pools keep real 24-hour days), so the whole loop takes about six minutes:
+ * stage A (create, join, prove, check-in on chain) and then stage B (crank settles, winner claims, treasury sweep, balance checks).
+ * Stage B starts automatically; if the run is interrupted, run the script again and it resumes. State: backend/.devnet/gate-state.json.
  *
- * Exit codes: 0 = finished and verified, 2 = needs devnet SOL (nothing sent), 3 = stage A done, waiting for settlement time.
+ * Exit codes: 0 = finished and verified, 2 = needs devnet SOL (nothing sent), 3 = settlement time is more than 15 minutes away (run again later).
  */
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, randomBytes, sign as cryptoSign, type KeyObject } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -148,15 +147,22 @@ async function main() {
       fee_bps: 0,
       max_stake: 100n * UNIT,
       settle_grace_secs: 7_200n,
+      // Circle's devnet USDC stays a normal-pool token only; demo pools may use only our own test mints.
       allowed_mints: [DEVNET_USDC, usdcT.publicKey.toBase58(), skrT.publicKey.toBase58()],
+      demo_enabled: true,
+      demo_max_stake: 20n * UNIT,
+      demo_mints: [usdcT.publicKey.toBase58(), skrT.publicKey.toBase58()],
     };
-    log(`\ninit_config (irreversible for this program id): oracle ${params.oracle}, treasury ${params.treasury}, fee 0, max stake 100 tokens, settle grace 2h, mints [devnet USDC, USDC (test), SKR (test)]`);
+    log(
+      `\ninit_config (irreversible for this program id): oracle ${params.oracle}, treasury ${params.treasury}, fee 0, max stake 100 tokens, settle grace 2h, ` +
+        `mints [devnet USDC, USDC (test), SKR (test)]; DEMO POOLS enabled for the two test mints only, demo stake cap 20 tokens`,
+    );
     const r = await signAndSend(chain, [program.ixInitConfig(deployer.publicKey, params)], [deployer]);
     log(`config initialised: ${explorer(r.signature)}`);
   } else {
     const cfg = program.decodeConfig((await chain.getAccount(program.configPda().toBase58()))!.data);
     if (cfg.oracle !== oracle.publicKey.toBase58()) throw new Error("onchain config has a different oracle than the key in .devnet/oracle.json");
-    log("config already initialised on devnet");
+    log(`config already initialised on devnet (demo pools ${cfg.demo_enabled ? "enabled" : "disabled"})`);
   }
 
   // ---- 3. the backend, in-process, against devnet
@@ -203,27 +209,38 @@ async function main() {
   await registerDevice(bob, bobAuth, devices.bob);
 
   const statePath = `${DIR}gate-state.json`;
-  type State = { poolA: string; poolB: string; startTs: number; settleAfter: number; before: { alice: string; bob: string }; stage: "A" | "done"; squad?: string };
+  type State = {
+    poolA: string; poolB: string; startTs: number; settleAfter: number; createdAt: number;
+    before: { alice: string; bob: string; treasury: string }; stage: "A" | "done"; squad?: string;
+  };
   const state: State | null = existsSync(statePath) ? (JSON.parse(readFileSync(statePath, "utf8")) as State) : null;
   const bal = async (k: PublicKey) => {
     const a = await chain.getAccount(ataAddress(k, usdcT.publicKey).toBase58());
     return a ? tokenAmount(a.data) : 0n;
   };
+  const sleep = (sec: number) => new Promise((r) => setTimeout(r, sec * 1000));
+  const waitUntil = async (ts: number, what: string) => {
+    const wait = ts - chain.nowSec();
+    if (wait > 0) {
+      log(`waiting ${wait}s for ${what}...`);
+      await sleep(wait);
+    }
+  };
 
   if (!state) return stageA();
   if (state.stage === "done") {
-    log("\nGate already completed. Delete backend/.devnet/gate-state.json to run a fresh pool.");
+    log("\nGate already completed. Delete backend/.devnet/gate-state.json to run a fresh round.");
     return;
   }
   return stageB(state);
 
   // ------------------------------------------------------------------ stage A
   async function stageA() {
-    log("\n== Stage A: create pools, join, prove, record check-ins on devnet ==");
+    log("\n== Stage A: two DEMO pools (60-second days): create, join, prove, record check-ins on devnet ==");
     const plan: GoalPlan = {
-      title: "20 squats for one day",
+      title: "20 squats on each of two demo days",
       category: "fitness",
-      cadence: { periodDays: 1, totalDays: 1, requiredDays: 1 },
+      cadence: { periodDays: 1, totalDays: 2, requiredDays: 2 },
       target: { metric: "squats", value: 20, unit: "reps", direction: "atLeast" },
       proofMethods: [{ type: "CAMERA_POSE", params: {}, trustTier: "high" }],
       window: null,
@@ -233,13 +250,14 @@ async function main() {
       suggestedAlternative: null,
       clarifyingQuestions: [],
     };
-    const before = { alice: (await bal(alice.publicKey)).toString(), bob: (await bal(bob.publicKey)).toString() };
-    const startTs = chain.nowSec() + 240;
+    const before = { alice: (await bal(alice.publicKey)).toString(), bob: (await bal(bob.publicKey)).toString(), treasury: (await bal(treasury.publicKey)).toString() };
+    const createdAt = chain.nowSec();
+    const startTs = createdAt + 150;
     const mint = usdcT.publicKey.toBase58();
     const create = async (kp: Keypair, auth: { headers: Record<string, string> }) => {
-      const r = await api("POST", "/v1/challenges/tx/create", auth, { mint, kind: "Squad", mode: "Hard", startTs, plan, maxParticipants: 10 });
+      const r = await api("POST", "/v1/challenges/tx/create", auth, { mint, kind: "Squad", mode: "Hard", startTs, plan, maxParticipants: 10, demo: { daySecs: 60 } });
       const sig = await sendTx(kp, r.transaction, auth);
-      log(`pool ${r.pool} created: ${explorer(sig)}`);
+      log(`DEMO pool ${r.pool} created (${r.summary.label}): ${explorer(sig)}`);
       return r.pool as string;
     };
     const join = async (kp: Keypair, auth: { headers: Record<string, string> }, d: { id: string }, pool: string, stake: bigint) => {
@@ -255,42 +273,44 @@ async function main() {
     // pool B: bob alone, never proves, so everything is forfeited and swept to the treasury later
     const poolB = await create(bob, bobAuth);
     await join(bob, bobAuth, devices.bob, poolB, 5n * UNIT);
+    if (chain.nowSec() >= startTs + 55) throw new Error("setup took too long: the join window (one demo day) has passed; re-run");
 
-    const wait = startTs + 20 - chain.nowSec();
-    if (wait > 0) {
-      log(`waiting ${wait}s for the pools to start...`);
-      await new Promise((r) => setTimeout(r, wait * 1000));
-    }
-    // alice proves day 0 (device-signed package; the backend verifies, the oracle records it on chain)
-    const sess = await api("POST", "/v1/proofs/session", aliceAuth, { pool: poolA, dayIndex: 0, proofType: "CAMERA_POSE" });
-    const now = chain.nowSec();
-    const pkg = {
-      sessionId: sess.sessionId, nonce: sess.nonce, challengeId: poolA, dayIndex: 0, proofType: "CAMERA_POSE" as const,
-      metrics: { reps: 24, livenessPassed: true }, startedAt: now - 60, endedAt: now - 5,
-      evidenceHash: createHash("sha256").update(`gate-evidence-${poolA}`).digest("hex"), deviceKeyId: devices.alice.id,
+    // alice proves each demo day inside its window (day 0: start..start+75, day 1: start+60..start+135); bob never proves in pool A
+    const proveDay = async (day: number) => {
+      const sess = await api("POST", "/v1/proofs/session", aliceAuth, { pool: poolA, dayIndex: day, proofType: "CAMERA_POSE" });
+      const now = chain.nowSec();
+      const pkg = {
+        sessionId: sess.sessionId, nonce: sess.nonce, challengeId: poolA, dayIndex: day, proofType: "CAMERA_POSE" as const,
+        metrics: { reps: 24, livenessPassed: true }, startedAt: now - 20, endedAt: now - 2,
+        evidenceHash: createHash("sha256").update(`gate-evidence-${poolA}-${day}`).digest("hex"), deviceKeyId: devices.alice.id,
+      };
+      const signature = cryptoSign("sha256", canonicalPackageBytes(pkg), { key: devices.alice.priv, dsaEncoding: "der" }).toString("base64");
+      const sub = await api("POST", "/v1/proofs/submit", aliceAuth, { ...pkg, signature });
+      log(`alice's day-${day} proof accepted (trust tier ${sub.trustTier}); check-in ${sub.checkin.status}${sub.checkin.signature ? `: ${explorer(sub.checkin.signature)}` : ""}`);
+      if (sub.checkin.status !== "confirmed" || sub.daysCompleted !== day + 1) throw new Error(`day-${day} check-in was not recorded on chain`);
     };
-    const signature = cryptoSign("sha256", canonicalPackageBytes(pkg), { key: devices.alice.priv, dsaEncoding: "der" }).toString("base64");
-    const sub = await api("POST", "/v1/proofs/submit", aliceAuth, { ...pkg, signature });
-    log(`alice's proof accepted (trust tier ${sub.trustTier}); check-in ${sub.checkin.status}${sub.checkin.signature ? `: ${explorer(sub.checkin.signature)}` : ""}`);
-    if (sub.checkin.status !== "confirmed" || sub.daysCompleted !== 1) throw new Error("check-in was not recorded on chain");
+    await waitUntil(startTs + 6, "demo day 0 to open");
+    await proveDay(0);
+    await waitUntil(startTs + 66, "demo day 1 to open");
+    await proveDay(1);
 
     const chA = (await api("GET", `/v1/challenges/${poolA}`, aliceAuth)).challenge;
-    const next: State = { poolA, poolB, startTs, settleAfter: chA.settleAfterTs, before, stage: "A", squad: squad.id };
+    if (!chA.isDemo || chA.daySecs !== 60) throw new Error("pool A is not labelled as a demo pool");
+    const next: State = { poolA, poolB, startTs, settleAfter: chA.settleAfterTs, createdAt, before, stage: "A", squad: squad.id };
     writeFileSync(statePath, JSON.stringify(next, null, 2));
-    const when = new Date(chA.settleAfterTs * 1000).toISOString();
-    log(`\nStage A complete. Settlement opens at ${when}. Run \`npm run gate:devnet\` again after that to settle, claim, sweep and verify.`);
-    process.exit(3);
+    log(`\nStage A complete (${chA.demoLabel}). Settlement opens at ${new Date(chA.settleAfterTs * 1000).toISOString()}, about ${Math.max(0, chA.settleAfterTs - chain.nowSec())}s from now.`);
+    return stageB(next);
   }
 
   // ------------------------------------------------------------------ stage B
   async function stageB(st: State) {
     log("\n== Stage B: settle, claim, sweep, verify ==");
-    const now = chain.nowSec();
-    if (now < st.settleAfter) {
-      const mins = Math.ceil((st.settleAfter - now) / 60);
-      log(`Not yet: settlement opens at ${new Date(st.settleAfter * 1000).toISOString()} (in about ${mins} minutes, ${(mins / 60).toFixed(1)} h).`);
+    const remaining = st.settleAfter + 8 - chain.nowSec();
+    if (remaining > 900) {
+      log(`Not yet: settlement opens at ${new Date(st.settleAfter * 1000).toISOString()} (in about ${Math.ceil(remaining / 60)} minutes). Run again then.`);
       process.exit(3);
     }
+    await waitUntil(st.settleAfter + 8, "the settlement time (demo pools settle one demo day after they end)");
     await pollOnce(s);
     const rep = await runCrank(s);
     log(`crank: settled ${rep.settled}, swept ${rep.swept}${rep.errors.length ? `, errors: ${rep.errors.join("; ")}` : ""}`);
@@ -307,11 +327,11 @@ async function main() {
     // verify balances against what we recorded before the pools were created
     const a = await bal(alice.publicKey);
     const b = await bal(bob.publicKey);
-    const t = await chain.getAccount(ataAddress(treasury.publicKey, usdcT.publicKey).toBase58());
-    const treasuryBal = t ? tokenAmount(t.data) : 0n;
+    const treasuryNow = await bal(treasury.publicKey);
     const expectAlice = BigInt(st.before.alice) - 10n * UNIT + 20n * UNIT;
     const expectBob = BigInt(st.before.bob) - 10n * UNIT - 5n * UNIT;
-    const checks: [string, bigint, bigint][] = [["alice", a, expectAlice], ["bob", b, expectBob], ["treasury", treasuryBal, 5n * UNIT]];
+    const expectTreasury = BigInt(st.before.treasury) + 5n * UNIT;
+    const checks: [string, bigint, bigint][] = [["alice", a, expectAlice], ["bob", b, expectBob], ["treasury", treasuryNow, expectTreasury]];
     for (const [name, got, want] of checks) log(`  ${name}: ${Number(got) / 1e6} (expected ${Number(want) / 1e6}) ${got === want ? "OK" : "MISMATCH"}`);
     for (const pool of [st.poolA, st.poolB]) {
       const v = await chain.getAccount(program.vaultPda(pool).toBase58());
@@ -319,7 +339,7 @@ async function main() {
     }
     if (checks.some(([, g, w]) => g !== w)) throw new Error("balances do not match expectations");
     writeFileSync(statePath, JSON.stringify({ ...st, stage: "done" }, null, 2));
-    log("\nGATE PASSED on devnet: create, join, prove, oracle check-in, settle, claim and treasury sweep all verified.");
+    log(`\nGATE PASSED on devnet in ${chain.nowSec() - st.createdAt}s: create, join, prove, oracle check-ins, settle, claim and treasury sweep all verified (DEMO pools, 60-second days).`);
   }
 }
 

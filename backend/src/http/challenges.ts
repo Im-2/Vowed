@@ -6,6 +6,7 @@ import { z } from "zod";
 import { buildTransaction } from "../chain/tx.js";
 import { getChallenge, getParticipant, syncParticipation, syncPool, type ChallengeRow, type ParticipantRow } from "../challenges/sync.js";
 import { claimable } from "../domain/payout.js";
+import { DEMO_MAX_DAY_SECS, DEMO_MAX_PARTICIPANTS, DEMO_MIN_DAY_SECS, demoLabel } from "../domain/schedule.js";
 import { canonicalJson, GoalPlanSchema, maxStakeForPlan, planHash, planTrustTier, type GoalPlan } from "../domain/plan.js";
 import { ApiError, badRequest, conflict, forbidden, notFound } from "../errors.js";
 import { processLogs } from "../indexer.js";
@@ -71,6 +72,10 @@ export function challengeView(c: ChallengeRow) {
     distributable: c.distributable,
     status: c.status,
     squadId: c.squad_id,
+    /** true for a DEMO POOL (minutes-long days, test money only). Clients must show demoLabel prominently. */
+    isDemo: c.is_demo === 1,
+    daySecs: c.day_secs,
+    demoLabel: c.is_demo === 1 ? demoLabel(c.day_secs) : null,
     trustTier: plan ? planTrustTier(plan) : null,
     plan,
   };
@@ -102,6 +107,9 @@ const challengeSchema = z.object({
   distributable: z.string(),
   status: z.string(),
   squadId: z.string().nullable(),
+  isDemo: z.boolean(),
+  daySecs: z.number(),
+  demoLabel: z.string().nullable(),
   trustTier: z.enum(["high", "medium", "low"]).nullable(),
   plan: z.any().nullable(),
 });
@@ -140,6 +148,9 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
                 maxStake: z.string(),
                 settleGraceSecs: z.string(),
                 allowedMints: z.array(z.string()),
+                demoEnabled: z.boolean(),
+                demoMaxStake: z.string(),
+                demoMints: z.array(z.string()),
               })
               .nullable(),
           }),
@@ -162,6 +173,9 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           maxStake: cfg.max_stake.toString(),
           settleGraceSecs: cfg.settle_grace_secs.toString(),
           allowedMints: cfg.allowed_mints.slice(0, cfg.allowed_mint_count),
+          demoEnabled: cfg.demo_enabled,
+          demoMaxStake: cfg.demo_max_stake.toString(),
+          demoMints: cfg.allowed_mints.slice(0, cfg.allowed_mint_count).filter((_, i) => cfg.demo_mints[i]),
         },
       };
     },
@@ -253,8 +267,15 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           /** Soft mode only: 1-5000. Hard is always 10000. */
           penaltyBps: z.number().int().min(1).max(10_000).optional(),
           startTs: z.number().int().positive(),
-          joinWindowSecs: z.number().int().min(0).max(86_400).default(3_600),
-          maxParticipants: z.number().int().min(1).max(1_000).default(50),
+          /** Default: one hour for normal pools, one demo day for demo pools. */
+          joinWindowSecs: z.number().int().min(0).max(86_400).optional(),
+          /** Default: 50 (demo pools: 10, and never more than 20). */
+          maxParticipants: z.number().int().min(1).max(1_000).optional(),
+          /**
+           * Makes this a DEMO POOL: each "day" lasts daySecs seconds (60-3600) instead of 24 hours. Test money only; allowed only for
+           * tokens and while the program config has demo pools enabled, with a lower stake cap. Normal pools omit this.
+           */
+          demo: z.object({ daySecs: z.number().int().min(DEMO_MIN_DAY_SECS).max(DEMO_MAX_DAY_SECS) }).optional(),
           plan: GoalPlanSchema,
           poolId: u64.optional(),
         }),
@@ -273,7 +294,19 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         if (!cfg.allowed_mints.slice(0, cfg.allowed_mint_count).includes(b.mint)) throw badRequest("mint_not_allowed", "that token is not enabled");
         const penaltyBps = b.mode === "Hard" ? 10_000 : b.penaltyBps;
         if (b.mode === "Soft" && (penaltyBps === undefined || penaltyBps > 5_000)) throw badRequest("bad_penalty", "soft mode needs penaltyBps between 1 and 5000");
-        if (b.startTs < s.now() + 120) throw badRequest("start_too_soon", "start time must be at least two minutes ahead so there is time to sign");
+        const minLead = b.demo ? 45 : 120;
+        if (b.startTs < s.now() + minLead) throw badRequest("start_too_soon", `start time must be at least ${minLead} seconds ahead so there is time to sign`);
+        const joinWindowSecs = b.joinWindowSecs ?? (b.demo ? b.demo.daySecs : 3_600);
+        const maxParticipants = b.maxParticipants ?? (b.demo ? 10 : 50);
+        if (b.demo) {
+          // The program enforces all of this too; checking here gives clear errors before anyone signs.
+          if (!cfg.demo_enabled) throw conflict("demo_not_enabled", "demo pools are switched off on this deployment");
+          const idx = cfg.allowed_mints.slice(0, cfg.allowed_mint_count).indexOf(b.mint);
+          if (!cfg.demo_mints[idx]) throw badRequest("demo_mint_not_allowed", "that token cannot be used for demo pools");
+          if (maxParticipants > DEMO_MAX_PARTICIPANTS) throw badRequest("demo_too_many_participants", `demo pools allow at most ${DEMO_MAX_PARTICIPANTS} participants`);
+          if (joinWindowSecs > b.demo.daySecs) throw badRequest("demo_join_window", "a demo pool's join window cannot exceed one demo day");
+          if (b.startTs > s.now() + 86_400) throw badRequest("demo_start_too_far", "a demo pool must start within 24 hours");
+        }
 
         const poolId = b.poolId ? BigInt(b.poolId) : BigInt(`0x${randomBytes(8).toString("hex")}`);
         const goalHash = planHash(plan);
@@ -287,8 +320,9 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           duration_days: plan.cadence.totalDays,
           required_days: plan.cadence.requiredDays,
           goal_hash: Buffer.from(goalHash, "hex"),
-          join_window_secs: BigInt(b.joinWindowSecs),
-          max_participants: b.maxParticipants,
+          join_window_secs: BigInt(joinWindowSecs),
+          max_participants: maxParticipants,
+          demo_day_secs: b.demo?.daySecs ?? 0,
         });
         s.db.prepare("INSERT OR IGNORE INTO plans (goal_hash, creator, plan_json, created_at) VALUES (?,?,?,?)").run(goalHash, wallet, canonicalJson(plan), s.wallNow());
         const tx = await buildTransaction(s.chain, creator, [ix]);
@@ -311,7 +345,10 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
             requiredDays: plan.cadence.requiredDays,
             goalHash,
             trustTier: planTrustTier(plan),
-            maxStake: maxStakeForPlan(plan, cfg.max_stake).toString(),
+            maxStake: (b.demo && cfg.demo_max_stake < maxStakeForPlan(plan, cfg.max_stake) ? cfg.demo_max_stake : maxStakeForPlan(plan, cfg.max_stake)).toString(),
+            isDemo: !!b.demo,
+            daySecs: b.demo?.daySecs ?? 86_400,
+            ...(b.demo ? { label: demoLabel(b.demo.daySecs) } : {}),
           },
         };
       });
@@ -356,7 +393,8 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         const cfg = await getProgramConfig(s);
         if (cfg.paused) throw conflict("paused", "the program is paused");
         const stake = BigInt(b.stake);
-        const cap = maxStakeForPlan(plan, cfg.max_stake);
+        let cap = maxStakeForPlan(plan, cfg.max_stake);
+        if (c.is_demo === 1 && cfg.demo_max_stake < cap) cap = cfg.demo_max_stake; // demo pools have their own, lower cap
         if (stake <= 0n) throw badRequest("stake_zero", "stake must be greater than zero");
         if (stake > cap) throw badRequest("stake_over_cap", `stake is capped at ${cap} for a ${planTrustTier(plan)}-trust goal`, { cap: cap.toString() });
 
@@ -376,7 +414,7 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           blockhash: tx.recentBlockhash!,
           lastValidBlockHeight: tx.lastValidBlockHeight!,
           pool: c.pool,
-          summary: { action: "join_pool", pool: c.pool, vault: c.vault, mint: c.mint, stake: b.stake, tzOffsetMinutes: b.tzOffsetMinutes, deviceId: b.deviceId, mode: c.mode, penaltyBps: c.penalty_bps },
+          summary: { action: "join_pool", pool: c.pool, vault: c.vault, mint: c.mint, stake: b.stake, tzOffsetMinutes: b.tzOffsetMinutes, deviceId: b.deviceId, mode: c.mode, penaltyBps: c.penalty_bps, isDemo: c.is_demo === 1, daySecs: c.day_secs, ...(c.is_demo === 1 ? { label: demoLabel(c.day_secs) } : {}) },
         };
       });
     },

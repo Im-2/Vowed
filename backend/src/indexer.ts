@@ -1,6 +1,7 @@
 import { getChallenge, getParticipant, syncAllParticipants, syncParticipation, syncPool } from "./challenges/sync.js";
 import { kvGet, kvSet } from "./db.js";
-import { currentStreak, dayIndex } from "./domain/time.js";
+import { dayIndexFor } from "./domain/schedule.js";
+import { currentStreak } from "./domain/time.js";
 import type { Services } from "./services.js";
 import { addFeed } from "./squads/feed.js";
 
@@ -39,7 +40,7 @@ async function handle(s: Services, ev: Ev): Promise<void> {
       const c = getChallenge(s, pool!);
       const p = getParticipant(s, pool!, user!);
       if (c?.squad_id && p) {
-        const today = dayIndex(s.now(), c.start_ts, p.tz_offset_minutes);
+        const today = dayIndexFor(c, p.tz_offset_minutes, s.now());
         addFeed(s, c.squad_id, pool!, user!, "checked_in", {
           day: Number(d.day_index),
           streak: currentStreak(BigInt(p.checkin_bitmap), today, c.duration_days),
@@ -75,7 +76,7 @@ async function handle(s: Services, ev: Ev): Promise<void> {
 function recordCoachStats(s: Services, pool: string, wallet: string): void {
   const c = getChallenge(s, pool);
   const p = getParticipant(s, pool, wallet);
-  if (!c || !p) return;
+  if (!c || !p || c.is_demo) return; // demo pools are not habit history
   let category = "custom";
   let difficulty = 3;
   if (c.plan_json) {

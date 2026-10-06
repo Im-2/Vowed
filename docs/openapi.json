@@ -215,6 +215,18 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "demoEnabled": {
+                          "type": "boolean"
+                        },
+                        "demoMaxStake": {
+                          "type": "string"
+                        },
+                        "demoMints": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       },
                       "required": [
@@ -224,7 +236,10 @@
                         "paused",
                         "maxStake",
                         "settleGraceSecs",
-                        "allowedMints"
+                        "allowedMints",
+                        "demoEnabled",
+                        "demoMaxStake",
+                        "demoMints"
                       ],
                       "additionalProperties": false
                     }
@@ -379,6 +394,16 @@
                             "nullable": true,
                             "type": "string"
                           },
+                          "isDemo": {
+                            "type": "boolean"
+                          },
+                          "daySecs": {
+                            "type": "number"
+                          },
+                          "demoLabel": {
+                            "nullable": true,
+                            "type": "string"
+                          },
                           "trustTier": {
                             "nullable": true,
                             "type": "string",
@@ -418,6 +443,9 @@
                           "distributable",
                           "status",
                           "squadId",
+                          "isDemo",
+                          "daySecs",
+                          "demoLabel",
                           "trustTier",
                           "plan"
                         ],
@@ -539,6 +567,16 @@
                           "nullable": true,
                           "type": "string"
                         },
+                        "isDemo": {
+                          "type": "boolean"
+                        },
+                        "daySecs": {
+                          "type": "number"
+                        },
+                        "demoLabel": {
+                          "nullable": true,
+                          "type": "string"
+                        },
                         "trustTier": {
                           "nullable": true,
                           "type": "string",
@@ -578,6 +616,9 @@
                         "distributable",
                         "status",
                         "squadId",
+                        "isDemo",
+                        "daySecs",
+                        "demoLabel",
                         "trustTier",
                         "plan"
                       ],
@@ -691,16 +732,27 @@
                     "maximum": 9007199254740991
                   },
                   "joinWindowSecs": {
-                    "default": 3600,
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 86400
                   },
                   "maxParticipants": {
-                    "default": 50,
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 1000
+                  },
+                  "demo": {
+                    "type": "object",
+                    "properties": {
+                      "daySecs": {
+                        "type": "integer",
+                        "minimum": 60,
+                        "maximum": 3600
+                      }
+                    },
+                    "required": [
+                      "daySecs"
+                    ]
                   },
                   "plan": {
                     "type": "object",
@@ -1461,6 +1513,12 @@
                         "closesAt"
                       ],
                       "additionalProperties": false
+                    },
+                    "isDemo": {
+                      "type": "boolean"
+                    },
+                    "daySecs": {
+                      "type": "number"
                     }
                   },
                   "required": [
@@ -1470,7 +1528,9 @@
                     "proofType",
                     "dayIndex",
                     "target",
-                    "window"
+                    "window",
+                    "isDemo",
+                    "daySecs"
                   ],
                   "additionalProperties": false
                 }

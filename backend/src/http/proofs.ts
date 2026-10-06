@@ -31,6 +31,9 @@ export function registerProofRoutes(app: FastifyInstance, s: Services) {
             dayIndex: z.number(),
             target: z.object({ metric: z.string(), value: z.number(), unit: z.string(), direction: z.enum(["atLeast", "atMost"]) }),
             window: z.object({ opensAt: z.number(), closesAt: z.number() }),
+            /** true for a DEMO POOL: its "days" are minutes long. Show the demo label. */
+            isDemo: z.boolean(),
+            daySecs: z.number(),
           }),
         },
       },

@@ -13,7 +13,7 @@ export interface SeedChallenge {
 }
 
 /** Inserts a mirrored challenge row directly (for tests that do not need the chain). */
-export function seedChallenge(w: World, over: Partial<{ pool: string; creator: string; startTs: number; durationDays: number; requiredDays: number; status: string; squadId: string | null; plan: GoalPlan | null }> = {}): SeedChallenge {
+export function seedChallenge(w: World, over: Partial<{ pool: string; creator: string; startTs: number; durationDays: number; requiredDays: number; status: string; squadId: string | null; plan: GoalPlan | null; isDemo: boolean; daySecs: number }> = {}): SeedChallenge {
   const pool = over.pool ?? Keypair.generate().publicKey.toBase58();
   const creator = over.creator ?? Keypair.generate().publicKey.toBase58();
   const startTs = over.startTs ?? 1_799_971_200;
@@ -32,6 +32,10 @@ export function seedChallenge(w: World, over: Partial<{ pool: string; creator: s
       startTs, startTs + durationDays * 86_400, startTs + 3_600, startTs + durationDays * 86_400 + 7_200, durationDays, over.requiredDays ?? 2, hash, 50,
       0, 0, 0, "0", "0", "0", "0", over.status ?? "Open", plan ? canonicalJson(plan) : null, over.squadId ?? null, w.s.wallNow(),
     );
+  if (over.isDemo) {
+    const day = over.daySecs ?? 60;
+    w.s.db.prepare("UPDATE challenges SET is_demo = 1, day_secs = ?, end_ts = ?, settle_after_ts = ? WHERE pool = ?").run(day, startTs + durationDays * day, startTs + durationDays * day + day, pool);
+  }
   return { pool, creator, startTs, durationDays, status: over.status ?? "Open", planHash: hash };
 }
 

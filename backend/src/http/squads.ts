@@ -4,7 +4,8 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { getChallenge, type ChallengeRow, type ParticipantRow } from "../challenges/sync.js";
 import { MESSAGES, suggestFor, WINDOW_DAYS, type CategoryHistory } from "../domain/coach.js";
-import { currentStreak, dayIndex, windowBounds } from "../domain/time.js";
+import { dayIndexFor, windowFor } from "../domain/schedule.js";
+import { currentStreak } from "../domain/time.js";
 import { ApiError, conflict, forbidden, notFound, tooMany } from "../errors.js";
 import { pushToWallet } from "../push/service.js";
 import type { Services } from "../services.js";
@@ -214,7 +215,7 @@ export function registerSquadRoutes(app: FastifyInstance, s: Services) {
       for (const c of squadChallenges(s, req.params.id)) {
         const parts = s.db.prepare("SELECT * FROM participants WHERE pool = ?").all(c.pool) as unknown as ParticipantRow[];
         for (const p of parts) {
-          const today = dayIndex(now, c.start_ts, p.tz_offset_minutes);
+          const today = dayIndexFor(c, p.tz_offset_minutes, now);
           const bitmap = BigInt(p.checkin_bitmap);
           const streak = currentStreak(bitmap, today, c.duration_days);
           const done = today >= 0 && today < c.duration_days && ((bitmap >> BigInt(today)) & 1n) === 1n;
@@ -258,9 +259,9 @@ export function registerSquadRoutes(app: FastifyInstance, s: Services) {
         if (c.status !== "Open") continue;
         const p = s.db.prepare("SELECT * FROM participants WHERE pool = ? AND wallet = ? AND status = 'Active'").get(c.pool, recipient) as ParticipantRow | undefined;
         if (!p) continue;
-        const d = dayIndex(now, c.start_ts, p.tz_offset_minutes);
+        const d = dayIndexFor(c, p.tz_offset_minutes, now);
         if (d < 0 || d >= c.duration_days) continue;
-        if (now >= windowBounds(c.start_ts, p.tz_offset_minutes, d).closesAt) continue;
+        if (now >= windowFor(c, p.tz_offset_minutes, d).closesAt) continue;
         if (((BigInt(p.checkin_bitmap) >> BigInt(d)) & 1n) === 0n) pending = true;
       }
       if (!pending) throw conflict("nothing_to_nudge", "they have already checked in today or have no open challenge");
@@ -347,13 +348,13 @@ export function registerSquadRoutes(app: FastifyInstance, s: Services) {
       const parts = s.db.prepare("SELECT * FROM participants WHERE wallet = ?").all(wallet) as unknown as ParticipantRow[];
       for (const p of parts) {
         const c = getChallenge(s, p.pool);
-        if (!c?.plan_json) continue;
+        if (!c?.plan_json || c.is_demo) continue; // demo pools never feed the coach: minutes-long days say nothing about real habits
         const plan = JSON.parse(c.plan_json) as { category: string; difficulty: number };
         const h = get(plan.category);
         h.lastDifficulty = plan.difficulty;
         const bitmap = BigInt(p.checkin_bitmap);
         for (let d = 0; d < c.duration_days; d++) {
-          const { closesAt } = windowBounds(c.start_ts, p.tz_offset_minutes, d);
+          const { closesAt } = windowFor(c, p.tz_offset_minutes, d);
           if (closesAt > now || closesAt <= since) continue;
           h.attemptedDays++;
           if (((bitmap >> BigInt(d)) & 1n) === 1n) h.completedDays++;

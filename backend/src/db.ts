@@ -185,6 +185,11 @@ CREATE TABLE plans (
   PRIMARY KEY (goal_hash, creator)
 );
 `,
+  // 2: demo pools (minutes-long days)
+  `
+ALTER TABLE challenges ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE challenges ADD COLUMN day_secs INTEGER NOT NULL DEFAULT 86400;
+`,
 ];
 
 export function openDb(path: string): Db {

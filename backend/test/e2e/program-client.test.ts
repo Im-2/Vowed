@@ -42,6 +42,9 @@ describe.skipIf(!lib)("program client against the real vowed.so (LiteSVM)", () =
           max_stake: 100_000_000n,
           settle_grace_secs: 7_200n,
           allowed_mints: [mintKp.publicKey.toBase58()],
+          demo_enabled: false,
+          demo_max_stake: 0n,
+          demo_mints: [],
         }),
       ],
       [admin],
@@ -72,6 +75,7 @@ describe.skipIf(!lib)("program client against the real vowed.so (LiteSVM)", () =
       goal_hash: new Uint8Array(32).fill(5),
       join_window_secs: 3_600n,
       max_participants: 10,
+      demo_day_secs: 0,
     });
     const created = await signAndSend(chain, [create], [alice]);
     const events = program.decodeEvents(created.logs);
