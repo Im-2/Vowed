@@ -187,6 +187,17 @@ Emit events for pool created, joined, check-in recorded, participation settled, 
 - Fuzz or property tests for payout math: total paid out never exceeds total deposited.
 - Write `docs/threat-model.md` covering oracle compromise, replay, griefing by non-settlement, and front-running on join.
 
+### 4.6 Demo pools (added in Phase 2; implemented and tested)
+
+A **demo pool** has minutes-long "days" so a judge or a demo video can see a full settlement. It exists only for demonstration and testing; normal pools keep real 24-hour days. The program stores `is_demo` and `day_secs` on the pool and emits both in `PoolCreated`. Clients must label demo pools clearly (the API returns `isDemo`, `daySecs` and a ready-made `demoLabel`).
+
+Rules (all enforced by the program, tested in `t_demo.rs`):
+- `create_pool` takes `demo_day_secs`: `0` = normal pool; `60..=3600` = demo pool. Anything else is `InvalidDemoDay`.
+- A demo pool follows **every** normal rule (max 60 days, Hard = full forfeit, Soft penalty <= 50%, start in the future, pause switch, allowed-token list) and is **stricter** in these ways: only while `config.demo_enabled`; only for tokens flagged as demo tokens in the config (`DemoMintNotAllowed` otherwise); a separate, lower per-participant stake cap `config.demo_max_stake` (never above `max_stake`); at most 20 participants; must start within 24 hours; the join window cannot exceed one demo day.
+- Days are counted from the start time (no timezone). A check-in window is the demo day plus a grace of a quarter day. Settlement opens one demo day after the end (instead of the 2-hour normal grace), so a 2-day pool with 60-second days settles three minutes after it starts.
+- `init_config` validates that the demo settings can only be stricter (demo cap <= normal cap, demo tokens must be allowed tokens, enabling needs a cap and a token). `set_demo_enabled` (admin) switches creation of new demo pools on or off without stranding existing ones. **A real-money deployment should set `demo_enabled = false`.**
+- The backend excludes demo pools from the adaptive coach and from reminders, because minutes-long days say nothing about real habits.
+
 ---
 
 ## 5. Backend
@@ -364,6 +375,7 @@ Stake caps scale with the weakest trust tier in the plan (for example Low caps v
 ### 8.5 Judge-friendly modes
 
 - **Practice mode:** the full flow with no money, so anyone can try it.
+- **Demo pools (SPEC 4.6):** minutes-long days with test tokens only, always labeled "DEMO POOL" in the UI, so the full loop (stake, prove, settle, payout) can be shown live in a 3-minute video. Normal pools keep real 24-hour days.
 - **Demo mode (devnet):** a "Get test funds" button (devnet airdrop and test token mint through the backend), and optional pre-seeded demo data (an existing squad with history) clearly labeled as demo data.
 
 ---
