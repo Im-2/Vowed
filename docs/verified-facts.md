@@ -13,11 +13,19 @@ Never hardcode these from memory; re-check before mainnet.
   `connect(ActivityResultSender)`, `signIn(sender, SignInWithSolana.Payload(domain, statement))`,
   `transact(sender) { authResult -> signAndSendTransactions(arrayOf(bytes)) }`.
   `signTransactions` is deprecated by MWA 2.0; use `signAndSendTransactions`.
-- OPEN: minSdk required by 2.2.0 and AGP/Gradle compatibility. Check at Phase 3 when the dependency resolves.
+- **Verified by building (2026-10-06):** MWA `clientlib-ktx` 2.2.0 forces `compileSdk 37`, and the current Compose BOM (2026.09.00)
+  requires **AGP 9.1+** and compileSdk 37. Working stack: AGP 9.4.1, Gradle 9.8.0, Kotlin Compose plugin 2.4.10 (AGP 9 has built-in Kotlin,
+  so no `kotlin-android` plugin), JDK 17, compileSdk/targetSdk 37, minSdk 26 (compiles and runs; MWA's own minSdk not separately confirmed).
+  AGP 8.13 + compileSdk 36 fails the AAR metadata check.
+- **Verified end to end on the emulator:** `MobileWalletAdapter(...).connect(ActivityResultSender)` returned the wallet's public key
+  from the Mock MWA Wallet (screenshot `docs/phase0-mwa-connect.png`).
 
 ## 2. Mock MWA Wallet: VERIFIED
 - Source: https://github.com/solana-mobile/mock-mwa-wallet
-- No APK release is mentioned: clone, open in Android Studio, build and install on device or emulator.
+- No APK release is mentioned: clone and build (`gradlew assembleDebug`; its stack is AGP 8.13, Gradle 8.13, compileSdk 36; built fine from the CLI, no Android Studio needed).
+  Without a screen lock the AUTHENTICATE button does nothing: set a PIN on the emulator (`adb shell locksettings set-pin 1234`), press AUTHENTICATE,
+  enter the PIN (the prompt is a secure window, screenshots show black; use `adb shell input text`). Then the connect sheet appears in the wallet and works.
+  A random keypair is generated unless `privateKey=` is set in the wallet's `local.properties`.
   Optional Ed25519 key in `local.properties`. Supports authorize, SIWS, sign transactions and messages,
   bottom-sheet approval, biometrics. Press **Authenticate** in the wallet first (valid 15 minutes).
   Testing only, never real funds.
@@ -42,7 +50,10 @@ Never hardcode these from memory; re-check before mainnet.
 ## 5. Anchor and tooling: PARTIAL
 - Docs show Anchor CLI **1.2.0**, Rust 1.85.0, Solana (Agave) CLI **4.1.2**, Node 23.9 / Yarn 1.22.1 examples.
   Default test template is **LiteSVM** (no validator, no TS needed). Source: https://www.anchor-lang.com/docs/installation
-- **Windows users must use WSL.** This machine had no WSL distro installed (see progress.md).
+- **Windows users must use WSL.** Installed Ubuntu (WSL2) with `wsl --install -d Ubuntu --no-launch`; no restart was needed; we run as root
+  (`wsl -u root`), no Ubuntu user created. Installed in WSL: Rust 1.99.0, Solana (Agave) CLI (installer gave 4.3.0, Anchor then switched it to 4.1.2), Anchor 1.2.0 via AVM from
+  `https://github.com/otter-sec/anchor` (this is the old coral-xyz/anchor repo after a transfer; it is the repo the official install page uses).
+  First `anchor` run downloads Solana platform-tools (slow). `anchor init --test-template rust` gives a LiteSVM `cargo test` setup, pinned to Rust 1.89.0.
 - Token interface: use Anchor `anchor_spl::token_interface` so both Token and Token-2022 mints work; we restrict to an
   allowed-mints list in Config. Source: https://solana.com/docs/core/tokens (general), details re-checked in Phase 1.
 
