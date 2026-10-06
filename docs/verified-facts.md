@@ -119,3 +119,14 @@ Never hardcode these from memory; re-check before mainnet.
 - **SKR prize: SKR staking integrations do NOT qualify.** Design changed: USDC main token; SKR = weekly rewards for top streaks + SKR-paid perks (e.g. streak freezes); SKR deposits optional. ORE prize out of scope.
 - Scoring: 25% each stickiness/PMF, UX, innovation, presentation/demo.
 - OPEN: APK link vs upload field on the form (the SPEC assumes link).
+
+## Phase 1 findings (program), 2026-10-06
+- **Test tooling:** LiteSVM 0.17.0 + litesvm-token 0.17.0 (crates.io) run the program in-process, no validator, with clock control via `set_sysvar::<Clock>`.
+  LiteSVM uses newer Solana types than Anchor 1.2.0 (transaction/message/instruction 4.x vs 3.x), so the test harness converts instructions field by field.
+  LiteSVM deploys programs as upgradeable with `upgrade_authority: None`; the harness patches the programdata header to test the `init_config` guard.
+  Needs host Rust >= 1.97 for the test crate (we pin 1.99.0 in `rust-toolchain.toml`); the SBF build uses Solana's own toolchain.
+- **Anchor 1.2.0 API shapes used (compiled and tested):** `CpiContext::new(program_id: Pubkey, accounts)`, `anchor_spl::token_interface` (`transfer_checked`, `InterfaceAccount<Mint|TokenAccount>`, `Interface<TokenInterface>`),
+  `token::mint/authority/token_program` constraints, `crate::program::Vowed` + `Account<ProgramData>` for the upgrade-authority check. `anchor build` emits the IDL (10 instructions, 11 events, 27 errors) copied to `programs/vowed/idl/vowed.json`.
+- **Program binary:** 387,640 bytes. Deploy needs about 2 SOL on devnet (CLI said 1.97 SOL).
+- **Devnet faucet:** both `solana airdrop` and raw `requestAirdrop` returned HTTP 429 ("reached your airdrop limit today or the faucet has run dry"). The web faucet (https://faucet.solana.com) is the documented alternative.
+- **Program id (devnet and localnet):** `BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL`. The program keypair and the throwaway deployer key are in WSL `~/.config/solana/` and never in the repo.

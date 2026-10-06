@@ -1,0 +1,5 @@
+. "$(dirname "$0")/wsl-env.sh"
+K="$HOME/.config/solana/vowed-program-keypair.json"
+mkdir -p "$HOME/.config/solana"
+[ -f "$K" ] || solana-keygen new --no-bip39-passphrase --silent -o "$K"
+solana-keygen pubkey "$K"

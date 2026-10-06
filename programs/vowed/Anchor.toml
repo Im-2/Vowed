@@ -5,7 +5,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-vowed = "88wHexJKLPw8TSKPq1X61Kkvt9wxwB9uDegktYG2Q4Z3"
+vowed = "BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL"
+
+[programs.devnet]
+vowed = "BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL"
 
 [provider]
 cluster = "localnet"

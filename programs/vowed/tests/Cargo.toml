@@ -1,14 +1,22 @@
 [package]
 name = "tests"
 version = "0.1.0"
-description = "Created with Anchor"
+description = "LiteSVM integration tests for the Vowed program"
 edition = "2021"
-rust-version = "1.89.0"
+rust-version = "1.97.0"
 
 [dependencies]
-anchor-client = "1.2.0"
-vowed = { version = "0.1.0", path = "../programs/vowed" }
-solana-keypair = "3.0.0"
-solana-pubkey = "3.0.0"
-solana-sdk-ids = "3"
+anchor-lang = "=1.2.0"
+anchor-spl = { version = "=1.2.0", default-features = false, features = ["token", "token_2022"] }
+vowed = { version = "0.1.0", path = "../programs/vowed", features = ["no-entrypoint"] }
+litesvm = "0.17"
+litesvm-token = "0.17"
+solana-keypair = "3"
 solana-signer = "3"
+solana-transaction = "4"
+solana-message = "4"
+solana-instruction = "4"
+solana-address = "2"
+solana-clock = "3"
+serde_json = "1"
+proptest = "1"
