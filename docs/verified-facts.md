@@ -53,7 +53,19 @@ Never hardcode these from memory; re-check before mainnet.
 - **Windows users must use WSL.** Installed Ubuntu (WSL2) with `wsl --install -d Ubuntu --no-launch`; no restart was needed; we run as root
   (`wsl -u root`), no Ubuntu user created. Installed in WSL: Rust 1.99.0, Solana (Agave) CLI (installer gave 4.3.0, Anchor then switched it to 4.1.2), Anchor 1.2.0 via AVM from
   `https://github.com/otter-sec/anchor` (this is the old coral-xyz/anchor repo after a transfer; it is the repo the official install page uses).
-  First `anchor` run downloads Solana platform-tools (slow). `anchor init --test-template rust` gives a LiteSVM `cargo test` setup, pinned to Rust 1.89.0.
+  First `anchor` run downloads Solana platform-tools (slow). `anchor init --test-template rust` gives a Rust-client template whose test needs a validator: `anchor test --validator legacy` (the `solana-test-validator`; the default `surfpool` is deliberately not installed). Template pins Rust 1.89.0.
+- **Anchor repo provenance (checked 2026-10-06):**
+  - Official install page https://www.anchor-lang.com/docs/installation links to `github.com/otter-sec/anchor` (raw HTML contains the `otter-sec/anchor` repo,
+    its `docs/content/docs/installation.mdx`, and issue 3392); the install command is `cargo install --git https://github.com/otter-sec/anchor avm`.
+  - `https://github.com/coral-xyz/anchor` returns **HTTP 301 -> https://github.com/otter-sec/anchor**; `github.com/solana-foundation/anchor` also 301s to it.
+    GitHub API: `api.github.com/repositories/325891672` is `otter-sec/anchor` (same id the old coral-xyz URL resolves to). The org `otter-sec` is "OtterSec",
+    GitHub-verified, blog osec.io.
+  - Announcement: Solana Compass's Breakpoint talk summary (https://solanacompass.com/learn/breakpoint-25/anchor-today-and-tomorrow) says OtterSec (CEO Robert Chen)
+    and the Solana Foundation (Jacob Creech) took over Anchor maintenance and shipped Anchor 1.0. It does not literally say "repository transferred";
+    the transfer evidence is the official docs plus the redirects. We could not find a formal GitHub-side announcement.
+  - Result: confirmed enough to trust; no fallback to a coral-xyz source needed (that URL now serves the same repo anyway).
+  - **Pinned version:** Anchor **1.2.0** = tag `v1.2.0` = commit `84a63f9f7112b23581816436fbcf3f6c515779f9` (tagged 2026-09-04). AVM is built from the same tag with `--locked`
+    (`scripts/avm-pin.sh`, `scripts/wsl-setup.sh`). Latest release at check time was v1.2.1; we stay on 1.2.0 deliberately. The `anchor-lang` crate in the program is pinned to the same version.
 - Token interface: use Anchor `anchor_spl::token_interface` so both Token and Token-2022 mints work; we restrict to an
   allowed-mints list in Config. Source: https://solana.com/docs/core/tokens (general), details re-checked in Phase 1.
 

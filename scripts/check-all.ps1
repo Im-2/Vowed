@@ -5,5 +5,6 @@ $env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot"
 $env:ANDROID_HOME = "C:\Users\hp\Android\Sdk"
 Push-Location "$root\backend"; npm run typecheck; npm test; Pop-Location
 Push-Location "$root\android"; .\gradlew.bat assembleDebug; Pop-Location
-$wslPath = "/mnt/" + $root.Path.Substring(0,1).ToLower() + ($root.Path.Substring(2) -replace '\','/')
+$wslPath = '/mnt/' + $root.Path.Substring(0,1).ToLower() + $root.Path.Substring(2).Replace([string][char]92, '/')
 wsl -d Ubuntu -u root -- bash "$wslPath/scripts/program-build.sh"
+if ($LASTEXITCODE -ne 0) { throw "program build/test failed" }
