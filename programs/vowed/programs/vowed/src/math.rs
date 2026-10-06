@@ -23,6 +23,22 @@ pub fn checkin_window_ok(now: i64, start_ts: i64, tz_offset_minutes: i16, day: u
     local_now >= window_start && local_now < window_start + SECONDS_PER_DAY + CHECKIN_GRACE_SECS
 }
 
+/// Demo pools: check-in grace is a quarter of the (short) day instead of 2 hours.
+pub fn demo_checkin_grace(day_secs: u32) -> i64 {
+    (day_secs / 4) as i64
+}
+
+/// Demo pools count days from the start time (no timezone): day d is [start + d*day_secs, start + (d+1)*day_secs).
+pub fn demo_day_index(now: i64, start_ts: i64, day_secs: u32) -> i64 {
+    (now - start_ts).div_euclid(day_secs as i64)
+}
+
+/// Is `now` inside the check-in window for `day` of a demo pool? The window is the demo day plus its grace.
+pub fn demo_window_ok(now: i64, start_ts: i64, day_secs: u32, day: u8) -> bool {
+    let opens = start_ts + day as i64 * day_secs as i64;
+    now >= opens && now < opens + day_secs as i64 + demo_checkin_grace(day_secs)
+}
+
 /// amount * bps / 10_000, rounded down, using u128 intermediates.
 pub fn bps_of(amount: u64, bps: u16) -> Option<u64> {
     let v = (amount as u128).checked_mul(bps as u128)? / BPS_DENOMINATOR as u128;
@@ -86,6 +102,22 @@ mod tests {
         assert!(!checkin_window_ok(SECONDS_PER_DAY + CHECKIN_GRACE_SECS, start, 0, 0));
         assert!(!checkin_window_ok(SECONDS_PER_DAY - 1, start, 0, 1));
         assert!(checkin_window_ok(SECONDS_PER_DAY, start, 0, 1));
+    }
+
+    #[test]
+    fn demo_windows() {
+        // 60-second days starting at t=1000
+        assert_eq!(demo_day_index(1000, 1000, 60), 0);
+        assert_eq!(demo_day_index(1059, 1000, 60), 0);
+        assert_eq!(demo_day_index(1060, 1000, 60), 1);
+        assert_eq!(demo_day_index(999, 1000, 60), -1);
+        assert_eq!(demo_checkin_grace(60), 15);
+        assert!(!demo_window_ok(999, 1000, 60, 0));
+        assert!(demo_window_ok(1000, 1000, 60, 0));
+        assert!(demo_window_ok(1000 + 60 + 14, 1000, 60, 0)); // grace
+        assert!(!demo_window_ok(1000 + 60 + 15, 1000, 60, 0));
+        assert!(!demo_window_ok(1059, 1000, 60, 1)); // day 1 not open yet
+        assert!(demo_window_ok(1060, 1000, 60, 1));
     }
 
     #[test]

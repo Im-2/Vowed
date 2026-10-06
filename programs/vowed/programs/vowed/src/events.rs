@@ -19,6 +19,9 @@ pub struct PoolCreated {
     pub required_days: u8,
     pub penalty_bps: u16,
     pub goal_hash: [u8; 32],
+    /// DEMO POOL flag and day length (86_400 for normal pools).
+    pub is_demo: bool,
+    pub day_secs: u32,
 }
 
 #[event]
@@ -71,6 +74,11 @@ pub struct PoolVoided {
 pub struct TreasurySwept {
     pub pool: Pubkey,
     pub amount: u64,
+}
+
+#[event]
+pub struct DemoEnabledChanged {
+    pub enabled: bool,
 }
 
 #[event]

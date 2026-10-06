@@ -24,6 +24,8 @@ pub const DECIMALS: u8 = 6;
 pub const UNIT: u64 = 1_000_000;
 pub const MAX_STAKE: u64 = 1_000_000 * UNIT;
 pub const SETTLE_GRACE: i64 = 2 * DAY;
+/// Demo pools: per-participant stake cap configured in the harness (normal cap is MAX_STAKE).
+pub const DEMO_MAX_STAKE: u64 = 5 * UNIT;
 
 pub fn addr(p: &Pk) -> Address {
     Address::new_from_array(p.to_bytes())
@@ -77,16 +79,23 @@ pub struct PoolRef {
     pub mint: Pk,
     pub start_ts: i64,
     pub duration: u8,
+    /// 86_400 for normal pools; the demo day length for demo pools.
+    pub day_secs: i64,
+    pub is_demo: bool,
 }
 impl PoolRef {
     pub fn day_start(&self, day: i64) -> i64 {
-        self.start_ts + day * DAY
+        self.start_ts + day * self.day_secs
     }
     pub fn end_ts(&self) -> i64 {
-        self.start_ts + self.duration as i64 * DAY
+        self.start_ts + self.duration as i64 * self.day_secs
     }
     pub fn settle_after(&self) -> i64 {
-        self.end_ts() + SETTLE_GRACE
+        self.end_ts() + if self.is_demo { self.day_secs } else { SETTLE_GRACE }
+    }
+    /// A moment safely inside day `day`'s window.
+    pub fn in_day(&self, day: i64) -> i64 {
+        self.day_start(day) + (3_600).min(self.day_secs / 6)
     }
 }
 
@@ -99,7 +108,10 @@ pub struct Env {
     pub funder: Keypair,
     pub mint: Pk,
     pub mint_auth: Keypair,
+    /// Allowed for normal pools, but NOT for demo pools.
     pub other_mint: Pk,
+    /// Not on the allowed list at all.
+    pub third_mint: Pk,
 }
 
 fn so_path() -> String {
@@ -148,6 +160,11 @@ impl Env {
             .decimals(DECIMALS)
             .send()
             .unwrap();
+        let third_mint = CreateMint::new(&mut svm, &funder)
+            .authority(&mint_auth.pubkey())
+            .decimals(DECIMALS)
+            .send()
+            .unwrap();
         let treasury_token = CreateAssociatedTokenAccount::new(&mut svm, &funder, &mint)
             .owner(&treasury.pubkey())
             .send()
@@ -163,6 +180,7 @@ impl Env {
             mint: pk(&mint),
             mint_auth,
             other_mint: pk(&other_mint),
+            third_mint: pk(&third_mint),
         };
         env.set_time(BASE);
         env
@@ -175,7 +193,10 @@ impl Env {
             fee_bps,
             max_stake: MAX_STAKE,
             settle_grace_secs: SETTLE_GRACE,
-            allowed_mints: vec![self.mint],
+            allowed_mints: vec![self.mint, self.other_mint],
+            demo_enabled: true,
+            demo_max_stake: DEMO_MAX_STAKE,
+            demo_mints: vec![self.mint],
         }
     }
 
@@ -308,6 +329,7 @@ impl Env {
             goal_hash: [7u8; 32],
             join_window_secs: 3_600,
             max_participants: 100,
+            demo_day_secs: 0,
         }
     }
 
@@ -343,6 +365,8 @@ impl Env {
                 mint: self.mint,
                 start_ts: params.start_ts,
                 duration: params.duration_days,
+                day_secs: if params.demo_day_secs == 0 { DAY } else { params.demo_day_secs as i64 },
+                is_demo: params.demo_day_secs != 0,
             },
         )
     }
@@ -404,7 +428,7 @@ impl Env {
 
     /// Move the clock to the start of `day` for a UTC user (+1h) and record it.
     pub fn checkin_on_day(&mut self, pool: &PoolRef, user: &Pk, day: u8) -> TransactionResult {
-        self.set_time(pool.day_start(day as i64) + 3_600);
+        self.set_time(pool.in_day(day as i64));
         self.checkin(pool, user, day)
     }
 
@@ -480,6 +504,16 @@ impl Env {
         let admin = self.admin.insecure_clone();
         let ix = self.ix_void(&pk_of(&admin), pool);
         self.send(ix, &[&admin])
+    }
+
+    pub fn ix_set_demo_enabled(&self, admin: &Pk, enabled: bool) -> Instruction {
+        Self::mk(
+            vowed::accounts::AdminOnly {
+                admin: *admin,
+                config: config_pda(),
+            },
+            vowed::instruction::SetDemoEnabled { enabled },
+        )
     }
 
     pub fn ix_set_paused(&self, admin: &Pk, paused: bool) -> Instruction {

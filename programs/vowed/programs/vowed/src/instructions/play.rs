@@ -40,10 +40,12 @@ pub fn handle_record_checkin(ctx: Context<RecordCheckin>, day_index: u8) -> Resu
     require!(now < pool.settle_after_ts, VowedError::OutsideCheckinWindow);
     require!(p.status == ParticipationStatus::Active, VowedError::ParticipationNotActive);
     require!(day_index < pool.duration_days, VowedError::DayOutOfRange);
-    require!(
-        math::checkin_window_ok(now, pool.start_ts, p.tz_offset_minutes, day_index),
-        VowedError::OutsideCheckinWindow
-    );
+    let in_window = if pool.is_demo {
+        math::demo_window_ok(now, pool.start_ts, pool.day_secs, day_index)
+    } else {
+        math::checkin_window_ok(now, pool.start_ts, p.tz_offset_minutes, day_index)
+    };
+    require!(in_window, VowedError::OutsideCheckinWindow);
 
     let bit = 1u64 << day_index;
     require!(p.checkin_bitmap & bit == 0, VowedError::DuplicateCheckin);

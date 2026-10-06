@@ -16,6 +16,9 @@ fn create_pool_sets_state_and_vault() {
     assert_eq!(s.end_ts, BASE + DAY + 7 * DAY);
     assert_eq!(s.join_deadline_ts, BASE + DAY + 3_600);
     assert_eq!(s.settle_after_ts, s.end_ts + SETTLE_GRACE);
+    // normal pools keep real 24-hour days and are not demo pools
+    assert!(!s.is_demo);
+    assert_eq!(s.day_secs, 86_400);
     assert_eq!(s.goal_hash, [7u8; 32]);
     assert_eq!(s.status, PoolStatus::Open);
     // vault: owned by the token program, authority is the pool PDA, right mint, empty
@@ -62,6 +65,10 @@ fn create_pool_validates_params() {
     let mut p = base.clone();
     p.max_participants = 1_001;
     assert_err(try_params(&mut env, p), "InvalidPoolParams");
+    let mut p = base.clone();
+    p.demo_day_secs = 0;
+    p.start_ts = BASE + 31 * DAY; // normal pools may start up to 30 days ahead, no more
+    assert_err(try_params(&mut env, p), "InvalidPoolParams");
     // Hard must forfeit everything
     let mut p = base.clone();
     p.penalty_bps = 9_999;
@@ -94,7 +101,7 @@ fn create_pool_rejects_unlisted_mint_and_wrong_token_program() {
     let funder = env.funder.insecure_clone();
     let params = env.create_params(1, StakeMode::Hard, 10_000, 7, 5);
     // a mint that is not on the allowed list
-    let ix = env.ix_create_pool(&pk_of(&funder), &env.other_mint.clone(), params.clone());
+    let ix = env.ix_create_pool(&pk_of(&funder), &env.third_mint.clone(), params.clone());
     assert_err(env.send(ix, &[&funder]), "MintNotAllowed");
     // the allowed mint paired with the Token-2022 program: the mint is not owned by that program
     let mut ix = env.ix_create_pool(&pk_of(&funder), &env.mint.clone(), params);

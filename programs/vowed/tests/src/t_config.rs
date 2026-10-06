@@ -14,9 +14,14 @@ fn init_config_sets_fields() {
     assert_eq!(c.fee_bps, 250);
     assert!(!c.paused);
     assert_eq!(c.max_stake, MAX_STAKE);
-    assert_eq!(c.allowed_mint_count, 1);
+    assert_eq!(c.allowed_mint_count, 2);
     assert!(c.is_mint_allowed(&env.mint));
-    assert!(!c.is_mint_allowed(&env.other_mint));
+    assert!(c.is_mint_allowed(&env.other_mint));
+    assert!(!c.is_mint_allowed(&env.third_mint));
+    assert!(c.demo_enabled);
+    assert_eq!(c.demo_max_stake, DEMO_MAX_STAKE);
+    assert!(c.is_demo_mint(&env.mint));
+    assert!(!c.is_demo_mint(&env.other_mint)); // allowed for normal pools, not for demo pools
 }
 
 #[test]

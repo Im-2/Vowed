@@ -10,6 +10,12 @@ pub struct InitConfigParams {
     pub max_stake: u64,
     pub settle_grace_secs: i64,
     pub allowed_mints: Vec<Pubkey>,
+    /// Demo pools (minutes-long days, test money only). Leave disabled on any network where real money is staked.
+    pub demo_enabled: bool,
+    /// Per-participant stake cap for demo pools; must not exceed `max_stake`.
+    pub demo_max_stake: u64,
+    /// Subset of `allowed_mints` that demo pools may use.
+    pub demo_mints: Vec<Pubkey>,
 }
 
 /// Only the program's upgrade authority can initialise the config, so nobody can front-run the
@@ -46,6 +52,14 @@ pub fn handle_init_config(ctx: Context<InitConfig>, params: InitConfigParams) ->
         require!(*m != Pubkey::default(), VowedError::InvalidConfig);
         require!(!params.allowed_mints[..i].contains(m), VowedError::InvalidConfig);
     }
+    // Demo settings may only be stricter than the normal ones, never looser.
+    require!(params.demo_max_stake <= params.max_stake, VowedError::InvalidConfig);
+    for m in &params.demo_mints {
+        require!(params.allowed_mints.contains(m), VowedError::InvalidConfig);
+    }
+    if params.demo_enabled {
+        require!(params.demo_max_stake > 0 && !params.demo_mints.is_empty(), VowedError::InvalidConfig);
+    }
     require!(params.oracle != Pubkey::default(), VowedError::InvalidConfig);
     require!(params.treasury != Pubkey::default(), VowedError::InvalidConfig);
 
@@ -60,6 +74,12 @@ pub fn handle_init_config(ctx: Context<InitConfig>, params: InitConfigParams) ->
     config.allowed_mints = [Pubkey::default(); MAX_ALLOWED_MINTS];
     config.allowed_mints[..n].copy_from_slice(&params.allowed_mints);
     config.allowed_mint_count = n as u8;
+    config.demo_enabled = params.demo_enabled;
+    config.demo_max_stake = params.demo_max_stake;
+    config.demo_mints = [false; MAX_ALLOWED_MINTS];
+    for (i, m) in params.allowed_mints.iter().enumerate() {
+        config.demo_mints[i] = params.demo_mints.contains(m);
+    }
     config.bump = ctx.bumps.config;
 
     emit!(ConfigInitialized {
@@ -85,6 +105,17 @@ pub struct AdminOnly<'info> {
 pub fn handle_set_paused(ctx: Context<AdminOnly>, paused: bool) -> Result<()> {
     ctx.accounts.config.paused = paused;
     emit!(PausedChanged { paused });
+    Ok(())
+}
+
+/// Turns creation of NEW demo pools on or off. Existing demo pools are unaffected so nobody's stake is stranded.
+pub fn handle_set_demo_enabled(ctx: Context<AdminOnly>, enabled: bool) -> Result<()> {
+    let config = &mut ctx.accounts.config;
+    if enabled {
+        require!(config.demo_max_stake > 0 && config.demo_mints.iter().any(|d| *d), VowedError::InvalidConfig);
+    }
+    config.demo_enabled = enabled;
+    emit!(DemoEnabledChanged { enabled });
     Ok(())
 }
 

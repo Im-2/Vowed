@@ -25,6 +25,10 @@ pub mod vowed {
         instructions::admin::handle_set_paused(ctx, paused)
     }
 
+    pub fn set_demo_enabled(ctx: Context<AdminOnly>, enabled: bool) -> Result<()> {
+        instructions::admin::handle_set_demo_enabled(ctx, enabled)
+    }
+
     pub fn update_oracle(ctx: Context<AdminOnly>, new_oracle: Pubkey) -> Result<()> {
         instructions::admin::handle_update_oracle(ctx, new_oracle)
     }

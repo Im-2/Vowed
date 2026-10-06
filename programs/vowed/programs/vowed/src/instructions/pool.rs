@@ -17,6 +17,8 @@ pub struct CreatePoolParams {
     pub goal_hash: [u8; 32],
     pub join_window_secs: i64,
     pub max_participants: u32,
+    /// 0 = normal pool with real 24-hour days. 60..=3600 = DEMO POOL whose "days" last this many seconds.
+    pub demo_day_secs: u32,
 }
 
 #[derive(Accounts)]
@@ -77,10 +79,6 @@ pub fn handle_create_pool(ctx: Context<CreatePool>, params: CreatePoolParams) ->
     );
     require!(params.start_ts > now, VowedError::InvalidPoolParams);
     require!(
-        params.start_ts <= now.checked_add(MAX_START_AHEAD_SECS).ok_or(VowedError::MathOverflow)?,
-        VowedError::InvalidPoolParams
-    );
-    require!(
         (0..=MAX_JOIN_WINDOW_SECS).contains(&params.join_window_secs),
         VowedError::InvalidPoolParams
     );
@@ -88,6 +86,24 @@ pub fn handle_create_pool(ctx: Context<CreatePool>, params: CreatePoolParams) ->
         (1..=MAX_PARTICIPANTS_LIMIT).contains(&params.max_participants),
         VowedError::InvalidPoolParams
     );
+    // A demo pool follows every rule above and below, plus tighter ones of its own. It can never be looser than a normal pool.
+    let is_demo = params.demo_day_secs != 0;
+    let day_secs = if is_demo { params.demo_day_secs } else { NORMAL_DAY_SECS };
+    let max_ahead = if is_demo { DEMO_MAX_START_AHEAD_SECS } else { MAX_START_AHEAD_SECS };
+    require!(
+        params.start_ts <= now.checked_add(max_ahead).ok_or(VowedError::MathOverflow)?,
+        VowedError::InvalidPoolParams
+    );
+    if is_demo {
+        require!(config.demo_enabled, VowedError::DemoDisabled);
+        require!(config.is_demo_mint(&mint.key()), VowedError::DemoMintNotAllowed);
+        require!(
+            (DEMO_MIN_DAY_SECS..=DEMO_MAX_DAY_SECS).contains(&params.demo_day_secs),
+            VowedError::InvalidDemoDay
+        );
+        require!(params.max_participants <= DEMO_MAX_PARTICIPANTS, VowedError::InvalidPoolParams);
+        require!(params.join_window_secs <= day_secs as i64, VowedError::InvalidPoolParams);
+    }
     match params.mode {
         StakeMode::Hard => require!(
             params.penalty_bps == HARD_PENALTY_BPS,
@@ -100,7 +116,7 @@ pub fn handle_create_pool(ctx: Context<CreatePool>, params: CreatePoolParams) ->
     }
 
     let duration_secs = (params.duration_days as i64)
-        .checked_mul(SECONDS_PER_DAY)
+        .checked_mul(day_secs as i64)
         .ok_or(VowedError::MathOverflow)?;
     let end_ts = params
         .start_ts
@@ -122,9 +138,11 @@ pub fn handle_create_pool(ctx: Context<CreatePool>, params: CreatePoolParams) ->
         .start_ts
         .checked_add(params.join_window_secs)
         .ok_or(VowedError::MathOverflow)?;
-    pool.settle_after_ts = end_ts
-        .checked_add(config.settle_grace_secs)
-        .ok_or(VowedError::MathOverflow)?;
+    // Demo pools settle one demo-day after the end (long enough for the last check-in window to close); normal pools use the configured grace.
+    let settle_grace = if is_demo { day_secs as i64 } else { config.settle_grace_secs };
+    pool.settle_after_ts = end_ts.checked_add(settle_grace).ok_or(VowedError::MathOverflow)?;
+    pool.is_demo = is_demo;
+    pool.day_secs = day_secs;
     pool.duration_days = params.duration_days;
     pool.required_days = params.required_days;
     pool.goal_hash = params.goal_hash;
@@ -154,6 +172,8 @@ pub fn handle_create_pool(ctx: Context<CreatePool>, params: CreatePoolParams) ->
         required_days: pool.required_days,
         penalty_bps: pool.penalty_bps,
         goal_hash: pool.goal_hash,
+        is_demo: pool.is_demo,
+        day_secs: pool.day_secs,
     });
     Ok(())
 }
@@ -203,6 +223,10 @@ pub fn handle_join_pool(
     require!(!config.paused, VowedError::Paused);
     require!(stake > 0, VowedError::StakeZero);
     require!(stake <= config.max_stake, VowedError::StakeTooLarge);
+    // Demo pools have their own, lower stake cap (existing demo pools keep working even if demo creation is switched off).
+    if ctx.accounts.pool.is_demo {
+        require!(stake <= config.demo_max_stake, VowedError::StakeTooLarge);
+    }
     require!(
         (MIN_TZ_OFFSET_MINUTES..=MAX_TZ_OFFSET_MINUTES).contains(&tz_offset_minutes),
         VowedError::InvalidTimezone

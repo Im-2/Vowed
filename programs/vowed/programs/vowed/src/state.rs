@@ -17,12 +17,25 @@ pub struct Config {
     pub settle_grace_secs: i64,
     pub allowed_mints: [Pubkey; MAX_ALLOWED_MINTS],
     pub allowed_mint_count: u8,
+    /// Demo pools (minutes-long days, test money only) can be created only while this is true.
+    pub demo_enabled: bool,
+    /// Per-participant stake cap for demo pools. Always <= max_stake.
+    pub demo_max_stake: u64,
+    /// demo_mints[i] is true when allowed_mints[i] may be used for demo pools.
+    pub demo_mints: [bool; MAX_ALLOWED_MINTS],
     pub bump: u8,
 }
 
 impl Config {
     pub fn is_mint_allowed(&self, mint: &Pubkey) -> bool {
         self.allowed_mints[..self.allowed_mint_count as usize].contains(mint)
+    }
+
+    pub fn is_demo_mint(&self, mint: &Pubkey) -> bool {
+        self.allowed_mints[..self.allowed_mint_count as usize]
+            .iter()
+            .zip(self.demo_mints.iter())
+            .any(|(m, demo)| m == mint && *demo)
     }
 }
 
@@ -69,6 +82,10 @@ pub struct Pool {
     pub vault: Pubkey,
     pub kind: PoolKind,
     pub mode: StakeMode,
+    /// DEMO POOL: days last `day_secs` seconds instead of 24 hours. Test money only; clients must label these clearly.
+    pub is_demo: bool,
+    /// Length of one "day" in seconds: 86_400 for normal pools, 60..=3600 for demo pools.
+    pub day_secs: u32,
     pub penalty_bps: u16,
     /// Snapshot of config.fee_bps at creation, so later config changes cannot alter this pool's rules.
     pub fee_bps: u16,

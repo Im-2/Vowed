@@ -5,6 +5,7 @@
 mod common;
 mod t_checkin;
 mod t_config;
+mod t_demo;
 mod t_math;
 mod t_pool;
 mod t_settle;

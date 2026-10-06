@@ -76,6 +76,20 @@ def main():
                         {"now": now, "start_ts": start, "tz": tz, "day": day, "ok": window_ok(now, start, tz, day)}
                     )
 
+    # ---- demo pools: days counted from the start time, no timezone, grace = day_secs // 4
+    demo_index, demo_windows = [], []
+    for day_secs in (60, 61, 600, 3600):
+        grace = day_secs // 4
+        for start in (1_000, base + 600):
+            for off in (-1, 0, 1, day_secs - 1, day_secs, day_secs + grace - 1, day_secs + grace, 3 * day_secs + 7):
+                now = start + off
+                demo_index.append({"now": now, "start_ts": start, "day_secs": day_secs, "day_index": (now - start) // day_secs})
+            for day in (0, 1, 59):
+                opens = start + day * day_secs
+                for off in (-1, 0, 1, day_secs - 1, day_secs, day_secs + grace - 1, day_secs + grace, day_secs + grace + 1):
+                    now = opens + off
+                    demo_windows.append({"now": now, "start_ts": start, "day_secs": day_secs, "day": day, "ok": opens <= now < opens + day_secs + grace})
+
     # ---- payouts
     payout_cases = []
     named = [
@@ -107,10 +121,10 @@ def main():
         payout_cases.append(c)
 
     (OUT / "day-index.json").write_text(
-        json.dumps({"checkin_grace_secs": GRACE, "day_seconds": DAY, "day_index": day_cases, "window": window_cases}, indent=1)
+        json.dumps({"checkin_grace_secs": GRACE, "day_seconds": DAY, "day_index": day_cases, "window": window_cases, "demo_day_index": demo_index, "demo_window": demo_windows}, indent=1)
     )
     (OUT / "payout.json").write_text(json.dumps({"cases": payout_cases}, indent=1))
-    print(f"wrote {len(day_cases)} day-index, {len(window_cases)} window, {len(payout_cases)} payout cases to {OUT}")
+    print(f"wrote {len(day_cases)} day-index, {len(window_cases)} window, {len(demo_index)} demo day-index, {len(demo_windows)} demo window, {len(payout_cases)} payout cases to {OUT}")
 
 
 if __name__ == "__main__":

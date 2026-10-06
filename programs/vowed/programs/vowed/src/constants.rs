@@ -29,5 +29,13 @@ pub const MIN_TZ_OFFSET_MINUTES: i16 = -720;
 pub const MAX_TZ_OFFSET_MINUTES: i16 = 840;
 pub const MAX_ALLOWED_MINTS: usize = 4;
 pub const MAX_PARTICIPANTS_LIMIT: u32 = 1_000;
+/// Normal pools: one real day.
+pub const NORMAL_DAY_SECS: u32 = 86_400;
+// ---- DEMO POOLS: minutes-long "days" for demonstrations and tests only. Everything else about a pool stays the same.
+pub const DEMO_MIN_DAY_SECS: u32 = 60;
+pub const DEMO_MAX_DAY_SECS: u32 = 3_600;
+pub const DEMO_MAX_PARTICIPANTS: u32 = 20;
+/// A demo pool must start within a day of creation (normal pools: 30 days).
+pub const DEMO_MAX_START_AHEAD_SECS: i64 = SECONDS_PER_DAY;
 /// Size of a plain SPL mint. Larger means Token-2022 extensions (transfer fees etc.), which we reject.
 pub const PLAIN_MINT_LEN: usize = 82;

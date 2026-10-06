@@ -52,6 +52,12 @@ pub enum VowedError {
     ClaimsPending,
     #[msg("Pool already has payouts and cannot be voided")]
     CannotVoid,
+    #[msg("Demo pools are not enabled")]
+    DemoDisabled,
+    #[msg("This token is not enabled for demo pools")]
+    DemoMintNotAllowed,
+    #[msg("Demo day length must be between 60 and 3600 seconds")]
+    InvalidDemoDay,
     #[msg("Arithmetic overflow")]
     MathOverflow,
     #[msg("Account does not belong to this pool")]

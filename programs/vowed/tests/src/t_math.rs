@@ -45,6 +45,22 @@ fn shared_vectors_day_index() {
 }
 
 #[test]
+fn shared_vectors_demo_pool_windows() {
+    let v = load_vector("day-index.json");
+    let idx = v["demo_day_index"].as_array().unwrap();
+    let win = v["demo_window"].as_array().unwrap();
+    assert!(idx.len() > 50 && win.len() > 100);
+    for c in idx {
+        let got = math::demo_day_index(i(&c["now"]), i(&c["start_ts"]), u(&c["day_secs"]) as u32);
+        assert_eq!(got, i(&c["day_index"]), "demo day_index case {c}");
+    }
+    for c in win {
+        let got = math::demo_window_ok(i(&c["now"]), i(&c["start_ts"]), u(&c["day_secs"]) as u32, u(&c["day"]) as u8);
+        assert_eq!(got, c["ok"].as_bool().unwrap(), "demo window case {c}");
+    }
+}
+
+#[test]
 fn shared_vectors_checkin_window() {
     let v = load_vector("day-index.json");
     let cases = v["window"].as_array().unwrap();
