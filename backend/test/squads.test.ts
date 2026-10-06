@@ -103,6 +103,26 @@ describe("squads", () => {
   });
 });
 
+describe("challenge visibility", () => {
+  it("lists Open pools to everyone but Squad pools only to creator, participants and squad members; the address still works as an invite", async () => {
+    const w = await makeWorld();
+    const [owner, member, outsider, participant] = [await person(w), await person(w), await person(w), await person(w)];
+    const sq = await squadWith(w, owner, [member]);
+    const open = seedChallenge(w, { creator: owner.wallet });
+    w.s.db.prepare("UPDATE challenges SET kind = 'Open' WHERE pool = ?").run(open.pool);
+    const squadPool = seedChallenge(w, { creator: owner.wallet, squadId: sq.id });
+    const unlinked = seedChallenge(w, { creator: owner.wallet });
+    seedParticipant(w, unlinked.pool, participant.wallet);
+    const listed = async (p: Person) => ((await get(w, p, "/v1/challenges")).json().challenges as { pool: string }[]).map((c) => c.pool).sort();
+    expect(await listed(outsider)).toEqual([open.pool]);
+    expect(await listed(member)).toEqual([open.pool, squadPool.pool].sort());
+    expect(await listed(owner)).toEqual([open.pool, squadPool.pool, unlinked.pool].sort());
+    expect(await listed(participant)).toEqual([open.pool, unlinked.pool].sort());
+    // by address any signed-in user can still read it (needed to show the goal before joining from an invite)
+    expect((await get(w, outsider, `/v1/challenges/${squadPool.pool}`)).statusCode).toBe(200);
+  });
+});
+
 describe("nudges", () => {
   async function setup() {
     const w = await makeWorld();

@@ -130,3 +130,19 @@ Never hardcode these from memory; re-check before mainnet.
 - **Program binary:** 387,640 bytes. Deploy needs about 2 SOL on devnet (CLI said 1.97 SOL).
 - **Devnet faucet:** both `solana airdrop` and raw `requestAirdrop` returned HTTP 429 ("reached your airdrop limit today or the faucet has run dry"). The web faucet (https://faucet.solana.com) is the documented alternative.
 - **Program id (devnet and localnet):** `BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL`. The program keypair and the throwaway deployer key are in WSL `~/.config/solana/` and never in the repo.
+
+## Phase 2 findings (backend), 2026-10-06
+- **Node and SQLite:** Node 24.15 ships `node:sqlite` (`DatabaseSync`), used for the local database: no native add-on, no hosted DB, no account. Supports `RETURNING`.
+- **LiteSVM for Node** (`litesvm` 1.5.0) is built on `@solana/kit` 8.x and ships binaries for Linux and macOS only (no Windows). Backend VM tests therefore run in WSL with a Linux Node 24.15.0 (tarball SHA-256 checked against nodejs.org SHASUMS256.txt).
+  A web3.js v1 transaction converts with `getTransactionDecoder().decode(tx.serialize())`.
+- **Anchor TypeScript client not used.** `@anchor-lang/core` 1.2.0 failed to encode our enums and pulled `toml` (high advisory). We wrote an IDL-driven Borsh codec (`backend/src/program/borsh.ts`), exercised end to end against the real program binary.
+  `@solana/spl-token` was also dropped (`bigint-buffer` high advisory); the few token helpers are hand-written.
+- **Android key attestation, verified against real data:** Google's open-source verifier repo (https://github.com/android/keyattestation, Apache-2.0) publishes `roots.json` (two roots: the RSA root valid to 2042 and the newer "Key Attestation CA1" EC root, valid 2025-2035) and real device chains used as its own test data.
+  `https://android.googleapis.com/attestation/root` and `/status` were unreachable from this network (TLS reset), so the roots come from that repo. Copy: `backend/src/devices/google-roots.json`; fixtures: `backend/test/fixtures/attestation/` (6 real chains, TEE and StrongBox, SDK 28-37).
+  **Trust anchors must be compared by root public key, not by full-certificate fingerprint:** real chains carry a re-issued copy of the old root whose fingerprint differs from the published one but whose key is identical. All six chains verify this way.
+  Rules implemented: chain signatures, root self-signature and root key in the trusted set, extension only in the leaf (a later occurrence could be forged), challenge equality, attested key equals registered key, revocation list when reachable (a fetch failure is reported as "not checked", never as revoked), security level and verified-boot state from RootOfTrust tag 704.
+  The live revocation endpoint is therefore untested from here; a stubbed fetch covers the logic.
+- **Seeker attestation** is still unverified (needs the physical device); tracked in `docs/device-tests.md`.
+- **JSON vectors:** integers above 2^53 are not exact in JavaScript's `JSON.parse`; the shared vectors now carry all amounts as decimal strings (caught by the vector test).
+- **Devnet faucet:** unreliable for scripted use (HTTP 429). The gate script never calls it; funding is moved from the deployer or provided by hand.
+- **Devnet timing:** real 24-hour days plus `settle_grace_secs` mean a pool can be settled about 26 hours after its start, so the gate script is resumable in two stages. See `docs/progress.md` for the recommendation about demo pools.

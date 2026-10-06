@@ -246,7 +246,7 @@
     },
     "/v1/challenges": {
       "get": {
-        "summary": "List challenges (mine=true: only those I joined or created)",
+        "summary": "List challenges I may see: public Open pools plus my own and my squads' (mine=true: only those I joined or created). Squad pools are unlisted: anyone holding the pool address can still fetch it by address, so invitations work.",
         "tags": [
           "challenges"
         ],

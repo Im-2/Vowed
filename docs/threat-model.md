@@ -61,3 +61,42 @@ Later phases extend this file (device attestation, deep links, signing-request p
 - `void_pool` is a centralisation trade-off by design; it is disabled once a pool is fully settled.
 - Unaudited. Keep stake and pool caps small; no mainnet deployment without explicit approval.
 - Wallet-side risks (phishing of signing requests, malicious deep links) are covered when the Android app exists (Phase 3 and 9).
+
+
+---
+
+# Backend (Phase 2)
+
+Scope: the TypeScript API, oracle, indexer, crank and push. Written against the code in `backend/src`; tests are named in brackets.
+
+## Trust boundaries
+
+- **Wallet** proves identity by signing a Sign-In With Solana message with a server nonce (single use, 5 minutes, bound to the wallet and domain) [auth.test]. The token is an HS256 JWT valid for 1 hour.
+- **Device key** (Android Keystore, P-256) proves a proof package came from the phone the stake committed to. The stake commits to `sha256(device public key)` onchain at join time; the backend only accepts proofs signed by that key, registered to that wallet [lifecycle, proof-verify].
+- **Backend** decides whether a proof satisfies the plan, then the **oracle key** records the day onchain. The program trusts the oracle completely for check-ins (see the program threat model above).
+- **Chain state is the source of truth.** The SQLite mirror is rebuilt by re-reading accounts after each event; request bodies never feed it.
+
+## Threats and mitigations
+
+| Threat | Mitigation | Residual risk |
+|---|---|---|
+| Replay of an old proof | Per-session nonce signed into the package; session single-use, 5 min TTL, bound to wallet, pool, day and type; the program also rejects a second check-in for a day | none known |
+| Resubmission or double send | Accepted sessions return the stored result; the oracle sends once per (pool, wallet, day), shares in-flight calls and treats `DuplicateCheckin` as success; sessions are claimed atomically while processing [race test and mutation] | none known |
+| Forged proof from a modified app | Signature by the registered hardware-backed key; key attestation chain verified on the server against Google roots (by public key), challenge-bound, extension only in the leaf, revocation list; trust cap by security level and boot state | A rooted or modified phone with an honest-looking key can still lie about sensor data. Mitigated only by plausibility limits, trust tiers and stake caps. Stated openly in the pitch |
+| Attestation unavailable (emulator, odd ROM) | Accepted only when `REQUIRE_ATTESTATION=false`, and capped at **low** trust. Never silently upgraded | Real-device behaviour on Seeker and common phones is untested until `docs/device-tests.md` is run |
+| Fabricated metrics | Per-type plausibility (rep rate, steps per day, focus time within session length, dwell within session), unit conversion, direction checks, required liveness flag | Limits catch absurd values, not clever ones |
+| Stolen JWT | 1 h expiry; per-wallet rate limits; tokens grant API access only, never signing power (funds always need a wallet signature) | Token theft exposes that wallet's data for up to 1 h |
+| Malicious transaction from the API (compromised backend) | The app must decode every returned transaction and check program id, accounts and amounts before the wallet signs (SPEC 3.1). The API returns unsigned transactions plus a summary; summaries are never trusted by the app | Depends on the Android implementation (Phase 3) |
+| Enumeration or scraping of goals | Squad pools are unlisted: listed only to creator, participants and squad members; fetching by address works (the address is the invite). Open pools are public by design. Joining a squad-linked pool requires membership | Pool accounts themselves are public onchain (no goal text, only a hash) |
+| Invite code guessing | 8 characters from a 30-letter alphabet (about 6.5e11 codes), 20 attempts per wallet per hour, codes rotate on request | low |
+| Nudge spam | 1 per pair per 6 h, 10 per sender per day, 5 per recipient per day, only for people with an open check-in | low |
+| Oracle key compromise or outage | Key can only call `record_checkin`; rotation via `update_oracle`; accepted proofs queue and retry; `void_pool` for fraud before settlement | An attacker with the key can mark days done for anyone until it is rotated |
+| Crank key compromise | Holds no authority; can only pay fees for permissionless instructions | Loses its SOL balance |
+| Direct onchain joins bypass the API | The program enforces only global limits (max stake per participant, participants per pool). The per-trust-tier stake cap, plan hash linkage and device registration are backend rules | A direct joiner has no registered device, so cannot prove and will forfeit; no risk to others. Per-pool onchain caps are a possible later hardening |
+| Denial of service | 64 KB body limit, schema validation on every input, SQLite rate limits per IP (300/min) and per wallet (240/min) plus stricter per-endpoint limits, bounded open sessions | Limits are per instance; add a shared limiter if scaled out |
+| Secrets in logs or errors | Config errors never echo values; error responses carry codes and short messages; raw evidence is never stored (hash only); goal text is stored only as the structured plan | Operators must keep request logging free of bodies |
+| Dependency risk | Exact version pins; `@solana/spl-token` and `@anchor-lang/core` removed because of advisories; the remaining advisories are inside web3.js 1.x RPC JSON handling, reachable only through our own configured RPC | Re-audit each release (see runbook) |
+
+## Privacy
+
+Camera frames, sensor streams and raw location never reach the backend (the API has no field for them). Stored per proof: type, trust tier, evidence hash, local hour of day (for the coach), accept or reject reason. Stored per goal: the structured GoalPlan. Push messages never contain goal text or wallet addresses.

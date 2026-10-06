@@ -41,6 +41,8 @@ interface SentTx {
 export class LiteSvmChain implements Chain {
   /** Make the next N sendAndConfirm calls fail like an RPC outage (tests the oracle retry path). */
   failNext = 0;
+  /** Artificial latency per call so concurrent requests really interleave, like over real RPC. */
+  delayMs = 0;
   private slotCounter = 1;
   private sent: SentTx[] = [];
   readonly svm: import("litesvm").LiteSVM;
@@ -79,7 +81,12 @@ export class LiteSvmChain implements Chain {
     return Number(this.svm.getClock().unixTimestamp);
   }
 
+  private async lag() {
+    if (this.delayMs > 0) await new Promise((r) => setTimeout(r, this.delayMs));
+  }
+
   async getAccount(address: string): Promise<AccountData | null> {
+    await this.lag();
     const a = this.svm.getAccount(address as Address);
     if (!a.exists) return null;
     return { data: a.data, lamports: BigInt(a.lamports), owner: a.programAddress as string };
@@ -94,6 +101,7 @@ export class LiteSvmChain implements Chain {
   }
 
   async sendAndConfirm(tx: Transaction): Promise<SendResult> {
+    await this.lag();
     if (this.failNext > 0) {
       this.failNext--;
       throw new Error("rpc unavailable");

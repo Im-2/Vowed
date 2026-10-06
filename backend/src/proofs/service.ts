@@ -79,7 +79,7 @@ export async function createSession(s: Services, wallet: string, pool: string, d
 
 
 function reject(s: Services, sessionId: string, pkg: ProofPackage, wallet: string, reason: string, tier: TrustTier = "low"): never {
-  s.db.prepare("UPDATE proof_sessions SET status='rejected', result_json=? WHERE id=? AND status='open'").run(JSON.stringify({ reason }), sessionId);
+  s.db.prepare("UPDATE proof_sessions SET status='rejected', result_json=? WHERE id=? AND status IN ('open','processing')").run(JSON.stringify({ reason }), sessionId);
   s.db
     .prepare(
       `INSERT OR IGNORE INTO proofs (session_id, wallet, pool, day_index, proof_type, trust_tier, evidence_hash, status, reject_reason, hour_of_day, created_at)
@@ -92,6 +92,16 @@ function reject(s: Services, sessionId: string, pkg: ProofPackage, wallet: strin
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 export async function submitProof(s: Services, wallet: string, pkg: ProofPackage): Promise<SubmitResult> {
+  try {
+    return await submitProofInner(s, wallet, pkg);
+  } catch (e) {
+    // An unexpected failure (not a deliberate rejection) must not burn the session: reopen it so the app can retry.
+    if (!(e instanceof ApiError)) s.db.prepare("UPDATE proof_sessions SET status='open' WHERE id=? AND status='processing'").run(pkg.sessionId);
+    throw e;
+  }
+}
+
+async function submitProofInner(s: Services, wallet: string, pkg: ProofPackage): Promise<SubmitResult> {
   const session = s.db.prepare("SELECT * FROM proof_sessions WHERE id = ?").get(pkg.sessionId) as
     | { id: string; wallet: string; pool: string; day_index: number; proof_type: string; nonce: string; expires_at: number; status: string; result_json: string | null }
     | undefined;
@@ -103,11 +113,15 @@ export async function submitProof(s: Services, wallet: string, pkg: ProofPackage
     if (stored.checkin.status === "pending") stored.checkin = await submitCheckin(s, session.pool, wallet, session.day_index);
     return stored;
   }
+  if (session.status === "processing") throw conflict("session_busy", "this proof is already being processed");
   if (session.status !== "open") throw conflict("session_closed", "this proof session is already closed; request a new one");
   if (session.expires_at < s.wallNow()) {
     s.db.prepare("UPDATE proof_sessions SET status='rejected', result_json=? WHERE id=?").run(JSON.stringify({ reason: "expired" }), session.id);
     throw conflict("session_expired", "the proof session expired; request a new one");
   }
+  // Claim the session atomically: of two concurrent submissions only one proceeds.
+  const claimed = s.db.prepare("UPDATE proof_sessions SET status='processing' WHERE id = ? AND status = 'open'").run(session.id);
+  if (Number(claimed.changes) !== 1) throw conflict("session_busy", "this proof is already being processed");
   // Binding: the package must be for exactly this session.
   if (!same(pkg.nonce, session.nonce) || pkg.challengeId !== session.pool || pkg.dayIndex !== session.day_index || pkg.proofType !== session.proof_type) {
     return reject(s, session.id, pkg, wallet, "package does not match the proof session");

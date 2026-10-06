@@ -54,3 +54,36 @@ Design decisions that differ from or extend the SPEC (flagged for review):
 
 Open for Phase 2: oracle and treasury keys (devnet), allowed-mints list (devnet USDC `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`, plus our own test mint for SKR), and the backend must reuse `shared/test-vectors`.
 Before mainnet: move the upgrade authority to a multisig or make the program immutable.
+
+## Phase 2: Backend — code, tests and gate script DONE; devnet gate NOT yet run (2026-10-06)
+
+Gate: "an automated script creates a pool, joins with two test wallets, submits proofs, records check-ins, settles and claims on devnet."
+
+**What is verified now**
+- 89 backend tests (`scripts/backend-test.sh` in WSL; 76 run natively on Windows with `npm test`, 13 need the VM). The main one drives the whole lifecycle **through the HTTP API against the real
+  `vowed.so`** in an in-process VM with an advancing clock: create pool, join with two wallets, device-signed proofs, oracle check-ins, squad feed and missed-day entries, crank settlement, claim, treasury sweep, voids, pause, outage retry, replay and race safety.
+- 10 backend mutations (broken signature check, nonce binding, replay idempotency, stake cap, auth nonce reuse, squad membership, wallet signature, attestation challenge, day window, in-flight race) are all caught by the tests (`scripts/backend-mutation-check.sh`).
+- Key attestation verifier checked against 6 **real** device chains from Google's own test data (TEE and StrongBox, 2018-2026), plus tampered, replayed, spliced and revoked variants.
+- Backend time and payout rules equal the program's: both check the same shared vectors (`shared/test-vectors`, amounts now decimal strings). Program suite still 60 tests green.
+- `docs/openapi.json` (26 endpoints) generated from the route schemas, with a test that fails if it is stale. `docs/runbook.md`, `docs/threat-model.md` (backend section), `docs/device-tests.md`, `backend/.env.example` written.
+- `scripts/check-all.ps1` runs everything (backend on Windows and WSL, Android debug build, program tests): exit 0.
+
+**What is built**: wallet sign-in (SIWS + JWT), tx builders for create/join/claim (unsigned, idempotent with `Idempotency-Key`), device registration with hardware key attestation and trust caps, proof sessions and verification
+(nonce, signature, window, per-type plausibility), oracle (idempotent, retrying), event indexer and poller, settlement and sweep crank, squads (invite codes, feed, leaderboard, nudges with spam limits), push token registry with an FCM HTTP v1 sender
+(unit-tested with a fake network; needs a Firebase project to go live), deterministic coach, rate limits, SQLite for local dev (no outside account needed).
+
+**What is NOT done and why**
+1. **Devnet run of the gate script.** `backend/scripts/devnet-gate.ts` is written and its read-only `--plan` mode works, but it has not sent anything. It needs your approval to move **0.11 SOL from the deployer** to four throwaway test wallets
+   (addresses below; no faucet involved) and it runs `init_config` on devnet on first use (irreversible for this program id; oracle = the throwaway key at the address below).
+2. **Stage B needs about 26 hours.** The program uses real 24-hour days and settlement opens `end_ts + 2h` (the config's settle grace). A pool created now can be settled and claimed only after that, so the script runs stage A (create, join, prove, on-chain check-ins) immediately and stage B (crank settles, winner claims, treasury sweep, balance checks) when run again after the printed time.
+3. Not exercised against the live services: Google's attestation revocation endpoint (unreachable from this network; stub-tested), FCM (needs a Firebase project; fake-network-tested), real Seeker/phone attestation chains (`docs/device-tests.md`).
+4. Gemini goal parser is Phase 5 (not part of this phase's list).
+
+**Test wallets (devnet, throwaway, keys in gitignored `backend/.devnet/`)**: alice `2YePEWRp8aTfqQnJHK2EBt4YkXRXWetzdmL8dDG7UFZf` 0.03 SOL, bob `8gXPzzYFGnKSA1FHnqM5TbA7BBMpAQ1hBQrbZJyUYiYQ` 0.03, oracle `8SvB51yoFX4DPA3YS3FfbYL8ZgbwJ7aL9hFVG1cMfEuE` 0.02, crank `DTiVsCBJnqTP7yyXtigNSjkUVHNAyFyDCTEe5sJQc5wg` 0.03. Deployer `Est16oNPGu3zQRvaZ9s13UBzH6HrSiofFA15maw86eYz` has about 0.527 SOL.
+Treasury (no SOL needed): `backend/.devnet/treasury.json`.
+
+**Decision needed from you (affects the demo, not this gate)**: with 24-hour days nobody can see a real settlement during a 3-minute demo or a judge's quick test on devnet. Options: (a) rely on the SPEC's labeled demo data for the fast-forward step;
+(b) add a per-pool `day_secs` to the program so "demo pools" can have 60-second days (small change plus tests and a redeploy; the redeploy needs about 2 SOL of devnet funding). I recommend (b), decided before Phase 3.
+
+**Findings during the phase worth knowing** (details in `docs/verified-facts.md`): LiteSVM for Node has no Windows build, so full tests run in WSL; the Anchor TS client could not encode our enums and carried an advisory, so we use our own small Borsh codec;
+real attestation chains need root comparison by public key, not fingerprint; `JSON.parse` loses precision above 2^53 (vectors now use strings); a concurrent-submit race and a squad-goal visibility leak were found in self-review and fixed with tests.

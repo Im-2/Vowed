@@ -186,6 +186,43 @@ describe.skipIf(!lib)("API lifecycle against the real program (LiteSVM)", () => 
     expect(w.s.db.prepare("SELECT COUNT(*) AS n FROM checkins").get()).toEqual({ n: 0 });
   });
 
+  it("two concurrent submissions of one proof produce exactly one check-in and no server error", async () => {
+    const w = (await makeChainWorld())!;
+    const alice = await makePlayer(w);
+    const pool = await createPool(w, alice);
+    await join(w, alice, pool);
+    w.chain.setTime(dayOf(0));
+    const first = await prove(w, alice, pool, 0, {}); // establishes a valid session+package, then we race a fresh one
+    expect(first.sub.statusCode).toBe(200);
+    w.chain.setTime(dayOf(1));
+    const sess = (await post(w, alice, "/v1/proofs/session", { pool, dayIndex: 1, proofType: "CAMERA_POSE" })).json();
+    const now = w.chain.nowSec();
+    const pkg = alice.device.signPackage({ sessionId: sess.sessionId, nonce: sess.nonce, challengeId: pool, dayIndex: 1, proofType: "CAMERA_POSE", metrics: { reps: 25, livenessPassed: true }, startedAt: now - 60, endedAt: now - 5, evidenceHash: sha("race"), deviceKeyId: alice.device.id });
+    w.chain.delayMs = 25; // real RPC calls take time, so the two requests overlap
+    const [r1, r2] = await Promise.all([post(w, alice, "/v1/proofs/submit", pkg), post(w, alice, "/v1/proofs/submit", pkg)]);
+    w.chain.delayMs = 0;
+    expect([r1.statusCode, r2.statusCode].every((c) => c < 500)).toBe(true);
+    expect([r1.statusCode, r2.statusCode]).toContain(200);
+    expect(w.s.db.prepare("SELECT COUNT(*) AS n FROM checkins WHERE day_index = 1").get()).toEqual({ n: 1 });
+    expect(w.s.db.prepare("SELECT COUNT(*) AS n FROM proofs WHERE session_id = ?").get(sess.sessionId)).toEqual({ n: 1 });
+    const again = await post(w, alice, "/v1/proofs/submit", pkg); // and a later retry still returns the stored result
+    expect(again.statusCode).toBe(200);
+  });
+
+  it("only squad members can join a pool linked to a squad", async () => {
+    const w = (await makeChainWorld())!;
+    const [alice, bob, mallory] = [await makePlayer(w), await makePlayer(w), await makePlayer(w)];
+    const pool = await createPool(w, alice);
+    const sq = (await post(w, alice, "/v1/squads", { name: "Crew" })).json();
+    await post(w, alice, `/v1/squads/${sq.id}/challenges`, { pool });
+    const j = (p: Player) => post(w, p, "/v1/challenges/tx/join", { pool, stake: (10n * UNIT).toString(), tzOffsetMinutes: 0, deviceId: p.device.id });
+    expect((await j(mallory)).json().error.code).toBe("not_in_squad");
+    expect((await j(bob)).json().error.code).toBe("not_in_squad");
+    await post(w, bob, "/v1/squads/join", { code: sq.inviteCode });
+    expect((await j(bob)).statusCode).toBe(200);
+    expect((await j(alice)).statusCode).toBe(200); // the creator
+  });
+
   it("keeps an accepted proof when the network is down and sends the check-in later, exactly once", async () => {
     const w = (await makeChainWorld())!;
     const alice = await makePlayer(w);

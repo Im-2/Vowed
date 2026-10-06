@@ -173,7 +173,7 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
       preHandler: auth,
       schema: {
         tags: ["challenges"],
-        summary: "List challenges (mine=true: only those I joined or created)",
+        summary: "List challenges I may see: public Open pools plus my own and my squads' (mine=true: only those I joined or created). Squad pools are unlisted: anyone holding the pool address can still fetch it by address, so invitations work.",
         querystring: z.object({
           status: z.enum(["Open", "Settling", "Settled", "Voided"]).optional(),
           mine: z.enum(["true", "false"]).default("false"),
@@ -190,6 +190,10 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           `SELECT c.* FROM challenges c
            WHERE (?1 IS NULL OR c.status = ?1)
              AND (?2 = 'false' OR c.creator = ?3 OR EXISTS (SELECT 1 FROM participants p WHERE p.pool = c.pool AND p.wallet = ?3))
+             -- Open pools are public. A Squad pool (and its goal text) is listed only to its creator, participants and squad members.
+             AND (c.kind = 'Open' OR c.creator = ?3
+                  OR EXISTS (SELECT 1 FROM participants p WHERE p.pool = c.pool AND p.wallet = ?3)
+                  OR (c.squad_id IS NOT NULL AND EXISTS (SELECT 1 FROM squad_members m WHERE m.squad_id = c.squad_id AND m.wallet = ?3)))
            ORDER BY c.start_ts DESC LIMIT ?4`,
         )
         .all(status ?? null, mine, wallet, limit) as unknown as ChallengeRow[];
@@ -344,6 +348,9 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         if (c.participant_count >= c.max_participants) throw conflict("pool_full", "the challenge is full");
         if (!c.plan_json) throw conflict("plan_missing", "this challenge has no verified goal plan, so it cannot be proven");
         if (getParticipant(s, b.pool, wallet)) throw conflict("already_joined", "you already joined this challenge");
+        if (c.squad_id && c.creator !== wallet && !s.db.prepare("SELECT 1 FROM squad_members WHERE squad_id = ? AND wallet = ?").get(c.squad_id, wallet)) {
+          throw forbidden("not_in_squad", "this challenge belongs to a squad you are not a member of");
+        }
 
         const plan = GoalPlanSchema.parse(JSON.parse(c.plan_json)) as GoalPlan;
         const cfg = await getProgramConfig(s);

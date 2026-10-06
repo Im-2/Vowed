@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "openapi": "tsx scripts/gen-openapi.ts"
+    "openapi": "tsx scripts/gen-openapi.ts",
+    "gate:devnet": "tsx scripts/devnet-gate.ts"
   },
   "dependencies": {
     "@anchor-lang/core": "1.2.0",

@@ -44,7 +44,10 @@ Vowed is an Android app (Kotlin + Jetpack Compose) built for the Solana Mobile "
 
 - Everything: `powershell scripts/check-all.ps1`
 - Program build + tests (WSL Ubuntu as root): `wsl -d Ubuntu -u root -- bash /mnt/c/Users/hp/Vowed/scripts/program-build.sh`
-- Backend dev / tests: `cd backend; npm run dev` / `npm test`
+- Backend dev / fast tests (Windows): `cd backend; npm run dev` / `npm test` (13 VM tests are skipped there)
+- Backend full suite incl. real-program VM tests (WSL): `wsl -d Ubuntu -u root -- bash /mnt/c/Users/hp/Vowed/scripts/backend-test.sh` (run `program-build.sh` first)
+- Backend devnet gate (resumable, never uses a faucet): `cd backend; npm run gate:devnet -- --plan` then `-- --fund`, then no flag; see `docs/runbook.md`
+- Regenerate API docs: `cd backend; npm run openapi` (a test fails if `docs/openapi.json` is stale)
 - Android build: `cd android; .\gradlew.bat assembleDebug` (needs `JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot`; SDK at `C:\Users\hp\Android\Sdk`; `sdk.dir` in `android/local.properties` must use forward slashes)
 - Emulator + install: `scripts/emulator.ps1` (AVD `vowed_api36`; Mock MWA Wallet built at `C:\Users\hp\Android\tools\mock-mwa-wallet`; a test PIN is set on the emulator, needed to AUTHENTICATE the wallet)
 - Build release APK: `TODO`
