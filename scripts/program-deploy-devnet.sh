@@ -15,12 +15,13 @@ echo "program id: $(solana-keygen pubkey "$KP")"
 echo "program size: $(stat -c %s "$SO") bytes"
 bal() { solana balance "$PAYER" --url "$URL" | awk '{print $1}'; }
 echo "balance: $(bal) SOL"
-need=6
-for i in 1 2 3 4 5 6; do
-  b="$(bal)"; if awk "BEGIN{exit !($b >= $need)}"; then break; fi
-  solana airdrop 2 "$PAYER" --url "$URL" 2>&1 | tail -1 || true
-  sleep 3
-done
+# No automatic airdrops: the faucet is rate limited and funding is done by a human (faucet.solana.com).
 echo "balance: $(bal) SOL"
 solana program deploy "$SO" --program-id "$KP" --keypair "$HOME/.config/solana/id.json" --url "$URL" 2>&1 | tail -5
-solana program show "$(solana-keygen pubkey "$KP")" --url "$URL"
+PID="$(solana-keygen pubkey "$KP")"
+solana program show "$PID" --url "$URL"
+solana program dump "$PID" /tmp/vowed-onchain.so --url "$URL" >/dev/null
+# on-chain data is padded; compare the first N bytes where N = local size
+N=$(stat -c %s "$SO")
+echo "local   sha256: $(sha256sum "$SO" | cut -d' ' -f1)"
+echo "onchain sha256: $(head -c "$N" /tmp/vowed-onchain.so | sha256sum | cut -d' ' -f1)"
