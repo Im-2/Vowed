@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vowed.app/schemas/proof-package.json",
+  "title": "ProofPackage",
+  "type": "object",
+  "required": ["sessionId","nonce","challengeId","dayIndex","proofType","metrics","startedAt","endedAt","evidenceHash","deviceKeyId","signature"],
+  "additionalProperties": false,
+  "properties": {
+    "sessionId":{"type":"string"},"nonce":{"type":"string"},"challengeId":{"type":"string"},
+    "dayIndex":{"type":"integer","minimum":0,"maximum":59},
+    "proofType":{"enum":["CAMERA_POSE","USAGE_LIMIT","NO_USE_WINDOW","STEPS","GEOFENCE","FOCUS_TIMER","SELF_ATTEST"]},
+    "metrics":{"type":"object"},
+    "startedAt":{"type":"integer"},"endedAt":{"type":"integer"},
+    "evidenceHash":{"type":"string"},"deviceKeyId":{"type":"string"},"signature":{"type":"string"}
+  }
+}

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+local.properties
+.gradle/
+build/
+.idea/
+target/
+.anchor/
+test-ledger/
+*.log
+*-keypair.json

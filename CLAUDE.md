@@ -1,0 +1,53 @@
+# Vowed: project memory for Claude Code
+
+Vowed is an Android app (Kotlin + Jetpack Compose) built for the Solana Mobile "CLOCK IN" hackathon. Users stake USDC or SKR on any goal they type in plain words, prove it each day with phone-native proofs, and play with friends in squads. All product detail lives in `SPEC.md`.
+
+## Hard requirements from the hackathon organizers
+
+- Android only; the app must produce a functional APK.
+- Must integrate the Solana Mobile Stack and Mobile Wallet Adapter (MWA). See SPEC 3.3.
+- Native mobile design from the ground up. No WebView UI, no PWA wrapper, no ported web app.
+- Must interact meaningfully with the Solana network (our onchain program does this).
+- Deliverables: APK, GitHub repo, demo video, pitch deck.
+
+## First thing every session
+
+1. Read `SPEC.md` fully before writing code. It is the source of truth.
+2. Read `docs/progress.md` (create it in Phase 0 if missing) to see which phase we are in.
+3. Work on one phase at a time, in the order given in SPEC section 11. Backend first, then UI.
+
+## Working rules
+
+- **Stop at each phase gate.** When a phase's gate in SPEC section 11 passes, update `docs/progress.md`, summarise what works in a few lines, and wait for the user before starting the next phase.
+- **Do not guess SDK facts from memory.** Versions, package names, program addresses (including the SKR mint) and API shapes must be checked against current official docs (docs.solanamobile.com, Anchor docs, Android docs) before use. Record what you verified in `docs/verified-facts.md` with the source URL.
+- **Never put secrets in the repo or the APK.** No private keys, API keys or JWT secrets in source, in `BuildConfig`, or in resources. Use environment variables on the backend and `.env.example` files with placeholders.
+- **Never ask the user to share a seed phrase or private key.** Test with the Mock MWA Wallet and devnet test keypairs only.
+- **No mainnet deploys, no real funds, and no paid services without explicit approval from the user in chat.** Default network is devnet. All AI features must run on free tiers or on-device (SPEC section 6).
+- **Label anything simulated.** If a feature uses mock data or a simulated yield, the UI must say so. Never present simulated numbers as real.
+- **Privacy rule.** Camera frames, sensor streams and raw location never leave the phone. Only derived, minimal proof summaries and the typed goal text go to the backend.
+- **Security rule.** Every onchain instruction needs signer, owner, PDA-seed and mint checks, plus tests for the failure cases (SPEC section 4.5).
+- **Test as you go.** Each phase ships with tests that run from one command. Do not mark a phase done with failing tests.
+- **Commit small and often** with clear messages. Do not commit build output, keystores or `.env` files.
+- **Prefer the emulator first.** Features that need real hardware (camera pose, step counter, usage stats) get an emulator-friendly fallback or a debug "inject test data" path, plus a manual real-device test checklist in `docs/device-tests.md`.
+
+## Repo layout (create in Phase 0)
+
+```
+/programs/vowed      Anchor program (Rust) + tests
+/backend             TypeScript API, oracle, indexer, jobs + tests
+/android             Kotlin + Compose app
+/shared              JSON schemas (GoalPlan, ProofPackage) used by backend and app
+/docs                progress.md, verified-facts.md, device-tests.md, threat-model.md, pitch/
+```
+
+## Commands (fill in as they are created)
+
+- Program tests: `TODO`
+- Backend dev / tests: `TODO`
+- Android build / unit tests: `TODO`
+- Run emulator + install debug build: `TODO`
+- Build release APK: `TODO`
+
+## Definition of done for the whole project
+
+Everything in SPEC section 13 (submission checklist) is complete and the demo script in section 13.3 runs end to end on a real Android phone.

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vowed.app/schemas/goal-plan.json",
+  "title": "GoalPlan",
+  "type": "object",
+  "required": ["title","category","cadence","target","proofMethods","window","difficulty","verifiable","unverifiableReason","suggestedAlternative","clarifyingQuestions"],
+  "additionalProperties": false,
+  "properties": {
+    "title": {"type":"string","minLength":1,"maxLength":120},
+    "category": {"enum":["fitness","study","detox","sleep","steps","location","custom"]},
+    "cadence": {"type":"object","required":["periodDays","totalDays","requiredDays"],"additionalProperties":false,
+      "properties":{"periodDays":{"const":1},"totalDays":{"type":"integer","minimum":1,"maximum":60},"requiredDays":{"type":"integer","minimum":1,"maximum":60}}},
+    "target": {"type":"object","required":["metric","value","unit","direction"],"additionalProperties":false,
+      "properties":{"metric":{"type":"string","maxLength":60},"value":{"type":"number"},"unit":{"type":"string","maxLength":30},"direction":{"enum":["atLeast","atMost"]}}},
+    "proofMethods": {"type":"array","maxItems":4,"items":{"type":"object","required":["type","params","trustTier"],"additionalProperties":false,
+      "properties":{"type":{"enum":["CAMERA_POSE","USAGE_LIMIT","NO_USE_WINDOW","STEPS","GEOFENCE","FOCUS_TIMER","SELF_ATTEST"]},"params":{"type":"object"},"trustTier":{"enum":["high","medium","low"]}}}},
+    "window": {"anyOf":[{"type":"null"},{"type":"object","required":["startLocalTime","endLocalTime"],"additionalProperties":false,
+      "properties":{"startLocalTime":{"type":"string","pattern":"^([01]\d|2[0-3]):[0-5]\d$"},"endLocalTime":{"type":"string","pattern":"^([01]\d|2[0-3]):[0-5]\d$"}}}]},
+    "difficulty": {"type":"integer","minimum":1,"maximum":5},
+    "verifiable": {"type":"boolean"},
+    "unverifiableReason": {"type":["string","null"]},
+    "suggestedAlternative": {"type":["string","null"]},
+    "clarifyingQuestions": {"type":"array","items":{"type":"string"},"maxItems":3}
+  }
+}
