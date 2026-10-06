@@ -12,6 +12,8 @@ mkdir -p "$W" "$HOME/vowed-shared"
 rsync -a --delete --exclude node_modules --exclude dist --exclude '*.sqlite*' --exclude .devnet --exclude .env "$SRC"/ "$W"/
 rsync -a --delete "$SHARED"/ "$HOME/vowed-shared"/
 ln -sfn "$HOME/vowed-shared" "$HOME/shared"
+mkdir -p "$HOME/vowed-docs"; rsync -a --delete "$SRC/../docs/" "$HOME/vowed-docs/"
+ln -sfn "$HOME/vowed-docs" "$HOME/docs"
 cd "$W"
 if [ ! -d node_modules ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then npm ci --no-audit --no-fund 2>&1 | tail -3; fi
 export VOWED_SO="$SO"

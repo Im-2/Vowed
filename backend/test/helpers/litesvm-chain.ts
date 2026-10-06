@@ -39,6 +39,8 @@ interface SentTx {
 }
 
 export class LiteSvmChain implements Chain {
+  /** Make the next N sendAndConfirm calls fail like an RPC outage (tests the oracle retry path). */
+  failNext = 0;
   private slotCounter = 1;
   private sent: SentTx[] = [];
   readonly svm: import("litesvm").LiteSVM;
@@ -92,6 +94,10 @@ export class LiteSvmChain implements Chain {
   }
 
   async sendAndConfirm(tx: Transaction): Promise<SendResult> {
+    if (this.failNext > 0) {
+      this.failNext--;
+      throw new Error("rpc unavailable");
+    }
     const kitTx = getTransactionDecoder().decode(tx.serialize());
     const res = this.svm.sendTransaction(kitTx);
     this.svm.expireBlockhash();

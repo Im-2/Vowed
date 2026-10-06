@@ -14,3 +14,10 @@ target/
 test-ledger/
 *.log
 *-keypair.json
+
+# devnet test keys, SQLite files and gate state (throwaway, never committed)
+backend/.devnet/
+.devnet/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
