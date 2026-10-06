@@ -1,0 +1,118 @@
+# Submission notes
+
+The single source for the submission form, README, demo script and pitch deck. **Only things that were built and verified are listed as done.**
+Every entry names the proof (a test or a demo you can run) and the commit that added it. Plans live in `SPEC.md`, not here.
+
+Rules for this file (also in `CLAUDE.md`):
+1. After every phase, add what was actually built and verified. Never list a feature as done unless it works.
+2. Say *where* it was verified: unit test, in-process VM with the real program, emulator, devnet, or a real phone. Do not blur these.
+3. Anything not yet proven goes in "Not verified yet" or "Do not claim", never in the feature tables.
+4. Commit ids are short hashes in this repository (https://github.com/Im-2/Vowed). A feature changed later keeps its first commit and lists the fix commit.
+
+Last updated: after Phase 2 (code and tests complete; devnet end-to-end run still pending).
+
+---
+
+## 1. Status of the product features (SPEC section 2)
+
+| Feature | Status | What exists |
+|---|---|---|
+| F1 Stake on a goal | **Onchain and backend verified; no app UI yet** | Program + backend tx builders. Real stake custody in a program vault, tested in the VM. The Android app cannot create or join yet (Phase 3) |
+| F2 Plain-language goals | **Not started** (only the GoalPlan schema, hashing and validation exist) | `backend/src/domain/plan.ts`; no parser, no templates, no AI yet (Phase 5) |
+| F3 Daily proof check-in | **Backend verified; no phone proofs yet** | Device-signed proof verification and onchain check-ins, tested with simulated devices. No camera, steps, usage, geofence or timer code on Android yet (Phases 4-5) |
+| F4 Squads | **Backend verified; no app UI** | Squads, invites, feed, leaderboard, nudges (tested). Push delivery needs a Firebase project (not created) |
+| F5 Streaks and payouts | **Onchain and backend verified** | Settlement, payout math, claims; streak calculation. No calendar heatmap or payout animation (app) |
+| F6 Yield / soft stakes | **Soft mode verified onchain. Yield not started** | Soft penalty (max 50%) works in tests. No yield integration; nothing simulated is shown anywhere yet |
+| F7 Adaptive coach | **Rules verified in backend; no app UI** | Deterministic suggestions with tests. No LLM wording (not planned for now) |
+| F8 Future-self letters | **Not started** | |
+| F9 Open proof plug-ins | **Not started** | |
+| SKR rewards and perks (prize) | **Not started** | Design decided (rewards for top streaks + SKR-paid perks, not staking); nothing built |
+
+---
+
+## 2. What is built and verified, by phase
+
+### Phase 0: foundations (gate passed 2026-10-06)
+
+| What works | Proof | Commit |
+|---|---|---|
+| A native Android app (Kotlin, Jetpack Compose) builds and, on an Android 36 emulator, connects to the Mock MWA Wallet through Mobile Wallet Adapter and shows the wallet's public key | Screenshot `docs/phase0-mwa-connect.png`; steps and gotchas in `docs/verified-facts.md` (items 1-2). Repeat with `scripts/emulator.ps1` | `cf1b700` (app), `f24342c` (gate) |
+| Backend, Android and Anchor projects all build and test from one command | `powershell scripts/check-all.ps1` exits 0 (last run after Phase 2) | `f24342c`, `1223d51`, extended in `2c1fc10` |
+| SPEC section 14 facts checked against official sources and recorded with URLs (MWA 2.2.0 artifact and its Android SDK 37 / AGP 9 requirement, SKR mint with 6 decimals read from chain, USDC mints, Anchor provenance) | `docs/verified-facts.md` | `1b5bd87`, `6466399`, `1223d51` |
+| Hackathon rules from the official portal recorded; SKR design changed to rewards and perks, not staking | `SPEC.md` sections 1.1 and 9.6 | `6466399` |
+
+Limits: wallet connection only, no transaction signing in the app yet. Emulator and the Mock wallet only, no real phone or Seed Vault Wallet yet.
+
+### Phase 1: Solana program (gate passed 2026-10-06)
+
+Program id `BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL`. Anchor 1.2.0 (pinned to tag `v1.2.0`).
+
+| What works | Proof | Commit |
+|---|---|---|
+| Stake custody: stakes sit in a vault owned by the program; only `claim` (to the owner) and `sweep_treasury` move money out | `programs/vowed/tests/src/t_settle.rs`, `t_pool.rs` (56 integration + 4 unit tests, all pass) | `8e3ddce` |
+| Pools with Soft (penalty capped at 50%) and Hard (full forfeit) modes, joins with limits, pause switch | `t_pool.rs`, `t_config.rs` | `8e3ddce` |
+| Oracle-signed daily check-ins, bounded to each day's window in the user's timezone; no duplicates | `t_checkin.rs` | `8e3ddce` |
+| Permissionless settlement, payouts: winners get their stake plus a share of forfeits; fees and rounding dust go to the treasury; all edge cases from SPEC 4.4 | `t_settle.rs`; payout property tests on pure math and on-chain with random pools: money is conserved and the vault ends at zero (`t_math.rs`) | `8e3ddce` |
+| Admin can void a pool before any payout and everyone gets their full stake back | `t_void.rs` | `8e3ddce` |
+| Security checks: wrong signers, wrong accounts, wrong mints, double claim, reinitialisation, config only by the upgrade authority | `t_config.rs`, `t_settle.rs`, `t_checkin.rs`, `t_pool.rs`; threat model `docs/threat-model.md` | `8e3ddce` |
+| The tests really catch bugs: removing the oracle check, the settle-time check or the claim-state update each makes tests fail (3 of 3) | `scripts/program-mutation-check.sh` | `8e3ddce` |
+| Rust, TypeScript and the program agree on day-index, check-in window and payout math | Shared vectors `shared/test-vectors/*.json` (generated by an independent Python implementation, 1,135 cases) checked in Rust and in the backend | `8e3ddce`, tightened in `2c1fc10` |
+| **Deployed to devnet**, and the onchain bytes equal the local build | Deploy tx `3bWZkcUugU72LA6kAPEhnr4e17fdpuh9xBQFjibqgDQVcsJNLGcqNgfr9J4Gh4cXihDMLARNYit7aG3gWfJvFr9q`; `scripts/program-verify-devnet.sh` shows identical SHA-256 `7f787026...` | `b4c397a` |
+
+Limits: the deployed program has **not been used live on devnet yet** (`init_config` not run). Unaudited; the oracle is a trusted backend key (see "Trust model" below). Token-2022 extension rejection has no integration test.
+
+### Phase 2: backend (code and tests complete; devnet gate pending)
+
+All of this is verified **in an in-process VM running the real program binary** (and in unit tests), not yet on devnet. Run: `wsl -d Ubuntu -u root -- bash scripts/backend-test.sh` (89 tests pass); `cd backend; npm test` runs 76 of them natively on Windows.
+
+| What works | Proof | Commit |
+|---|---|---|
+| Wallet sign-in with a signed Sign-In-With-Solana message, single-use nonce, short-lived token | `backend/test/auth.test.ts` (11 tests: replay, wrong key, wrong domain, expired, rate limit) | `d4992fa` |
+| The API builds unsigned create / join / claim transactions (safe to retry with `Idempotency-Key`); the wallet signs and sends them; the stake is bound to the user's registered device key | `backend/test/e2e/lifecycle.test.ts` (full lifecycle and the builder refusals); API reference `docs/openapi.json` (26 endpoints, kept current by a test) | `d4992fa`, `ace0612` |
+| Device registration with Android hardware key attestation: verifies Google's certificate chain, the challenge and the attested key; sets a trust cap from security level and boot state | `backend/test/attestation.test.ts`: **six real device attestation chains** (TEE and StrongBox, Android SDK levels 28 to 37) pass; tampered, replayed, wrong-key, foreign-root, spliced and revoked chains fail | `d4992fa` |
+| Proof sessions and verification: per-session nonce, device signature, day window, per-type plausibility (reps per second, steps per day, focus time, usage, dwell), trust tier | `backend/test/proof-verify.test.ts`, `lifecycle.test.ts` (rejects wrong nonce, other device, tampering, expiry, future and stale timestamps, strangers) | `d4992fa`, `ace0612` |
+| The oracle records an accepted proof onchain exactly once; survives an RPC outage by retrying; replays return the stored result | `lifecycle.test.ts` (replay, outage and concurrent-submit tests) | `d4992fa`, `ace0612`; race fix `2c1fc10` |
+| Settlement crank: settles every due participation and sweeps leftovers to the treasury; claims and balances checked | `lifecycle.test.ts` (winner, loser, nobody-wins sweep, void refunds) | `d4992fa`, `ace0612` |
+| Event indexer keeps a database mirror of onchain state (also via polling when the app never reports a transaction) | `lifecycle.test.ts` ("the poller mirrors...") | `d4992fa` |
+| Squads: create, invite code and link, join, linked pools, activity feed (joined, checked in, missed, settled), leaderboard, nudges with spam limits, squad goals hidden from non-members | `backend/test/squads.test.ts` (13 tests), `lifecycle.test.ts` | `d4992fa`, `ace0612`, visibility fix `2c1fc10` |
+| Coach: deterministic suggestions (easier below 70%, harder only after two strong cycles, never touches an active challenge) | `backend/test/coach.test.ts`, `squads.test.ts` ("coach endpoint") | `d4992fa` |
+| Push-token registry; FCM HTTP v1 sender (unit-tested with a fake network; **not** tested against Google) | `backend/test/fcm.test.ts`, `squads.test.ts` | `d4992fa` |
+| The tests catch real bugs: 10 of 10 deliberately broken guards fail the suite | `scripts/backend-mutation-check.sh` | `2c1fc10` |
+| Runs locally with SQLite and no outside account; no secrets in the repo; secret scan of the whole history is clean | `bash scripts/secret-scan.sh`; `docs/runbook.md` | `2c1fc10`, `7d0ce16` |
+
+Limits: no run on devnet yet; the app does not call the backend yet; Seeker and real-phone attestation unverified; Google's live revocation endpoint was unreachable from the development network (stub-tested only).
+
+---
+
+## 3. Trust model (use this wording; do not oversell)
+
+- Funds are controlled only by the program. Users sign their own deposits and claims with their wallet.
+- Daily completion is recorded by a backend **oracle** key after it verifies a device-signed proof. The oracle can be wrong or malicious, and a determined user with a rooted phone could try to fake sensor data. Mitigations that exist and are tested: hardware-backed device key with attestation, per-session nonces, trust tiers that cap stakes, plausibility limits, the admin's ability to void a pool before payouts, and the oracle's power being limited to recording check-ins.
+- Not built (roadmap only): multiple attestors, squad voting on disputes, oracle rotation with a timelock.
+- The program is unaudited and the upgrade authority is a single devnet key. Devnet only.
+
+---
+
+## 4. Do not claim yet
+
+- Camera pose, step counting, usage-limit, geofence or focus-timer proofs on a phone (backend verifies the data; nothing collects it).
+- Plain-language goals or any AI (no parser exists).
+- Yield on stakes, SKR rewards or SKR perks, letters, widget, plug-ins.
+- That the app can stake, join or claim (the Android app only connects a wallet today).
+- A working end-to-end flow on devnet (the devnet gate script exists but has not been run), or on a real phone, or on a Seeker.
+- Push notifications reaching a phone.
+- Audited, mainnet, or "first habit-staking app" (prior art exists; see SPEC 1.2).
+
+## 5. Not verified yet (tracked, will move to section 2 when proven)
+
+| Item | Blocked on |
+|---|---|
+| Devnet end-to-end run (create, join, prove, check-in, settle, claim, sweep) | Funding approval for four throwaway wallets, then about 26 hours (24-hour day plus 2-hour settle grace) |
+| Real phone and Seeker attestation | A physical device (`docs/device-tests.md`) |
+| Live FCM delivery | A Firebase project (free) |
+| Demo with settlement in real time | Decision on short-day "demo pools" (needs a program change and redeploy), or use labeled demo data per SPEC 8.5 |
+
+## 6. Demo and pitch material that already exists
+
+- The lifecycle test is a faithful narrated script of the product loop (create, join, prove, miss, settle, claim) against the real program; its steps map to demo beats 3-6 of SPEC 13.3 once the app UI exists.
+- Verified numbers safe to quote (reproducible with the commands above): 60 program tests, 89 backend tests, 10/10 and 3/3 mutations caught, 6 real attestation chains verified, 1,135 shared vectors, 26 documented API endpoints.
