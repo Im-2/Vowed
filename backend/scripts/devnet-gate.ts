@@ -3,7 +3,8 @@
  *
  *   npm run gate:devnet              # setup (idempotent), then start or finish depending on saved state
  *   npm run gate:devnet -- --plan    # only print which addresses need how much devnet SOL (sends nothing)
- *   npm run gate:devnet -- --fund    # top up the test wallets from the deployer key (never from a faucet)
+ *   npm run gate:devnet -- --fund --fund-only   # only top up the test wallets from the deployer key (never from a faucet), then stop
+ *   npm run gate:devnet -- --fund    # top up, then continue with the whole gate
  *
  * Why it runs in two stages: the program's days are real 24-hour days and settlement opens end_ts + 2h, so a pool created now
  * can only be settled about 26 hours later. Stage A (create, join, prove, check-in on chain) runs immediately; stage B (crank
@@ -87,10 +88,16 @@ async function main() {
 
   // ---- 1. funding plan (never a faucet)
   const targets: [string, Keypair, bigint][] = [
-    ["alice", alice, 30_000_000n],
-    ["bob", bob, 30_000_000n],
-    ["oracle", oracle, 20_000_000n],
-    ["crank", crank, 30_000_000n],
+    // Smallest amounts that work, from devnet's actual rent figures (lamports): system account minimum 650,240; token account 1,488,440;
+    // pool 1,945,640; participation 1,285,240; 5,000 per signature. Each target = what the wallet spends + 650,240 it must keep + about 15% margin.
+    //   alice: pool + vault + participation + 3 fees = 4.73M spent -> 6.2M
+    //   bob:   pool + vault + 2 participations + 3 fees = 6.02M spent -> 7.7M
+    //   oracle: fees only (each check-in is 5,000) -> 0.8M
+    //   crank: 3 settle fees + the treasury token account for the sweep = 1.51M spent -> 2.5M
+    ["alice", alice, 6_200_000n],
+    ["bob", bob, 7_700_000n],
+    ["oracle", oracle, 800_000n],
+    ["crank", crank, 2_500_000n],
   ];
   const deployerBal = await lamports(deployer.publicKey);
   const shortfalls: { name: string; key: PublicKey; have: bigint; need: bigint }[] = [];
@@ -101,11 +108,11 @@ async function main() {
     log(`  ${name.padEnd(7)} ${kp.publicKey.toBase58()}  has ${Number(have) / 1e9} SOL, target ${Number(target) / 1e9}${need ? `, short ${Number(need) / 1e9}` : ", ok"}`);
     if (need) shortfalls.push({ name, key: kp.publicKey, have, need });
   }
-  log(`  deployer ${deployer.publicKey.toBase58()} has ${Number(deployerBal) / 1e9} SOL (also pays mint/token-account/config rent, about 0.02 SOL)`);
+  log(`  deployer ${deployer.publicKey.toBase58()} has ${Number(deployerBal) / 1e9} SOL (also pays mint, token-account and config rent, about 0.007 SOL)`);
   const total = shortfalls.reduce((a, s) => a + s.need, 0n);
   if (shortfalls.length) {
     if (args.has("--fund")) {
-      if (deployerBal < total + 60_000_000n) throw new Error("deployer does not have enough SOL to fund the test wallets and still pay setup rent");
+      if (deployerBal < total + 20_000_000n) throw new Error("deployer does not have enough SOL to fund the test wallets and still pay setup rent");
       for (const s of shortfalls) {
         const sig = (await signAndSend(chain, [SystemProgram.transfer({ fromPubkey: deployer.publicKey, toPubkey: s.key, lamports: s.need })], [deployer])).signature;
         log(`  funded ${s.name} with ${Number(s.need) / 1e9} SOL: ${explorer(sig)}`);
@@ -115,7 +122,7 @@ async function main() {
       process.exit(2);
     }
   }
-  if (args.has("--plan")) return;
+  if (args.has("--plan") || args.has("--fund-only")) return; // --fund-only: top up the wallets and stop (no mints, no init_config, no pools)
 
   // ---- 2. test mints, tokens, config
   for (const [label, mintKp] of [["USDC (test)", usdcT], ["SKR (test)", skrT]] as [string, Keypair][]) {

@@ -79,7 +79,7 @@ Gate: "an automated script creates a pool, joins with two test wallets, submits 
 3. Not exercised against the live services: Google's attestation revocation endpoint (unreachable from this network; stub-tested), FCM (needs a Firebase project; fake-network-tested), real Seeker/phone attestation chains (`docs/device-tests.md`).
 4. Gemini goal parser is Phase 5 (not part of this phase's list).
 
-**Test wallets (devnet, throwaway, keys in gitignored `backend/.devnet/`)**: alice `2YePEWRp8aTfqQnJHK2EBt4YkXRXWetzdmL8dDG7UFZf` 0.03 SOL, bob `8gXPzzYFGnKSA1FHnqM5TbA7BBMpAQ1hBQrbZJyUYiYQ` 0.03, oracle `8SvB51yoFX4DPA3YS3FfbYL8ZgbwJ7aL9hFVG1cMfEuE` 0.02, crank `DTiVsCBJnqTP7yyXtigNSjkUVHNAyFyDCTEe5sJQc5wg` 0.03. Deployer `Est16oNPGu3zQRvaZ9s13UBzH6HrSiofFA15maw86eYz` has about 0.527 SOL.
+**Test wallets (devnet, throwaway, keys in gitignored `backend/.devnet/`)**: alice `2YePEWRp8aTfqQnJHK2EBt4YkXRXWetzdmL8dDG7UFZf`, bob `8gXPzzYFGnKSA1FHnqM5TbA7BBMpAQ1hBQrbZJyUYiYQ`, oracle `8SvB51yoFX4DPA3YS3FfbYL8ZgbwJ7aL9hFVG1cMfEuE`, crank `DTiVsCBJnqTP7yyXtigNSjkUVHNAyFyDCTEe5sJQc5wg` (amounts: see the funding update below; the 0.03/0.02 figures first quoted here were too generous). Deployer `Est16oNPGu3zQRvaZ9s13UBzH6HrSiofFA15maw86eYz`.
 Treasury (no SOL needed): `backend/.devnet/treasury.json`.
 
 **Decision needed from you (affects the demo, not this gate)**: with 24-hour days nobody can see a real settlement during a 3-minute demo or a judge's quick test on devnet. Options: (a) rely on the SPEC's labeled demo data for the fast-forward step;
@@ -87,3 +87,11 @@ Treasury (no SOL needed): `backend/.devnet/treasury.json`.
 
 **Findings during the phase worth knowing** (details in `docs/verified-facts.md`): LiteSVM for Node has no Windows build, so full tests run in WSL; the Anchor TS client could not encode our enums and carried an advisory, so we use our own small Borsh codec;
 real attestation chains need root comparison by public key, not fingerprint; `JSON.parse` loses precision above 2^53 (vectors now use strings); a concurrent-submit race and a squad-goal visibility leak were found in self-review and fixed with tests.
+
+### Funding update (2026-10-06, after the Phase 2 report)
+The four test wallets were funded **from the deployer** (no faucet) with the smallest amounts that work, computed from devnet's real rent figures
+(system account minimum 650,240 lamports; token account 1,488,440; pool 1,945,640; participation 1,285,240; 5,000 per signature) plus about 15% margin:
+alice 6,200,000 lamports (0.0062 SOL), bob 7,700,000 (0.0077), oracle 800,000 (0.0008), crank 2,500,000 (0.0025): **0.0172 SOL in total** (not the 0.11 first estimated).
+Balances confirmed on chain. The deployer keeps about 0.510 SOL, far more than the roughly 0.007 SOL it still needs for the test mints, two token accounts and `init_config`.
+Transactions: alice `aAAWmW1M...`, bob `2sdx79KP...`, oracle `3UwTKKE8...`, crank `b2JWMYpT...` (full links were printed by `npm run gate:devnet -- --fund --fund-only`).
+`init_config` and the pools have **not** been run yet; the gate still waits for your go-ahead on `init_config` (irreversible for this program id) and for the 26-hour stage B.
