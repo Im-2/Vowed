@@ -144,3 +144,8 @@ Backend: the Solana RPC layer now retries transient failures and reports a 502 i
 Bug found and fixed on the way: a screen that was merely sitting there kept an old clock, so "is today open" went stale when a refresh returned identical data. Fixed with a ticking clock (not yet reinstalled on the emulator; the check-ins above were done by re-opening screens).
 **SOL moved from the deployer (no faucet):** alice +0.08 SOL, bob +0.02, crank +0.01, oracle +0.005 (rent for the pools: each demo pool costs about 0.005 SOL). Deployer about 2.79 SOL.
 Next: Phase 5 (AI goal parser and camera pose) after your review.
+
+
+## Addendum (2026-10-07): in-app test tokens, devnet wallets, Circle USDC
+
+Added after the Phase 4 gate, at your request. Backend faucet (`/v1/faucet`, `/v1/faucet/claim`): fixed 20 tUSDC + 20 tSKR per claim, once per wallet per 24 hours, global cap 200 claims per UTC day, off unless its key and mints are configured, a failed send frees the claim; 13 new tests (103 backend tests pass on Windows) and each limit was verified to be caught by deliberately breaking it. App: a "Test tokens" card on Today with the TEST TOKENS label, balances, countdown and a note that devnet SOL is not included. Verified live on devnet through the app and with a second wallet (limits, new token account). Wallet research and Circle USDC findings are in `README.md` and `docs/verified-facts.md`: Phantom and Solflare document a devnet switch (not run by us), Seed Vault Wallet and Backpack are unverified, Circle USDC pool creation works in the app but joining was not possible without Circle USDC.

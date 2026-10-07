@@ -55,3 +55,16 @@ Use a demo pool with 2-minute days (New challenge: Demo pool on, "2 min days") s
 | P12 | Release build | There is no "Inject" panel anywhere; `DebugProofs` in the APK only throws (verified on the compiled classes) | |
 | P13 | Proof after the day window closed | "the check-in window for that day is not open" | |
 | P14 | Phone clock set one hour ahead | Proof refused (timestamp in the future) | |
+
+
+## Test tokens and wallets on devnet (real phone / Seeker)
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| T1 | Phantom: enable Testnet Mode and Solana Devnet, connect Vowed | Connects; sign-in works; no `ERROR_CHAIN_NOT_SUPPORTED` | |
+| T2 | Solflare: Settings -> Network -> Devnet, connect Vowed | Same | |
+| T3 | Seed Vault Wallet on a Seeker: connect Vowed on devnet | Record exactly what happens (works / chain not supported / needs a setting) | |
+| T4 | Today -> Get test tokens on a new wallet | 20 tUSDC and 20 tSKR arrive; the card says TEST TOKENS | |
+| T5 | Press it again | Disabled with "Available again in ..." | |
+| T6 | A wallet with no devnet SOL tries to create a pool | A clear failure from the wallet; the card tells the user to get devnet SOL | |
+| T7 | Circle devnet USDC (get 20 from https://faucet.circle.com/ by hand): create a normal pool, join, check in the next day, claim after it ends | Everything works like the test tokens | |

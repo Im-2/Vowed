@@ -54,6 +54,7 @@ Vowed is an Android app (Kotlin + Jetpack Compose) built for the Solana Mobile "
 - Regenerate API docs: `cd backend; npm run openapi` (a test fails if `docs/openapi.json` is stale)
 - Android build: `cd android; .\gradlew.bat assembleDebug` (needs `JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot`; SDK at `C:\Users\hp\Android\Sdk`; `sdk.dir` in `android/local.properties` must use forward slashes)
 - Emulator + install: `scripts/emulator.ps1` (AVD `vowed_api36`; Mock MWA Wallet built at `C:\Users\hp\Android\tools\mock-mwa-wallet`; a test PIN is set on the emulator, needed to AUTHENTICATE the wallet)
+- Test-token faucet tests: `cd backend; npx vitest run test/faucet.test.ts` (env and limits: `docs/runbook.md`)
 - Android unit tests + debug APK: `powershell scripts/android-test.ps1`
 - Dev backend for the emulator (devnet, port 8787, throwaway keys from backend/.devnet): `powershell scripts/dev-backend.ps1`
 - Drive the emulator through create/join/claim with the Mock wallet: `scripts/emu-drive.ps1`, `scripts/emu-claim.ps1` (the latter clears wallet and app data first). Mock wallet quirks are in `docs/verified-facts.md` ("Phase 3")

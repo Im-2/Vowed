@@ -164,3 +164,15 @@ Do not claim yet (additions): any proof captured by the app, a release APK, a re
 
 Limits to state honestly: collectors for steps, location and usage were not run on real sensors yet (device checklist P1-P14); proofs from the emulator carry trust "low"; the "friend" in the payout demo was a script-controlled test wallet, not a second phone; camera proof is not built yet.
 Do not claim yet (additions): proofs from real sensors, a second phone in a squad, any AI, yield or SKR features.
+
+
+---
+
+## Addendum: test tokens and devnet wallets
+
+| Feature that really works | Proof |
+|---|---|
+| In-app "Get test tokens": fixed 20 tUSDC + 20 tSKR to the signed-in wallet, once per wallet per 24 h, global daily cap, labelled TEST TOKENS | Emulator run: alice 109.9 to 129.9 tUSDC and 0 to 20 tSKR read from chain; bob claimed through the live API, then refused (429 `faucet_cooldown`); `backend/test/faucet.test.ts` (13 tests, each limit mutation-checked) |
+| Normal pool creation with Circle's devnet USDC from the app | Pool `55DPY...1EcY2` on devnet, mint `4zMMC...DncDU` |
+
+Limits to state honestly: testers also need devnet SOL (the tokens do not include it); joining and claiming with Circle USDC is **not verified**; Phantom and Solflare devnet switching is from their documentation, not run by us; Seed Vault Wallet and Backpack devnet support is unverified.

@@ -91,3 +91,11 @@ public devnet RPC is rate limited; FCM is free but needs a Firebase project.
 - Play a friend in a pool the app created (test wallet bob, no check-ins unless `--prove 0,1`): `cd backend; npm run demo:friend -- <pool> --stake 2`
 - Dev backend for the emulator: `powershell scripts/dev-backend.ps1` (run it as a background task with the longest timeout; it stops when the timeout ends)
 - Emulator helpers: `scripts/emu-lib.ps1` (dot-source; `Reset-And-Connect`, `Tap-Text`, `Sign-Reviewed`). The Mock wallet's key needs a recent PIN: if wallet requests start failing after a long idle, run `Reset-And-Connect`.
+
+
+## Test-token faucet
+
+- Enabled when the backend environment has `FAUCET_AUTHORITY_SECRET_KEY` (the mint authority of both test mints), `FAUCET_USDC_MINT` and `FAUCET_SKR_MINT`. `scripts/dev-backend.ps1` sets them from `backend/.devnet` for local runs. Amounts and limits: `FAUCET_USDC_AMOUNT`, `FAUCET_SKR_AMOUNT` (base units), `FAUCET_COOLDOWN_SECS` (default 86400), `FAUCET_GLOBAL_DAILY_CLAIMS` (default 200).
+- The authority wallet pays the token-account rent for new wallets (about 0.004 SOL for two accounts) and must keep at least 0.01 SOL; below that the faucet answers 503 `faucet_unfunded`.
+- Every claim is a row in `faucet_claims` (status pending, sent or failed; only pending and sent count toward limits).
+- Tests: `cd backend; npx vitest run test/faucet.test.ts`.

@@ -2558,6 +2558,162 @@
           }
         }
       }
+    },
+    "/v1/faucet": {
+      "get": {
+        "summary": "Test-token faucet status for the signed-in wallet (devnet only). Show `label` next to the tokens",
+        "tags": [
+          "faucet"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "network": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "symbol": {
+                            "type": "string",
+                            "enum": [
+                              "tUSDC",
+                              "tSKR"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "mint": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "string"
+                          },
+                          "decimals": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "symbol",
+                          "name",
+                          "mint",
+                          "amount",
+                          "decimals"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "canClaim": {
+                      "type": "boolean"
+                    },
+                    "nextClaimAt": {
+                      "type": "number"
+                    },
+                    "claimsLeftToday": {
+                      "type": "number"
+                    },
+                    "balances": {
+                      "type": "object",
+                      "properties": {
+                        "tUSDC": {
+                          "type": "string"
+                        },
+                        "tSKR": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tUSDC",
+                        "tSKR"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "network",
+                    "label",
+                    "tokens",
+                    "canClaim",
+                    "nextClaimAt",
+                    "claimsLeftToday",
+                    "balances"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/faucet/claim": {
+      "post": {
+        "summary": "Claim a fixed amount of TEST USDC and TEST SKR (once per wallet per 24 hours, with a global daily cap)",
+        "tags": [
+          "faucet"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "signature": {
+                      "type": "string"
+                    },
+                    "minted": {
+                      "type": "object",
+                      "properties": {
+                        "tUSDC": {
+                          "type": "string"
+                        },
+                        "tSKR": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tUSDC",
+                        "tSKR"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "nextClaimAt": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "signature",
+                    "minted",
+                    "nextClaimAt",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "security": [
