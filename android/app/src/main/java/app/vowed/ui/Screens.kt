@@ -614,6 +614,17 @@ fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPra
             Text("Proof key trust cap: ${state.account?.trustCap ?: "-"}")
             Text("Network: ${state.meta?.network ?: "devnet"} (test tokens only)")
             Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall)
+            if (app.vowed.BuildConfig.DEBUG) {
+                // debug builds only: the release app always uses its built-in address
+                val prefs = remember { app.vowed.data.Prefs(ctx) }
+                var shown by remember { mutableStateOf(prefs.backendUrl) }
+                Text("Debug: backend address (restart the app after changing)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { prefs.backendUrl = "https://vowed-backend.onrender.com"; shown = prefs.backendUrl }) { Text("Hosted") }
+                    OutlinedButton(onClick = { prefs.backendUrl = "http://10.0.2.2:8787"; shown = prefs.backendUrl }) { Text("Local (emulator)") }
+                }
+                Text("Now: $shown", style = MaterialTheme.typography.bodySmall)
+            }
             OutlinedButton(onClick = onPractice) { Text("Practice check-in (nothing is sent)") }
             OutlinedButton(onClick = onDisconnect) { Text("Disconnect wallet") }
         }

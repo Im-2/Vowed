@@ -72,14 +72,20 @@ export function startJobs(s: Services, log: (msg: string) => void = console.erro
         ]
       : []),
   ];
-  // one pass shortly after start, so a fresh deploy lists its samples without waiting half an hour
-  const first = s.config.SEED_SECRET_KEY
-    ? setTimeout(() => {
-        seedPublicChallenges(s)
-          .then((r) => r.errors.forEach((e) => log(`seed-explore: ${e}`)))
-          .catch(() => log("seed-explore failed"));
-      }, 90_000)
-    : null;
+  // a first pass shortly after start (and a retry every minute while the indexer is still reading history), so a fresh deploy lists its samples quickly
+  let first: ReturnType<typeof setTimeout> | null = null;
+  if (s.config.SEED_SECRET_KEY) {
+    let tries = 0;
+    const attempt = () => {
+      seedPublicChallenges(s)
+        .then((r) => {
+          r.errors.forEach((e) => log(`seed-explore: ${e}`));
+          if (r.errors.some((e) => e.startsWith("waiting for the indexer")) && ++tries < 30) first = setTimeout(attempt, 60_000);
+        })
+        .catch(() => log("seed-explore failed"));
+    };
+    first = setTimeout(attempt, 60_000);
+  }
   return () => {
     timers.forEach(clearInterval);
     if (first) clearTimeout(first);

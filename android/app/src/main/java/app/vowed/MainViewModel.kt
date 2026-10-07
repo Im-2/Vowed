@@ -296,6 +296,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         wallet = Base58.decode(account.wallet), mint = Base58.decode(mint), poolId = poolId, mode = draft.mode, penaltyBps = penaltyBps,
                         startTs = startTs, durationDays = draft.totalDays, requiredDays = draft.requiredDays, joinWindowSecs = joinWindow,
                         maxParticipants = maxParticipants, demoDaySecs = if (draft.demo) daySecs else 0, goalHash = goalHash,
+                        kind = if (draft.squadId == null && draft.visibility == "public") 1 else 0,
                     ),
                 )
                 val pool = resp.pool

@@ -14,8 +14,8 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         // Backend base URL. 10.0.2.2 is the emulator's alias for the development machine. No secrets live here.
-        // pass -PbackendUrl=https://your-service.onrender.com to build an APK that talks to the hosted backend (a public URL, not a secret)
-        buildConfigField("String", "BACKEND_URL", "\"${providers.gradleProperty("backendUrl").getOrElse("http://10.0.2.2:8787")}\"")
+        // The hosted devnet backend (a public URL, not a secret). Pass -PbackendUrl=http://10.0.2.2:8787 for a local backend; debug builds can also switch in You (settings).
+        buildConfigField("String", "BACKEND_URL", "\"${providers.gradleProperty("backendUrl").getOrElse("https://vowed-backend.onrender.com")}\"")
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {

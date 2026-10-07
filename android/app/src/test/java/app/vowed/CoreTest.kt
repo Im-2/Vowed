@@ -95,6 +95,24 @@ class CoreTest {
     }
     private fun reject(block: () -> Unit) = assertThrows(TxRejected::class.java) { block() }
 
+    /** The fixture pool is a Squad (kind 0) pool; this copy of it says Open (kind 1), as a public challenge would. */
+    private fun openCreateTx(): ByteArray {
+        val b = tx("create").copyOf()
+        val disc = Programs.CREATE_POOL
+        val at = (0..b.size - 8).first { i -> (0 until 8).all { b[i + it] == disc[it] } }
+        b[at + 16] = 1 // 8 discriminator bytes + 8 pool id bytes, then the kind byte
+        return b
+    }
+
+    @Test fun publicChoiceAcceptsAnOpenPoolAndRefusesASquadPool() {
+        TxChecker.checkCreate(openCreateTx(), createExp { CreateExpectation(it.wallet, it.mint, it.poolId, it.mode, it.penaltyBps, it.startTs, it.durationDays, it.requiredDays, it.joinWindowSecs, it.maxParticipants, it.demoDaySecs, it.goalHash, kind = 1) })
+        reject { TxChecker.checkCreate(tx("create"), createExp { CreateExpectation(it.wallet, it.mint, it.poolId, it.mode, it.penaltyBps, it.startTs, it.durationDays, it.requiredDays, it.joinWindowSecs, it.maxParticipants, it.demoDaySecs, it.goalHash, kind = 1) }) }
+    }
+
+    @Test fun privateChoiceRefusesAnOpenPool() {
+        reject { TxChecker.checkCreate(openCreateTx(), createExp()) } // the person chose private, the transaction says public
+    }
+
     @Test fun createRefusesWrongIntent() {
         val t = tx("create")
         reject { TxChecker.checkCreate(t, createExp { CreateExpectation(it.wallet, it.mint, it.poolId, "Soft", 3_000, it.startTs, it.durationDays, it.requiredDays, it.joinWindowSecs, it.maxParticipants, it.demoDaySecs, it.goalHash) }) }

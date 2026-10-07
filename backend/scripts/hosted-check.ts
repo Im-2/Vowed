@@ -1,0 +1,52 @@
+/**
+ * Checks a hosted backend end to end with the throwaway test wallet bob: health, sign-in, goal parsing (including one goal that needs the
+ * language model), Explore (sample challenges) and the test-token faucet. Prints results only; no keys, no tokens.
+ *   npx tsx scripts/hosted-check.ts https://vowed-backend.onrender.com [--claim]
+ */
+import { readFileSync } from "node:fs";
+import { Keypair } from "@solana/web3.js";
+import nacl from "tweetnacl";
+import { buildSiwsMessage } from "../src/http/auth.js";
+
+const base = (process.argv[2] ?? "").replace(/\/$/, "");
+if (!base) throw new Error("usage: hosted-check.ts <base url> [--claim]");
+const DIR = new URL("../.devnet/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+const bob = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(`${DIR}bob.json`, "utf8")) as number[]));
+let token = "";
+async function api(method: string, path: string, body?: unknown) {
+  const res = await fetch(base + path, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const text = await res.text();
+  let json: any = null;
+  try { json = JSON.parse(text); } catch { /* not json */ }
+  return { status: res.status, json, text };
+}
+const line = (k: string, v: unknown) => console.log(`${k.padEnd(34)} ${typeof v === "string" ? v : JSON.stringify(v)}`);
+
+const t0 = Date.now();
+const h = await api("GET", "/v1/health");
+line("health", { status: h.status, ...h.json, ms: Date.now() - t0 });
+const wallet = bob.publicKey.toBase58();
+const n = await api("POST", "/v1/auth/nonce", { wallet });
+const msg = new TextEncoder().encode(buildSiwsMessage({ domain: n.json.domain, address: wallet, statement: n.json.statement, uri: n.json.uri, nonce: n.json.nonce, issuedAt: n.json.issuedAt, expirationTime: n.json.expirationTime }));
+const v = await api("POST", "/v1/auth/verify", { wallet, message: Buffer.from(msg).toString("base64"), signature: Buffer.from(nacl.sign.detached(msg, bob.secretKey)).toString("base64") });
+line("sign-in", v.status === 200 ? "ok" : `failed ${v.status} ${v.text.slice(0, 120)}`);
+token = v.json?.token ?? "";
+if (!token) process.exit(1);
+
+for (const text of ["read for 30 minutes every day for a week", "I want to practise guitar for 45 minutes each evening", "meditate with my dog at sunrise for ten days", "I want to lose 5 kilos"]) {
+  const r = await api("POST", "/v1/goals/parse", { text, useAi: true });
+  const j = r.json;
+  line(`parse: ${text.slice(0, 32)}`, r.status === 200 ? { status: j.status, source: j.source, ai: j.ai, type: j.plan?.proofMethods?.[0]?.type, title: j.plan?.title, trust: j.trustTier } : `HTTP ${r.status} ${r.text.slice(0, 160)}`);
+}
+
+const ex = await api("GET", "/v1/explore?demo=exclude&limit=30");
+line("explore (normal pools)", ex.status === 200 ? { count: ex.json.items.length, samples: ex.json.items.filter((i: any) => i.sample).length, titles: ex.json.items.map((i: any) => `${i.title} [${i.category}]`) } : `HTTP ${ex.status}`);
+const exd = await api("GET", "/v1/explore?demo=only&limit=30");
+line("explore (demo pools)", exd.status === 200 ? { count: exd.json.items.length } : `HTTP ${exd.status}`);
+
+const f = await api("GET", "/v1/faucet");
+line("faucet status", f.status === 200 ? { enabled: f.json.enabled, canClaim: f.json.canClaim, nextClaimAt: f.json.nextClaimAt, tokens: f.json.tokens?.map((t: any) => t.symbol) } : `HTTP ${f.status} ${f.text.slice(0, 120)}`);
+if (process.argv.includes("--claim") && f.json?.canClaim) {
+  const c = await api("POST", "/v1/faucet/claim", {});
+  line("faucet claim", c.status === 200 ? { ok: true, usdc: c.json.usdc, skr: c.json.skr, signature: String(c.json.signature).slice(0, 12) + "…" } : `HTTP ${c.status} ${c.text.slice(0, 200)}`);
+}

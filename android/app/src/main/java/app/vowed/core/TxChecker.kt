@@ -21,6 +21,8 @@ class CreateExpectation(
     val demoDaySecs: Int,
     /** SHA-256 of the canonical plan JSON, computed on the phone from the goal the user is looking at. */
     val goalHash: ByteArray,
+    /** 0 = Squad (private), 1 = Open (listed in Explore). The pool kind in the transaction must be exactly the one the person chose. */
+    val kind: Int = 0,
 )
 
 class JoinExpectation(
@@ -82,7 +84,7 @@ object TxChecker {
         val maxParticipants = d.int
         val demoDay = d.int
         if (poolId != poolIdLong) throw TxRejected("pool id does not match the pool address")
-        if (kind != 0) throw TxRejected("unexpected pool kind")
+        if (kind != exp.kind) throw TxRejected(if (exp.kind == 1) "this pool is not public, but you chose public" else "unexpected pool kind: this would be a public pool, but you chose private")
         val expectedMode = if (exp.mode == "Hard") 1 else 0
         if (mode != expectedMode) throw TxRejected("penalty mode differs from the one you chose")
         if (penalty != exp.penaltyBps) throw TxRejected("penalty differs from the one you chose")

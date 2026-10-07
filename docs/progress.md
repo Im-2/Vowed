@@ -204,3 +204,15 @@ Gate: "coach suggestions change with test histories; a letter is delivered on a 
 
 Also: `POST /v1/letters/trigger-events` (the app reports a delivered letter; the server pushes "a letter is waiting" with no content; tested, rate limited). Letters are text only: **voice letters are not built** (SPEC allows cutting them). Letters are encrypted with an AES-256-GCM key in the Android Keystore and never leave the phone; losing the phone loses them (said in the UI).
 **Not verified:** the widget on a real launcher, the letter notification on a device, FCM push when the app is closed, anything on a real phone.
+
+
+## Hosted backend check (2026-10-07): https://vowed-backend.onrender.com
+
+Run with `cd backend; npx tsx scripts/hosted-check.ts https://vowed-backend.onrender.com [--claim]` (uses the throwaway test wallet bob; prints results only).
+- **Health:** `/v1/health` answers `ok`, devnet, jobs on, database ok; the on-chain config shows the rotated oracle.
+- **Live Gemini through the hosted backend: works.** "I want to practise guitar for 45 minutes each evening" and "meditate with my dog at sunrise for ten days" came back as `source: ai`, `ai.used: true`, a validated focus-timer plan (trust medium); a template goal came back as `source: template`; "I want to lose 5 kilos" came back `unverifiable`. So the hosted server can reach Google although this PC cannot. (`npm run gate:goals`, the longer 20-call script, still cannot be run from this PC; the hosted check is the live evidence.)
+- **Sign-in:** a wallet sign-in against the hosted server works from the script and from the app on the emulator (Mock wallet), and the app showed "Understood by AI (Gemini)" for a plan on the emulator.
+- **Faucet:** `/v1/faucet` enabled with tUSDC and tSKR; a claim by bob succeeded with the new faucet key.
+- **Explore:** empty for about 30 minutes after the deploy (the sample seeding waited for the indexer's first pass and then retried only after 30 minutes); then 5 SAMPLE challenges appeared (steps, screen time, fitness, study, self-report). Fixed: the seeding now retries every minute until the indexer is ready.
+- **Bug found by the emulator run and fixed:** creating a PUBLIC challenge stopped before signing with "unexpected pool kind": the phone-side transaction check still expected a private pool. It now expects the kind the person chose (public = Open). Tests: `CoreTest` accepts an Open pool only when public was chosen and refuses it when private was chosen.
+- **Not completed on the emulator:** create, join and see the challenge in Explore against the hosted backend. After the fix the create step was reached and the wallet flow failed twice with the "closed before it connected" message (the Mock wallet on a memory-starved emulator, see above), and my repeated attempts then tripped the per-wallet creation rate limit (it answered "too many requests, retry in about 30 minutes", which also shows the limit works on the hosted server). To redo after the limit resets.
