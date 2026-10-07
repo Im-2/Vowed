@@ -19,7 +19,7 @@ class SignInOutcome(val address: String, val signedMessage: ByteArray, val signa
  * signing a message or a transaction always happens in the wallet app, after the user approves it there.
  * The identity below is what the wallet shows to the user ("Vowed wants to connect").
  */
-class WalletManager(private val prefs: Prefs) {
+class WalletManager(private val prefs: Prefs, private val gate: WalletSessionGate = WalletSessionGate()) {
     private val adapter = MobileWalletAdapter(
         connectionIdentity = ConnectionIdentity(
             identityUri = Uri.parse("https://vowed.app"),
@@ -32,15 +32,19 @@ class WalletManager(private val prefs: Prefs) {
         is TransactionResult.Success -> payload.also { prefs.mwaAuthToken = adapter.authToken }
         is TransactionResult.NoWalletFound -> throw WalletException("No Solana wallet app was found on this phone. Install a Mobile Wallet Adapter wallet first.")
         // The library reports declined requests, rejected transactions and a missing wallet with similar wording.
-        is TransactionResult.Failure -> throw WalletException("The wallet did not complete the request (${message.ifBlank { "no detail" }}). If you were signing a transaction, try again and approve right away: a transaction expires after about a minute.")
+        is TransactionResult.Failure -> throw WalletException(if (WalletSessionGate.isAssociationFailure(message)) WalletSessionGate.CLOSED_BEFORE_CONNECTING else "The wallet did not complete the request (${message.ifBlank { "no detail" }}). If you were signing a transaction, try again and approve right away: a transaction expires after about a minute.")
     }
 
     /**
      * Connects to the wallet and has it sign the Sign-In-With-Solana message in one wallet session. The backend's nonce is per
      * wallet, so [fetchNonce] is called with the address the wallet just authorized.
      */
+    /** One wallet session at a time, with a short gap and one retry of a failed connection step (see [WalletSessionGate]). */
+    private suspend fun <T> sequential(attempt: suspend () -> TransactionResult<T>): TransactionResult<T> =
+        gate.run({ r: TransactionResult<T> -> r is TransactionResult.Failure && WalletSessionGate.isAssociationFailure(r.message) }, attempt)
+
     suspend fun connectAndSignIn(sender: ActivityResultSender, fetchNonce: suspend (String) -> app.vowed.data.NonceResponse): SignInOutcome =
-        adapter.transact(sender) { auth ->
+        sequential { adapter.transact(sender) { auth ->
             val addressBytes = auth.accounts.first().publicKey
             val address = Base58.encode(addressBytes)
             val n = fetchNonce(address)
@@ -48,18 +52,18 @@ class WalletManager(private val prefs: Prefs) {
             val message = payload.prepareMessage(addressBytes).encodeToByteArray()
             val signature = signMessagesDetached(arrayOf(message), arrayOf(addressBytes)).messages.first().signatures.first()
             SignInOutcome(address, message, signature)
-        }.unwrap()
+        } }.unwrap()
 
     /** Detached ed25519 signature of [message] by the connected account. */
     suspend fun signMessage(sender: ActivityResultSender, wallet: String, message: ByteArray): ByteArray {
         val addr = Base58.decode(wallet)
-        return adapter.transact(sender) { signMessagesDetached(arrayOf(message), arrayOf(addr)) }.unwrap()
+        return sequential { adapter.transact(sender) { signMessagesDetached(arrayOf(message), arrayOf(addr)) } }.unwrap()
             .messages.first().signatures.first()
     }
 
     /** Signs and submits [tx] (an unsigned legacy transaction). Returns the 64-byte transaction signature. */
     suspend fun signAndSend(sender: ActivityResultSender, tx: ByteArray): ByteArray =
-        adapter.transact(sender) { signAndSendTransactions(arrayOf(tx)) }.unwrap().signatures.first()
+        sequential { adapter.transact(sender) { signAndSendTransactions(arrayOf(tx)) } }.unwrap().signatures.first()
 
     suspend fun disconnect(sender: ActivityResultSender) {
         runCatching { adapter.disconnect(sender) }

@@ -37,7 +37,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 @Composable
-fun SquadsScreen(state: UiState, onLoad: () -> Unit, onCreate: (String) -> Unit, onJoin: (String) -> Unit, onOpen: (String) -> Unit, joinCode: String?) {
+fun SquadsScreen(state: UiState, onLoad: () -> Unit, onCreate: (String) -> Unit, onJoin: (String) -> Unit, onOpen: (String) -> Unit, joinCode: String?, notificationsOn: Boolean = true, onTurnOnNotifications: () -> Unit = {}) {
     LaunchedEffect(Unit) { onLoad() }
     val sq = state.squads
     var name by remember { mutableStateOf("") }
@@ -47,6 +47,7 @@ fun SquadsScreen(state: UiState, onLoad: () -> Unit, onCreate: (String) -> Unit,
             Text("A squad is a few friends doing a challenge together: you see who checked in today, nudge friends who have not, and share the leaderboard. Squad challenges are private.", style = MaterialTheme.typography.bodySmall)
             sq.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             sq.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            if (!notificationsOn) OutlinedButton(onClick = onTurnOnNotifications, modifier = Modifier.fillMaxWidth()) { Text("Turn on notifications for nudges and check-ins") }
             if (sq.loading && !sq.loaded) CircularProgressIndicator()
             if (sq.loaded && sq.list.isEmpty()) {
                 Card(Modifier.fillMaxWidth()) {

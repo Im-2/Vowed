@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -87,13 +88,9 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
     }
 
     val ctx = LocalContext.current
-    val askNotify = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { }
-    LaunchedEffect(state.signedIn) {
-        if (state.signedIn && android.os.Build.VERSION.SDK_INT >= 33 && !Notifier.allowed(ctx) && !vm.prefs.askedNotify) {
-            vm.prefs.askedNotify = true
-            askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
+    // notifications are requested only when the person taps "Turn on notifications" on the Squads screen, never automatically
+    var notifyOn by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(Notifier.allowed(ctx)) }
+    val askNotify = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { notifyOn = it }
     // squad activity: ask the server every 20 s while the app is in use, show a notification for each new item
     LaunchedEffect(state.signedIn) {
         while (state.signedIn) {
@@ -182,6 +179,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
             SquadsScreen(
                 state, onLoad = vm::loadSquads, onCreate = vm::createSquad, onJoin = { vm.joinSquad(it); vm.setPendingJoinCode(null) },
                 onOpen = { id -> vm.openSquad(id); nav.navigate("squad/$id") { launchSingleTop = true } }, joinCode = state.pendingJoinCode,
+                notificationsOn = notifyOn || android.os.Build.VERSION.SDK_INT < 33, onTurnOnNotifications = { askNotify.launch(android.Manifest.permission.POST_NOTIFICATIONS) },
             )
         }
         composable("squad/{id}") { entry ->

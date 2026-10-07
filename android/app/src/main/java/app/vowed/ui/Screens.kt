@@ -467,7 +467,7 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
         }
         if (demo) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(60 to "1 min", 120 to "2 min", 300 to "5 min").forEach { (secs, label) ->
+                listOf(60 to "1 min", 120 to "2 min", 300 to "5 min", 600 to "10 min").forEach { (secs, label) ->
                     FilterChip(selected = daySecs == secs, onClick = { daySecs = secs }, label = { Text("$label days") })
                 }
             }
