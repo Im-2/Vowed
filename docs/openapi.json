@@ -2714,6 +2714,1394 @@
           }
         }
       }
+    },
+    "/v1/goals/templates": {
+      "get": {
+        "summary": "The built-in goal templates (they work without any AI)",
+        "tags": [
+          "goals"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "templates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "example": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "proofType": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "needsPlace": {
+                            "type": "boolean"
+                          },
+                          "needsApp": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "example",
+                          "summary",
+                          "proofType",
+                          "category",
+                          "needsPlace",
+                          "needsApp"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "templates"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/goals/parse": {
+      "post": {
+        "summary": "Turn a goal typed in plain words into a verified plan. Only this text is ever sent to the language model",
+        "tags": [
+          "goals"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 600
+                  },
+                  "useAi": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "plan",
+                        "unverifiable",
+                        "unclear"
+                      ]
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "template",
+                        "ai",
+                        "cache",
+                        "template-after-ai-failed",
+                        "none"
+                      ]
+                    },
+                    "plan": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "fitness",
+                            "study",
+                            "detox",
+                            "sleep",
+                            "steps",
+                            "location",
+                            "custom"
+                          ]
+                        },
+                        "cadence": {
+                          "type": "object",
+                          "properties": {
+                            "periodDays": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "totalDays": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 60
+                            },
+                            "requiredDays": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 60
+                            }
+                          },
+                          "required": [
+                            "periodDays",
+                            "totalDays",
+                            "requiredDays"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "target": {
+                          "type": "object",
+                          "properties": {
+                            "metric": {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            "value": {
+                              "type": "number"
+                            },
+                            "unit": {
+                              "type": "string",
+                              "maxLength": 30
+                            },
+                            "direction": {
+                              "type": "string",
+                              "enum": [
+                                "atLeast",
+                                "atMost"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "metric",
+                            "value",
+                            "unit",
+                            "direction"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "proofMethods": {
+                          "minItems": 1,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "CAMERA_POSE",
+                                  "USAGE_LIMIT",
+                                  "NO_USE_WINDOW",
+                                  "STEPS",
+                                  "GEOFENCE",
+                                  "FOCUS_TIMER",
+                                  "SELF_ATTEST"
+                                ]
+                              },
+                              "params": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "trustTier": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "params",
+                              "trustTier"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "window": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "startLocalTime": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            },
+                            "endLocalTime": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            }
+                          },
+                          "required": [
+                            "startLocalTime",
+                            "endLocalTime"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "difficulty": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 5
+                        },
+                        "verifiable": {
+                          "type": "boolean"
+                        },
+                        "unverifiableReason": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "suggestedAlternative": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "clarifyingQuestions": {
+                          "maxItems": 3,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "category",
+                        "cadence",
+                        "target",
+                        "proofMethods",
+                        "window",
+                        "difficulty",
+                        "verifiable",
+                        "unverifiableReason",
+                        "suggestedAlternative",
+                        "clarifyingQuestions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "demoPlan": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "fitness",
+                            "study",
+                            "detox",
+                            "sleep",
+                            "steps",
+                            "location",
+                            "custom"
+                          ]
+                        },
+                        "cadence": {
+                          "type": "object",
+                          "properties": {
+                            "periodDays": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "totalDays": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 60
+                            },
+                            "requiredDays": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 60
+                            }
+                          },
+                          "required": [
+                            "periodDays",
+                            "totalDays",
+                            "requiredDays"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "target": {
+                          "type": "object",
+                          "properties": {
+                            "metric": {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            "value": {
+                              "type": "number"
+                            },
+                            "unit": {
+                              "type": "string",
+                              "maxLength": 30
+                            },
+                            "direction": {
+                              "type": "string",
+                              "enum": [
+                                "atLeast",
+                                "atMost"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "metric",
+                            "value",
+                            "unit",
+                            "direction"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "proofMethods": {
+                          "minItems": 1,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "CAMERA_POSE",
+                                  "USAGE_LIMIT",
+                                  "NO_USE_WINDOW",
+                                  "STEPS",
+                                  "GEOFENCE",
+                                  "FOCUS_TIMER",
+                                  "SELF_ATTEST"
+                                ]
+                              },
+                              "params": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "trustTier": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "params",
+                              "trustTier"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "window": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "startLocalTime": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            },
+                            "endLocalTime": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            }
+                          },
+                          "required": [
+                            "startLocalTime",
+                            "endLocalTime"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "difficulty": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 5
+                        },
+                        "verifiable": {
+                          "type": "boolean"
+                        },
+                        "unverifiableReason": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "suggestedAlternative": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "clarifyingQuestions": {
+                          "maxItems": 3,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "category",
+                        "cadence",
+                        "target",
+                        "proofMethods",
+                        "window",
+                        "difficulty",
+                        "verifiable",
+                        "unverifiableReason",
+                        "suggestedAlternative",
+                        "clarifyingQuestions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "templateId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "trustTier": {
+                      "nullable": true,
+                      "type": "string",
+                      "enum": [
+                        "high",
+                        "medium",
+                        "low"
+                      ]
+                    },
+                    "needsPlace": {
+                      "type": "boolean"
+                    },
+                    "needsApp": {
+                      "type": "boolean"
+                    },
+                    "limitations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "confidence": {
+                      "type": "string",
+                      "enum": [
+                        "high",
+                        "medium",
+                        "low"
+                      ]
+                    },
+                    "reason": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "suggestedAlternative": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "alternatives": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "plan": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "category": {
+                                "type": "string",
+                                "enum": [
+                                  "fitness",
+                                  "study",
+                                  "detox",
+                                  "sleep",
+                                  "steps",
+                                  "location",
+                                  "custom"
+                                ]
+                              },
+                              "cadence": {
+                                "type": "object",
+                                "properties": {
+                                  "periodDays": {
+                                    "type": "number",
+                                    "enum": [
+                                      1
+                                    ]
+                                  },
+                                  "totalDays": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 60
+                                  },
+                                  "requiredDays": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 60
+                                  }
+                                },
+                                "required": [
+                                  "periodDays",
+                                  "totalDays",
+                                  "requiredDays"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "target": {
+                                "type": "object",
+                                "properties": {
+                                  "metric": {
+                                    "type": "string",
+                                    "maxLength": 60
+                                  },
+                                  "value": {
+                                    "type": "number"
+                                  },
+                                  "unit": {
+                                    "type": "string",
+                                    "maxLength": 30
+                                  },
+                                  "direction": {
+                                    "type": "string",
+                                    "enum": [
+                                      "atLeast",
+                                      "atMost"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "metric",
+                                  "value",
+                                  "unit",
+                                  "direction"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "proofMethods": {
+                                "minItems": 1,
+                                "maxItems": 4,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "CAMERA_POSE",
+                                        "USAGE_LIMIT",
+                                        "NO_USE_WINDOW",
+                                        "STEPS",
+                                        "GEOFENCE",
+                                        "FOCUS_TIMER",
+                                        "SELF_ATTEST"
+                                      ]
+                                    },
+                                    "params": {
+                                      "type": "object",
+                                      "additionalProperties": {}
+                                    },
+                                    "trustTier": {
+                                      "type": "string",
+                                      "enum": [
+                                        "high",
+                                        "medium",
+                                        "low"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "params",
+                                    "trustTier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "window": {
+                                "nullable": true,
+                                "type": "object",
+                                "properties": {
+                                  "startLocalTime": {
+                                    "type": "string",
+                                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                                  },
+                                  "endLocalTime": {
+                                    "type": "string",
+                                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                                  }
+                                },
+                                "required": [
+                                  "startLocalTime",
+                                  "endLocalTime"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "difficulty": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 5
+                              },
+                              "verifiable": {
+                                "type": "boolean"
+                              },
+                              "unverifiableReason": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "suggestedAlternative": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "clarifyingQuestions": {
+                                "maxItems": 3,
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "category",
+                              "cadence",
+                              "target",
+                              "proofMethods",
+                              "window",
+                              "difficulty",
+                              "verifiable",
+                              "unverifiableReason",
+                              "suggestedAlternative",
+                              "clarifyingQuestions"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "demoPlan": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "category": {
+                                "type": "string",
+                                "enum": [
+                                  "fitness",
+                                  "study",
+                                  "detox",
+                                  "sleep",
+                                  "steps",
+                                  "location",
+                                  "custom"
+                                ]
+                              },
+                              "cadence": {
+                                "type": "object",
+                                "properties": {
+                                  "periodDays": {
+                                    "type": "number",
+                                    "enum": [
+                                      1
+                                    ]
+                                  },
+                                  "totalDays": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 60
+                                  },
+                                  "requiredDays": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 60
+                                  }
+                                },
+                                "required": [
+                                  "periodDays",
+                                  "totalDays",
+                                  "requiredDays"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "target": {
+                                "type": "object",
+                                "properties": {
+                                  "metric": {
+                                    "type": "string",
+                                    "maxLength": 60
+                                  },
+                                  "value": {
+                                    "type": "number"
+                                  },
+                                  "unit": {
+                                    "type": "string",
+                                    "maxLength": 30
+                                  },
+                                  "direction": {
+                                    "type": "string",
+                                    "enum": [
+                                      "atLeast",
+                                      "atMost"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "metric",
+                                  "value",
+                                  "unit",
+                                  "direction"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "proofMethods": {
+                                "minItems": 1,
+                                "maxItems": 4,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "CAMERA_POSE",
+                                        "USAGE_LIMIT",
+                                        "NO_USE_WINDOW",
+                                        "STEPS",
+                                        "GEOFENCE",
+                                        "FOCUS_TIMER",
+                                        "SELF_ATTEST"
+                                      ]
+                                    },
+                                    "params": {
+                                      "type": "object",
+                                      "additionalProperties": {}
+                                    },
+                                    "trustTier": {
+                                      "type": "string",
+                                      "enum": [
+                                        "high",
+                                        "medium",
+                                        "low"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "params",
+                                    "trustTier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "window": {
+                                "nullable": true,
+                                "type": "object",
+                                "properties": {
+                                  "startLocalTime": {
+                                    "type": "string",
+                                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                                  },
+                                  "endLocalTime": {
+                                    "type": "string",
+                                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                                  }
+                                },
+                                "required": [
+                                  "startLocalTime",
+                                  "endLocalTime"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "difficulty": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 5
+                              },
+                              "verifiable": {
+                                "type": "boolean"
+                              },
+                              "unverifiableReason": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "suggestedAlternative": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "clarifyingQuestions": {
+                                "maxItems": 3,
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "category",
+                              "cadence",
+                              "target",
+                              "proofMethods",
+                              "window",
+                              "difficulty",
+                              "verifiable",
+                              "unverifiableReason",
+                              "suggestedAlternative",
+                              "clarifyingQuestions"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "extras": {
+                            "type": "object",
+                            "properties": {
+                              "needsPlace": {
+                                "type": "boolean"
+                              },
+                              "needsApp": {
+                                "type": "boolean"
+                              },
+                              "limitations": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "needsPlace",
+                              "needsApp",
+                              "limitations"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "plan",
+                          "demoPlan",
+                          "extras"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "clarifyingQuestions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "examples": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "ai": {
+                      "type": "object",
+                      "properties": {
+                        "used": {
+                          "type": "boolean"
+                        },
+                        "note": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "used",
+                        "note"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "source",
+                    "plan",
+                    "demoPlan",
+                    "templateId",
+                    "trustTier",
+                    "needsPlace",
+                    "needsApp",
+                    "limitations",
+                    "notes",
+                    "confidence",
+                    "reason",
+                    "suggestedAlternative",
+                    "alternatives",
+                    "clarifyingQuestions",
+                    "examples",
+                    "ai"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/goals/validate": {
+      "post": {
+        "summary": "Check (and normalise) a plan the user edited before staking",
+        "tags": [
+          "goals"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "plan": {},
+                  "demo": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "plan"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "plan": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "fitness",
+                            "study",
+                            "detox",
+                            "sleep",
+                            "steps",
+                            "location",
+                            "custom"
+                          ]
+                        },
+                        "cadence": {
+                          "type": "object",
+                          "properties": {
+                            "periodDays": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "totalDays": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 60
+                            },
+                            "requiredDays": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 60
+                            }
+                          },
+                          "required": [
+                            "periodDays",
+                            "totalDays",
+                            "requiredDays"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "target": {
+                          "type": "object",
+                          "properties": {
+                            "metric": {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            "value": {
+                              "type": "number"
+                            },
+                            "unit": {
+                              "type": "string",
+                              "maxLength": 30
+                            },
+                            "direction": {
+                              "type": "string",
+                              "enum": [
+                                "atLeast",
+                                "atMost"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "metric",
+                            "value",
+                            "unit",
+                            "direction"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "proofMethods": {
+                          "minItems": 1,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "CAMERA_POSE",
+                                  "USAGE_LIMIT",
+                                  "NO_USE_WINDOW",
+                                  "STEPS",
+                                  "GEOFENCE",
+                                  "FOCUS_TIMER",
+                                  "SELF_ATTEST"
+                                ]
+                              },
+                              "params": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "trustTier": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "params",
+                              "trustTier"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "window": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "startLocalTime": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            },
+                            "endLocalTime": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            }
+                          },
+                          "required": [
+                            "startLocalTime",
+                            "endLocalTime"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "difficulty": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 5
+                        },
+                        "verifiable": {
+                          "type": "boolean"
+                        },
+                        "unverifiableReason": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "suggestedAlternative": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "clarifyingQuestions": {
+                          "maxItems": 3,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "category",
+                        "cadence",
+                        "target",
+                        "proofMethods",
+                        "window",
+                        "difficulty",
+                        "verifiable",
+                        "unverifiableReason",
+                        "suggestedAlternative",
+                        "clarifyingQuestions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "demoPlan": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "fitness",
+                            "study",
+                            "detox",
+                            "sleep",
+                            "steps",
+                            "location",
+                            "custom"
+                          ]
+                        },
+                        "cadence": {
+                          "type": "object",
+                          "properties": {
+                            "periodDays": {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            "totalDays": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 60
+                            },
+                            "requiredDays": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 60
+                            }
+                          },
+                          "required": [
+                            "periodDays",
+                            "totalDays",
+                            "requiredDays"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "target": {
+                          "type": "object",
+                          "properties": {
+                            "metric": {
+                              "type": "string",
+                              "maxLength": 60
+                            },
+                            "value": {
+                              "type": "number"
+                            },
+                            "unit": {
+                              "type": "string",
+                              "maxLength": 30
+                            },
+                            "direction": {
+                              "type": "string",
+                              "enum": [
+                                "atLeast",
+                                "atMost"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "metric",
+                            "value",
+                            "unit",
+                            "direction"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "proofMethods": {
+                          "minItems": 1,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "CAMERA_POSE",
+                                  "USAGE_LIMIT",
+                                  "NO_USE_WINDOW",
+                                  "STEPS",
+                                  "GEOFENCE",
+                                  "FOCUS_TIMER",
+                                  "SELF_ATTEST"
+                                ]
+                              },
+                              "params": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "trustTier": {
+                                "type": "string",
+                                "enum": [
+                                  "high",
+                                  "medium",
+                                  "low"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "params",
+                              "trustTier"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "window": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "startLocalTime": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            },
+                            "endLocalTime": {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            }
+                          },
+                          "required": [
+                            "startLocalTime",
+                            "endLocalTime"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "difficulty": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 5
+                        },
+                        "verifiable": {
+                          "type": "boolean"
+                        },
+                        "unverifiableReason": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "suggestedAlternative": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "clarifyingQuestions": {
+                          "maxItems": 3,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "category",
+                        "cadence",
+                        "target",
+                        "proofMethods",
+                        "window",
+                        "difficulty",
+                        "verifiable",
+                        "unverifiableReason",
+                        "suggestedAlternative",
+                        "clarifyingQuestions"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reason": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "plan",
+                    "demoPlan",
+                    "reason",
+                    "notes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "security": [

@@ -62,6 +62,20 @@ The app asks the wallet for the `solana:devnet` chain. A wallet that cannot serv
 | Seed Vault Wallet (Seeker) | **Not documented**; unverified | Solana Mobile's docs do not say. To be tested on a Seeker. |
 | Backpack | **Unverified**; no official statement found | |
 
+## Goals in plain words (AI usage and costs)
+
+Type a goal in your own words ("do 20 squats every day for a week"); the app shows a plan with how it will be proved, its **trust tier**, its limits, and lets you edit it before you stake.
+
+- **13 built-in templates work with no AI**: squats, push-ups, steps, walk outside, gym visit, focus/study time, reading, meditation, app-usage limit, no-use window for an app, early wake, phone-free sleep window, hydration. A deterministic matcher reads the amount, app, time window and length from the text. Common goals are answered this way, instantly and for free.
+- **Free-form goals use Google's Gemini free tier, through our server.** The app never holds a key. Only the **typed goal text** is sent to the model: no wallet address, no device information, no history. The free tier lets Google use submitted content to improve its products and allows human review, so the app says this before sending, asks people not to type personal details, and has a switch to turn AI off (then only the templates are used).
+- **The model's answer is never trusted.** It must pass a strict schema and a second set of rules: the proof type must fit the target, amounts must be realistic (too small or too large is refused), only whitelisted parameters survive (no coordinates), hidden or direction-changing characters are removed, and the **trust tier is always decided by the proof type**, never by the plan. Anything that fails falls back to the templates or asks a question. The same checks run again when a pool is created.
+- **Cost: $0.** Default model `gemini-3.5-flash-lite` on the free tier. The server caps its own use (per wallet per hour, per day for everyone), caches answers, and backs off when Google says it is busy. Exact free-tier limits are shown only in Google AI Studio, so none is assumed.
+- Goals no phone can verify (weight, food, smoking, feelings, money) are labelled as such, with a closest checkable version and an optional low-trust "I did it" version with a small stake cap.
+
+## Camera rep counting
+
+Squats and push-ups are counted on the phone with CameraX and ML Kit pose detection (the model is inside the app; no download). **The camera image is analysed in memory and dropped: it is never stored or sent. Only the rep count and "hand-raise check passed" leave the phone.** Before the set counts, the screen asks for a random hand to be raised at a random moment, which a pre-recorded video cannot answer. The counting logic is unit-tested on a synthetic skeleton; counting a real person is on the real-device checklist (`docs/device-tests.md`) and has not been run yet.
+
 ## Trust model (short)
 
 Funds are held by the program; users sign their own deposits and claims. Daily completion is recorded by an **oracle** key after the backend verifies a device-signed proof. The oracle can be wrong or malicious; mitigations (hardware key attestation, nonces, trust tiers that cap stakes, plausibility limits, void before payout) are in `docs/threat-model.md`. Not built: multiple attestors, dispute voting.

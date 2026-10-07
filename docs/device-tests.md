@@ -68,3 +68,26 @@ Use a demo pool with 2-minute days (New challenge: Demo pool on, "2 min days") s
 | T5 | Press it again | Disabled with "Available again in ..." | |
 | T6 | A wallet with no devnet SOL tries to create a pool | A clear failure from the wallet; the card tells the user to get devnet SOL | |
 | T7 | Circle devnet USDC (get 20 from https://faucet.circle.com/ by hand): create a normal pool, join, check in the next day, claim after it ends | Everything works like the test tokens | |
+
+
+## Phase 5: camera rep counting and plain-language goals (real phone / Seeker)
+
+Pose counting must be tested by a real person on a real phone; the emulator camera shows a virtual room with nobody in it. Use a demo pool (3 reps) for the first runs, then a normal one.
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| C1 | Squats: new challenge "Do 20 squats every day", stake in a demo pool, open the check-in, allow the camera, press Start | 3-second countdown, then the counter rises by one for each full squat | |
+| C2 | Phone leaned against a wall, 2 to 3 m away, whole body in view, side-on | Reps counted within about 1 of your own count over 10 squats | |
+| C3 | Same, facing the camera | Reps counted within about 1 of your own count | |
+| C4 | Half squats only (knees barely bend) | Not counted; the hint says "Go lower" | |
+| C5 | Step out of frame mid-set | The hint asks you to step back; no phantom reps appear | |
+| C6 | The hand-raise prompt appears 2 to 6 s in: raise the named hand | "Recorded" after the goal is reached | |
+| C7 | Ignore the prompt twice | Session ends without a result, "start again" message | |
+| C8 | Raise the OTHER hand | Not accepted | |
+| C9 | Play a video of someone squatting at the phone | Reps may count, but the hand prompt cannot be answered: no proof is submitted | |
+| C10 | Push-ups (goal "Do 15 push-ups every day"), phone on the floor at the side | Reps counted within about 1 of your own count | |
+| C11 | Dim light | Hints appear instead of wrong counts | |
+| C12 | Check Android settings, camera access | Only while the check-in is open; nothing stored (no new files in the app's storage) | |
+| G1 | Type a free-form goal that the templates do not know, with AI on, on a network that can reach Google | A plan labelled "Understood by AI (Gemini); check it carefully" | |
+| G2 | Same with AI off | "I need a little more" with examples; nothing sent to Google | |
+| G3 | Type "lose 5 kg" | "A phone cannot check this goal", with a checkable alternative and a low-trust option | |

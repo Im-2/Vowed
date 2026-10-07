@@ -176,3 +176,19 @@ Do not claim yet (additions): proofs from real sensors, a second phone in a squa
 | Normal pool creation with Circle's devnet USDC from the app | Pool `55DPY...1EcY2` on devnet, mint `4zMMC...DncDU` |
 
 Limits to state honestly: testers also need devnet SOL (the tokens do not include it); joining and claiming with Circle USDC is **not verified**; Phantom and Solflare devnet switching is from their documentation, not run by us; Seed Vault Wallet and Backpack devnet support is unverified.
+
+
+---
+
+## Phase 5 additions (goals in plain words, camera counting)
+
+| Feature that really works | Proof | Not proven |
+|---|---|---|
+| Plain-language goal to a plan, with **13 built-in templates and no AI needed** (squats, push-ups, steps, walk outside, gym, focus, reading, meditation, usage limit, no-use window, early wake, sleep window, hydration) | `backend/test/goals-templates.test.ts`: 37 tests incl. 14 sample sentences and 7 goals no phone can verify | |
+| The model's answer is never trusted: strict schema, realistic bounds, whitelisted parameters, hidden characters stripped, trust tier decided by the proof type, fallback to templates | `backend/test/goals-llm.test.ts`: 37 tests against a fake model returning 15 kinds of bad answer, an injection attempt and key-handling cases; 4 of 4 deliberately broken versions caught | **A live Gemini answer has not been seen**: this network blocks the Gemini host (see `docs/verified-facts.md`). The request shape for the live endpoint is from the docs but untested |
+| Only the typed goal text goes to the model; the key never leaves the server; free-tier use is capped and cached | Tests check the request body, URL, headers, responses and errors for the key and wallet address | |
+| The app shows the plan with trust tier and limitations, lets the user edit it, validates it on the server, hashes it on the phone, and checks the create-pool transaction against it | Emulator run: "Do 20 squats every day" became a plan, then the create-pool review (matching token, penalty, 7 days) | Staking from an edited AI plan was not run end to end because the Mock wallet kept timing out (a known quirk, see `docs/verified-facts.md`) |
+| Camera rep counting logic (angles, hysteresis, confidence gating, side choice), randomised hand-raise liveness, session rules | 18 + 1 unit tests on a synthetic skeleton | **Counting a real person has not been run**: checklist C1-C12 in `docs/device-tests.md` |
+| Camera pipeline starts on the emulator (CameraX preview, ML Kit pose, countdown, "I cannot see a person" with an empty scene) | Emulator run; the Camera practice screen needs no wallet or server | |
+
+Do not claim: that goals are understood by AI in practice (no live answer seen), that pose counting is accurate (no real-person test), or that the camera is liveness-proof against a determined second person off camera.
