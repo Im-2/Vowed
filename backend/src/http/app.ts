@@ -79,7 +79,16 @@ export async function buildApp(s: Services, opts: { logger?: boolean } = {}): Pr
     return reply.status(500).send({ error: { code: "internal", message: "internal error" } });
   });
 
-  app.get("/v1/health", { schema: { tags: ["meta"], summary: "Liveness", security: [] } }, async () => ({ ok: true, service: "vowed-backend" }));
+  app.get("/v1/health", { schema: { tags: ["meta"], summary: "Liveness and basic status (also answers HEAD, for uptime monitors). No secrets, no user data", security: [] } }, async () => {
+    let db = true;
+    try {
+      s.db.prepare("SELECT 1").get();
+    } catch {
+      db = false;
+    }
+    const row = db ? (s.db.prepare("SELECT COUNT(*) AS n FROM challenges").get() as { n: number }) : { n: 0 };
+    return { ok: db, service: "vowed-backend", network: s.config.NETWORK, jobs: s.config.RUN_JOBS, db, pools: row.n, uptimeSecs: Math.floor(process.uptime()) };
+  });
   app.get("/v1/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 
   registerAuthRoutes(app, s);

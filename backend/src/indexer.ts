@@ -96,11 +96,22 @@ function recordCoachStats(s: Services, pool: string, wallet: string): void {
     .run(wallet, pool, category, difficulty, c.required_days, c.duration_days, p.days_completed, p.status === "Failed" ? "failed" : "succeeded", s.wallNow());
 }
 
-/** Polls the chain for program transactions we have not processed yet, oldest first. */
+/** The most signatures read per poll when catching up (a fresh database reads the program's whole history, newest first, then replays it oldest first). */
+const BACKFILL_MAX = 5_000;
+
+/**
+ * Polls the chain for program transactions we have not processed yet, oldest first. With an empty database (a first start, or a host whose
+ * disk was wiped) it reads the whole history in pages, so pools, joins and check-ins are rebuilt from the chain.
+ */
 export async function pollOnce(s: Services): Promise<number> {
   const programId = s.program.programId.toBase58();
   const last = kvGet(s.db, "indexer:last_signature");
-  const sigs = await s.chain.getSignaturesForAddress(programId, { until: last, limit: 200 });
+  let sigs = await s.chain.getSignaturesForAddress(programId, { until: last, limit: 200 });
+  let page = sigs;
+  while (page.length >= 200 && sigs.length < BACKFILL_MAX) {
+    page = await s.chain.getSignaturesForAddress(programId, { until: last, before: sigs[sigs.length - 1]!.signature, limit: 200 });
+    sigs = sigs.concat(page);
+  }
   let processed = 0;
   for (const sig of [...sigs].reverse()) {
     if (sig.failed) continue;

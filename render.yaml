@@ -1,0 +1,42 @@
+# Render Blueprint for the Vowed backend (free web service). Secrets are NOT in this file: every `sync: false` value is typed into the
+# Render dashboard by the project owner. See docs/hosting-render.md.
+services:
+  - type: web
+    name: vowed-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci --include=dev
+    startCommand: npx tsx src/index.ts
+    healthCheckPath: /v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NETWORK
+        value: devnet
+      - key: RPC_URL
+        value: https://api.devnet.solana.com
+      - key: RUN_JOBS
+        value: "true"
+      - key: AUTH_DOMAIN
+        value: vowed.app
+      - key: SEED_TARGET
+        value: "4"
+      - key: DATABASE_PATH
+        value: /tmp/vowed.sqlite
+      - key: JWT_SECRET
+        sync: false
+      - key: ORACLE_SECRET_KEY
+        sync: false
+      - key: CRANK_SECRET_KEY
+        sync: false
+      - key: SEED_SECRET_KEY
+        sync: false
+      - key: FAUCET_AUTHORITY_SECRET_KEY
+        sync: false
+      - key: FAUCET_USDC_MINT
+        sync: false
+      - key: FAUCET_SKR_MINT
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

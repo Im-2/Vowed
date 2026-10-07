@@ -72,7 +72,18 @@ export function startJobs(s: Services, log: (msg: string) => void = console.erro
         ]
       : []),
   ];
-  return () => timers.forEach(clearInterval);
+  // one pass shortly after start, so a fresh deploy lists its samples without waiting half an hour
+  const first = s.config.SEED_SECRET_KEY
+    ? setTimeout(() => {
+        seedPublicChallenges(s)
+          .then((r) => r.errors.forEach((e) => log(`seed-explore: ${e}`)))
+          .catch(() => log("seed-explore failed"));
+      }, 90_000)
+    : null;
+  return () => {
+    timers.forEach(clearInterval);
+    if (first) clearTimeout(first);
+  };
 }
 
 export async function main(): Promise<void> {

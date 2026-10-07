@@ -47,6 +47,6 @@ export interface Chain {
   nowSec(): number;
   minimumBalanceForRentExemption(space: number): Promise<number>;
   /** Newest first. `until` stops at an already processed signature. */
-  getSignaturesForAddress(address: string, opts?: { until?: string; limit?: number }): Promise<SignatureInfo[]>;
+  getSignaturesForAddress(address: string, opts?: { until?: string; before?: string; limit?: number }): Promise<SignatureInfo[]>;
   getTransactionLogs(signature: string): Promise<string[] | null>;
 }

@@ -82,9 +82,9 @@ export class Web3Chain implements Chain {
     return rpc("getMinimumBalanceForRentExemption", () => this.connection.getMinimumBalanceForRentExemption(space));
   }
 
-  async getSignaturesForAddress(address: string, opts?: { until?: string; limit?: number }): Promise<SignatureInfo[]> {
+  async getSignaturesForAddress(address: string, opts?: { until?: string; before?: string; limit?: number }): Promise<SignatureInfo[]> {
     const sigs = await rpc("getSignaturesForAddress", () =>
-      this.connection.getSignaturesForAddress(new PublicKey(address), { until: opts?.until, limit: opts?.limit ?? 100 }, "confirmed"),
+      this.connection.getSignaturesForAddress(new PublicKey(address), { until: opts?.until, before: opts?.before, limit: opts?.limit ?? 100 }, "confirmed"),
     );
     return sigs.map((s) => ({ signature: s.signature, slot: s.slot, failed: s.err !== null }));
   }

@@ -19,6 +19,10 @@ $env:FAUCET_AUTHORITY_SECRET_KEY = (Get-Content (Join-Path $dev "deployer.json")
 $env:FAUCET_USDC_MINT = (node -e "const {Keypair}=require('@solana/web3.js');const k=Keypair.fromSecretKey(Uint8Array.from(JSON.parse(require('fs').readFileSync('.devnet/mint-usdc-test.json','utf8'))));process.stdout.write(k.publicKey.toBase58())")
 $env:FAUCET_SKR_MINT = (node -e "const {Keypair}=require('@solana/web3.js');const k=Keypair.fromSecretKey(Uint8Array.from(JSON.parse(require('fs').readFileSync('.devnet/mint-skr-test.json','utf8'))));process.stdout.write(k.publicKey.toBase58())")
 
+# Sample public challenges for Explore: the throwaway seeder wallet (created by backend/scripts/seeder-setup.ts), if it exists.
+$seederFile = Join-Path $dev "seeder.json"
+if (Test-Path $seederFile) { $env:SEED_SECRET_KEY = (Get-Content $seederFile -Raw).Trim() }
+
 # Goal parser: the Gemini key (if you have one) is read from the git-ignored backend/.devnet/gemini-key.txt into this process only.
 $geminiFile = Join-Path $dev "gemini-key.txt"
 if (Test-Path $geminiFile) { $env:GEMINI_API_KEY = (Get-Content $geminiFile -Raw).Trim() }

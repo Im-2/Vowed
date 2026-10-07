@@ -126,7 +126,7 @@ export class LiteSvmChain implements Chain {
     return { signature, logs };
   }
 
-  async getSignaturesForAddress(address: string, opts?: { until?: string; limit?: number }): Promise<SignatureInfo[]> {
+  async getSignaturesForAddress(address: string, opts?: { until?: string; before?: string; limit?: number }): Promise<SignatureInfo[]> {
     const out: SignatureInfo[] = [];
     for (const t of [...this.sent].reverse()) {
       if (opts?.until && t.signature === opts.until) break;

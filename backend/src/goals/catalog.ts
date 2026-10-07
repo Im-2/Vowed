@@ -54,7 +54,7 @@ export interface BuildOptions {
 const fmtNumber = (n: number) => (Number.isInteger(n) ? n.toLocaleString("en-US") : String(n));
 
 function fillTitle(t: CatalogTemplate, value: number, unit: string, app: string | undefined, window: BuildOptions["window"]): string {
-  const time = window ? window.startLocalTime : "";
+  const time = window ? (t.id === "early-wake" ? window.endLocalTime : window.startLocalTime) : "";
   const shownUnit = value === 1 ? unit.replace(/s$/, "") : unit;
   return t.title.replace("{value}", fmtNumber(value)).replace("{unit}", shownUnit).replace("{app}", app ?? "the app").replace("{time}", time);
 }

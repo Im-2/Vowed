@@ -10,6 +10,7 @@ import { canonicalJson, planHash, type GoalPlan } from "../domain/plan.js";
 import { buildFromTemplate, CATALOG, familyOf, type CatalogTemplate } from "../goals/catalog.js";
 import { recordMeta } from "../explore/service.js";
 import { syncPool } from "../challenges/sync.js";
+import { kvGet } from "../db.js";
 import type { Services } from "../services.js";
 
 /** Which templates to create next: kinds that are not already listed first, never more than one rep-based goal, never a repeat of a listed title. */
@@ -29,6 +30,36 @@ export function chooseSeeds(listedTitles: string[], need: number, pick: (n: numb
   return out;
 }
 
+/** The plan a sample pool of this template is created with (also used to recognise one again after the database was lost). */
+function samplePlan(t: CatalogTemplate): GoalPlan {
+  return buildFromTemplate(t, { app: t.proofParams.app, place: t.needsPlace ? t.proofParams.place : undefined });
+}
+
+/**
+ * After a restart on a host whose disk resets, the indexer rebuilds the pools from the chain but the typed goal text is gone (the chain
+ * holds only a hash). Sample pools are deterministic, so they are recognised by that hash and listed again with their titles.
+ */
+export function recoverSamples(s: Services): number {
+  const key = s.config.SEED_SECRET_KEY;
+  if (!key) return 0;
+  const creator = key.publicKey.toBase58();
+  const known = new Map(CATALOG.map((t) => [planHash(samplePlan(t)), t] as const));
+  const rows = s.db
+    .prepare("SELECT c.pool, c.goal_hash FROM challenges c LEFT JOIN challenge_meta m ON m.pool = c.pool WHERE c.creator = ? AND m.pool IS NULL")
+    .all(creator) as { pool: string; goal_hash: string }[];
+  let n = 0;
+  for (const r of rows) {
+    const t = known.get(r.goal_hash);
+    if (!t) continue;
+    const plan = samplePlan(t);
+    s.db.prepare("INSERT OR IGNORE INTO plans (goal_hash, creator, plan_json, created_at) VALUES (?,?,?,?)").run(r.goal_hash, creator, canonicalJson(plan), s.wallNow());
+    s.db.prepare("UPDATE challenges SET plan_json = ? WHERE pool = ? AND plan_json IS NULL").run(canonicalJson(plan), r.pool);
+    recordMeta(s, r.pool, creator, "public", plan.title, plan.category, plan.proofMethods[0]!.type, true);
+    n++;
+  }
+  return n;
+}
+
 let running = false;
 
 export async function seedPublicChallenges(s: Services): Promise<{ created: string[]; errors: string[] }> {
@@ -37,8 +68,11 @@ export async function seedPublicChallenges(s: Services): Promise<{ created: stri
   const key = s.config.SEED_SECRET_KEY;
   const mint = s.config.FAUCET_USDC_MINT;
   if (!key || !mint || running) return { created, errors };
+  // wait for the indexer's first pass, so sample pools that already exist on chain are recognised instead of created twice
+  if (!kvGet(s.db, "indexer:last_signature")) return { created, errors: ["waiting for the indexer's first pass"] };
   running = true;
   try {
+    recoverSamples(s);
     const now = s.now();
     const rows = s.db
       .prepare(
@@ -55,7 +89,7 @@ export async function seedPublicChallenges(s: Services): Promise<{ created: stri
     }
     for (const t of chooseSeeds(rows.map((r) => r.title), need)) {
       try {
-        const plan: GoalPlan = buildFromTemplate(t, { app: t.proofParams.app, place: t.needsPlace ? t.proofParams.place : undefined });
+        const plan: GoalPlan = samplePlan(t);
         const poolId = BigInt(`0x${randomBytes(8).toString("hex")}`);
         const startTs = s.now() + 180;
         const creator = key.publicKey;
