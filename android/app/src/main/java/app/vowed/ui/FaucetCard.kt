@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import app.vowed.ui.components.AppCard
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,7 +39,7 @@ private fun waitText(seconds: Long): String {
  * once per wallet per day. The card always says that these are test tokens, and that network fees still need devnet SOL.
  */
 @Composable
-fun FaucetAppCard(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim: () -> Unit) {
+fun FaucetCard(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim: () -> Unit) {
     LaunchedEffect(Unit) { onLoad() }
     val ctx = LocalContext.current
     val st = faucet.status
@@ -46,8 +47,19 @@ fun FaucetAppCard(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim
     // when the server has no faucet (for example a production backend), show nothing at all
     if (st != null && !st.enabled) return
     AppCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Test tokens", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                app.vowed.ui.components.GradientTile(listOf(androidx.compose.ui.graphics.Color(0xFFFFC857), androidx.compose.ui.graphics.Color(0xFFE8932A)), Modifier.size(44.dp)) {
+                    Text("T", style = MaterialTheme.typography.titleMedium, color = androidx.compose.ui.graphics.Color.White)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("Test tokens", style = MaterialTheme.typography.titleSmall)
+                    if (st != null) Text("You have: ${fmt(st.balances.tUSDC)} tUSDC · ${fmt(st.balances.tSKR)} tSKR", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    else if (faucet.loading) app.vowed.ui.components.Spinner(size = 20.dp)
+                }
+                val wait = (st?.nextClaimAt ?: 0L) - now
+                if (st != null && st.canClaim) app.vowed.ui.components.SmallButton("Get test tokens", onClaim, enabled = !faucet.claiming)
+            }
             Text(
                 st?.label ?: "TEST TOKENS: tUSDC and tSKR exist only on Solana devnet and have no real value.",
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error,
@@ -55,27 +67,24 @@ fun FaucetAppCard(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim
             if (st != null) {
                 val usdc = st.tokens.firstOrNull { it.symbol == "tUSDC" }
                 val skr = st.tokens.firstOrNull { it.symbol == "tSKR" }
-                Text("You have: ${fmt(st.balances.tUSDC)} tUSDC · ${fmt(st.balances.tSKR)} tSKR", fontWeight = FontWeight.Medium)
-                if (usdc != null && skr != null) Text("One claim gives ${fmt(usdc.amount)} tUSDC and ${fmt(skr.amount)} tSKR, once a day per wallet.", style = MaterialTheme.typography.bodySmall)
+                if (usdc != null && skr != null) Text("One claim gives ${fmt(usdc.amount)} tUSDC and ${fmt(skr.amount)} tSKR, once a day per wallet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val wait = st.nextClaimAt - now
                 when {
-                    st.canClaim -> Button(onClick = onClaim, enabled = !faucet.claiming, modifier = Modifier.fillMaxWidth()) { Text("Get test tokens") }
-                    wait > 0 -> OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("Available again in ${waitText(wait)}") }
-                    st.claimsLeftToday <= 0 -> OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) { Text("Out of test tokens for today (UTC). Try tomorrow.") }
-                    else -> OutlinedButton(onClick = onLoad, modifier = Modifier.fillMaxWidth()) { Text("Refresh") }
+                    st.canClaim -> Unit
+                    wait > 0 -> app.vowed.ui.components.StatusBadge("Available again in ${waitText(wait)}", app.vowed.ui.components.Tone.Neutral)
+                    st.claimsLeftToday <= 0 -> app.vowed.ui.components.StatusBadge("Out of test tokens for today (UTC). Try tomorrow.", app.vowed.ui.components.Tone.Warning)
+                    else -> androidx.compose.material3.TextButton(onClick = onLoad) { Text("Refresh") }
                 }
-            } else if (faucet.loading) {
-                CircularProgressIndicator(Modifier.padding(4.dp))
             }
-            if (faucet.claiming) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) { CircularProgressIndicator(Modifier.padding(2.dp)); Text("Sending test tokens…") }
+            if (faucet.claiming) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) { app.vowed.ui.components.Spinner(size = 20.dp); Text("Sending test tokens…") }
             faucet.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
             faucet.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             Text(
                 "Network fees are paid in devnet SOL, which these tokens do not include.",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (wallet != null) {
-                OutlinedButton(onClick = {
+                androidx.compose.material3.TextButton(onClick = {
                     val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     cm.setPrimaryClip(ClipData.newPlainText("wallet address", wallet))
                 }) { Text("Copy my wallet address (${short(wallet)})") }

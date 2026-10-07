@@ -65,8 +65,8 @@ function Reset-And-Connect {
     & $script:adb shell pm clear com.solana.mwallet | Out-Null
     & $script:adb shell pm clear app.vowed | Out-Null
     & $script:adb shell am start -n app.vowed/.MainActivity | Out-Null
-    "onboarding: " + (Has-Text "Next" 120)
-    Tap-Text "Next" 10 | Out-Null; Start-Sleep 2; Tap-Text "Next" 10 | Out-Null
+    "onboarding: " + (Has-Text "Get started" 120)
+    Tap-Text "Get started" 10 | Out-Null; Start-Sleep 2
     for ($try = 1; $try -le 3; $try++) {
         "connect tap (try $try): " + (Tap-Text "Connect wallet" 30)
         $ok = Tap-Text "Connect" 100
@@ -74,12 +74,14 @@ function Reset-And-Connect {
         if ($ok) { break }
     }
     $end = (Get-Date).AddSeconds(300)
-    while ((Get-Date) -lt $end -and -not (Has-Text "New challenge" 2)) {
+    while ((Get-Date) -lt $end -and -not (Has-Text "Wallet connected" 2)) {
         if (Find-Node "Dismiss") { "  connect failed, retrying"; Tap-Text "Dismiss" 2 | Out-Null; Start-Sleep 2; Tap-Text "Connect wallet" 5 | Out-Null; Tap-Text "Connect" 60 | Out-Null }
         if (Tap-Text "Allow" 1) { "  allowed notifications"; Start-Sleep 2 }
         if (Tap-Text "Approve" 4) { "  approved a wallet request"; Start-Sleep 3 }
     }
-    "home: " + (Has-Text "New challenge" 30)
+    "popup: " + (Has-Text "Wallet connected" 5)
+    Tap-Text "Continue" 5 | Out-Null
+    "home: " + (Has-Text "Today's check-ins" 60 -Contains)
 }
 
 function Sign-Reviewed($title, $timeoutSec = 90) {

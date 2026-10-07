@@ -201,3 +201,6 @@ Built: adaptive coach screen (backend rules from Phase 2), encrypted letters to 
 
 ## Phase 8 (2026-10-07)
 Built and verified: weekly test-SKR rewards for the top streaks (real devnet transfer, idempotent), SKR streak freeze (phone-side check, on-chain confirmation, no replay), open proof-provider format with a sample provider (spec, backend verification, shared test vector), simulated-and-labelled yield. **Do not claim:** real yield or lending; SKR on mainnet; that a freeze changes payouts or check-ins (it only keeps the streak); any third-party provider integration; the new screens shown on a device; the hosted weekly job. SKR here is a test token on devnet.
+
+## UI redesign and logo (2026-10-08)
+New visual identity (original logo, theme, bundled open-license font Nunito, original illustrations drawn in code), bottom navigation with a raised Create button, redesigned screens, and `docs/ui/` screenshots. Screens with data were captured through a debug-only preview with **made-up data**, so label them as such if used in the deck. **Do not claim:** that the screenshots show live data; dark mode as tested; real-device visuals.

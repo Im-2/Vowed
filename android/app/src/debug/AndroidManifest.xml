@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Debug builds only: plain HTTP to the dev backend on the host machine (emulator alias 10.0.2.2). Release builds keep the default (HTTPS only). -->
-    <application android:networkSecurityConfig="@xml/network_security_config" />
+    <application android:networkSecurityConfig="@xml/network_security_config">
+        <!-- screenshots with made-up data; debug builds only -->
+        <activity android:name="app.vowed.debug.PreviewActivity" android:exported="true" android:theme="@style/Theme.Vowed" />
+    </application>
 </manifest>

@@ -46,7 +46,7 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
     val options: List<FreezeOption> = state.details.values.flatMap { d -> FreezeOptions.forDetail(d, myWallet, planTitle(d.challenge), now) }
     Page("SKR rewards and perks", onBack = onBack, actions = { TextButton(onClick = onLoad) { Text("Refresh") } }) {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(st?.label ?: "TEST SKR: this build runs on Solana devnet and SKR here is a test token with no value.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelLarge)
+            app.vowed.ui.components.StatusBadge(st?.label ?: "TEST SKR: this build runs on Solana devnet and SKR here is a test token with no value.", app.vowed.ui.components.Tone.Danger)
             ru.message?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(it, Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
@@ -72,10 +72,14 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
                         Text("This week so far (paid after the week ends):", style = MaterialTheme.typography.labelLarge)
                         if (st.standings.isEmpty()) Text("Nobody has a streak yet.", style = MaterialTheme.typography.bodySmall)
                         st.standings.forEach { s ->
-                            Text(
-                                "${s.rank}. ${if (s.you) "You" else short(s.wallet)}: streak ${s.streak}${if (s.qualifies) " (in the rewards)" else ""}",
-                                fontWeight = if (s.you) FontWeight.Bold else FontWeight.Normal,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                app.vowed.ui.components.Avatar(s.wallet, 36.dp)
+                                Text(
+                                    "${s.rank}. ${if (s.you) "You" else short(s.wallet)}: streak ${s.streak}${if (s.qualifies) " (in the rewards)" else ""}",
+                                    Modifier.weight(1f), fontWeight = if (s.you) FontWeight.Bold else FontWeight.Normal,
+                                )
+                                if (s.qualifies) app.vowed.ui.components.StatusBadge("SKR", app.vowed.ui.components.Tone.Success)
+                            }
                         }
                     }
                 }

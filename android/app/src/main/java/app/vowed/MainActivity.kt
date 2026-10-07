@@ -30,8 +30,6 @@ import app.vowed.ui.theme.VowedTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
@@ -116,18 +114,14 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
     LaunchedEffect(openedSquad) {
         if (openedSquad != null && nav.currentDestination?.route == "squads") nav.navigate("squad/$openedSquad") { launchSingleTop = true }
     }
-    val tabs = listOf("home" to "Today", "explore" to "Explore", "squads" to "Squads", "settings" to "You")
+    val tabRoutes = listOf("home", "explore", "squads", "settings", "categories")
+    val goTab = { r: String -> if (route != r) nav.navigate(r) { popUpTo("home") { saveState = false }; launchSingleTop = true } }
     Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0), bottomBar = {
-        if (route in tabs.map { it.first }) NavigationBar {
-            tabs.forEach { (r, label) ->
-                NavigationBarItem(
-                    selected = route == r, label = { Text(label) },
-                    icon = { Text(label.take(1), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
-                    onClick = { if (route != r) nav.navigate(r) { popUpTo("home") { saveState = false }; launchSingleTop = true } },
-                )
-            }
-        }
-    }) { pad -> Box(Modifier.padding(pad).then(if (route in tabs.map { it.first }) Modifier else Modifier.navigationBarsPadding())) {
+        if (route in tabRoutes) app.vowed.ui.components.VowedBottomBar(
+            route, onHome = { goTab("home") }, onExplore = { goTab("explore") },
+            onCreate = { vm.setNewGoalSquad(null); nav.navigate("new") }, onSquads = { goTab("squads") }, onYou = { goTab("settings") },
+        )
+    }) { pad -> Box(Modifier.padding(pad).then(if (route in tabRoutes) Modifier else Modifier.navigationBarsPadding())) {
     NavHost(nav, startDestination = start) {
         composable("onboarding") { OnboardingScreen(state, onGetStarted = { nav.navigate("connect") }, onPractice = { nav.navigate("practice") }) }
         composable("connect") {
@@ -143,6 +137,8 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
                 onCheckIn = { pool -> vm.openCheckIn(pool); nav.navigate("checkin/$pool") }, onRefresh = vm::refreshList,
                 onSettings = { nav.navigate("settings") }, onSignIn = { vm.connect(sender) },
                 onLoadFaucet = vm::loadFaucet, onClaimFaucet = vm::claimTestTokens,
+                onSquads = { nav.navigate("squads") { launchSingleTop = true } }, onExplore = { nav.navigate("explore") { launchSingleTop = true } },
+                onLoadDiscover = { vm.loadExplore(true); vm.loadRewards() }, onTryGoal = { text -> vm.setNewGoalSquad(null); vm.tryGoal(text, false); nav.navigate("new") },
             )
         }
         composable("new") {
@@ -184,8 +180,11 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
             ExploreScreen(
                 state, onLoad = { vm.loadExplore(true) }, onMore = { vm.loadExplore(false) }, onFilter = { c, m, e -> vm.setExploreFilter(c, m, e) },
                 onOpen = { nav.navigate("detail/$it") }, onReport = vm::reportChallenge,
-                onQuick = { text -> vm.setNewGoalSquad(null); vm.tryGoal(text, true); nav.navigate("new") }, onDismissMessage = vm::clearExploreMessage,
+                onQuick = { text -> vm.setNewGoalSquad(null); vm.tryGoal(text, true); nav.navigate("new") }, onDismissMessage = vm::clearExploreMessage, onCategories = { nav.navigate("categories") { launchSingleTop = true } },
             )
+        }
+        composable("categories") {
+            app.vowed.ui.CategoriesScreen(onBack = { nav.popBackStack() }, onPick = { cat -> vm.setExploreFilter(category = cat); nav.navigate("explore") { popUpTo("home"); launchSingleTop = true } })
         }
         composable("squads") {
             SquadsScreen(

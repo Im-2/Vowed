@@ -37,6 +37,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import app.vowed.ui.components.AppCard
+import app.vowed.ui.theme.VowedTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -142,72 +143,6 @@ fun rememberNowSeconds(): Long {
 
 fun planTitle(c: Challenge): String = c.plan?.get("title")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } ?: "Challenge ${short(c.pool)}"
 
-@Composable
-fun HomeScreen(
-    state: UiState,
-    myWallet: String?,
-    onNew: () -> Unit,
-    onOpen: (String) -> Unit,
-    onCheckIn: (String) -> Unit,
-    onRefresh: () -> Unit,
-    onSettings: () -> Unit,
-    onSignIn: () -> Unit,
-    onLoadFaucet: () -> Unit,
-    onClaimFaucet: () -> Unit,
-) {
-    val now = rememberNowSeconds()
-    Page("Today", actions = { TextButton(onClick = onSettings) { Text("Settings") } }) {
-        if (state.account == null || !state.signedIn) {
-            Text("Sign in with your wallet to see your challenges.")
-            Button(onClick = onSignIn) { Text("Sign in") }
-            state.connectError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (state.connecting != null) CircularProgressIndicator()
-            return@Page
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onNew) { Text("New challenge") }
-            OutlinedButton(onClick = onRefresh) { Text("Refresh") }
-        }
-        state.listError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        FaucetAppCard(state.faucet, myWallet, onLoadFaucet, onClaimFaucet)
-        if (state.loadingList) CircularProgressIndicator()
-        if (state.challenges.isEmpty() && !state.loadingList) {
-            AppCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Nothing here yet", style = MaterialTheme.typography.titleMedium)
-                    Text("Start a challenge: type any goal (reading time, steps, waking up early, less screen time, the gym, a focus session, sleep, or something you simply confirm), put a small stake behind it, and check in each day. Or browse Explore to join someone else's.")
-                }
-            }
-        }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(state.challenges, key = { it.pool }) { c ->
-                val detail = state.details[c.pool]
-                val me = detail?.participants?.firstOrNull { it.wallet == myWallet }
-                val dv = if (me != null) CheckInLogic.dayView(c, me, now) else null
-                AppCard(onClick = { onOpen(c.pool) }, Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (c.isDemo) DemoBadge(c.demoLabel)
-                        Text(planTitle(c), fontWeight = FontWeight.SemiBold)
-                        Text("${c.status} · ${c.mode} · ${c.durationDays} days (${c.requiredDays} needed) · ${c.participantCount} joined", style = MaterialTheme.typography.bodySmall)
-                        if (dv != null && c.status == "Open") {
-                            DayDots(dv.doneBits, dv.day, c.durationDays)
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text("Streak ${dv.streak}", fontWeight = FontWeight.Medium)
-                                if (dv.done) Text("Today done", color = MaterialTheme.colorScheme.primary)
-                                else if (dv.dayOpen) Button(onClick = { onCheckIn(c.pool) }) { Text("Check in") }
-                                else Text("Not open yet", style = MaterialTheme.typography.bodySmall)
-                            }
-                        } else if (me != null) {
-                            DayDots(java.math.BigInteger(me.checkinBitmap.ifBlank { "0" }), c.durationDays, c.durationDays)
-                        }
-                        Text("Pot ${fmt(c.totalDeposits)} test USDC", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------- new goal
 
 fun trustExplanation(tier: String?): String = when (tier) {
@@ -268,8 +203,8 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Uni
                     else "AI is off: your text goes only to the Vowed server and is matched against the built-in templates.",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                Button(enabled = text.trim().length >= 3 && !goal.parsing, onClick = { onParse(text) }, modifier = Modifier.fillMaxWidth()) { Text("Preview plan") }
-                if (goal.parsing) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { CircularProgressIndicator(Modifier.height(24.dp)); Text("Working out a plan…") }
+                app.vowed.ui.components.PrimaryButton("Preview plan", { onParse(text) }, enabled = text.trim().length >= 3 && !goal.parsing)
+                if (goal.parsing) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { app.vowed.ui.components.Spinner(size = 24.dp); Text("Working out a plan…") }
                 goal.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
                 if (result != null && result.status == "unverifiable") {
@@ -368,8 +303,14 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
     AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Your plan", style = MaterialTheme.typography.titleMedium)
-            Text(sourceLabel(result), style = MaterialTheme.typography.labelMedium, color = if (result.source == "ai" || result.source == "cache") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-            Text("How it is proved: ${proofLabel(type)}")
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                app.vowed.ui.components.StatusBadge(sourceLabel(result), if (result.source == "ai" || result.source == "cache") app.vowed.ui.components.Tone.Danger else app.vowed.ui.components.Tone.Primary)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                app.vowed.ui.components.StatusBadge(app.vowed.ui.components.trustLabel(result.trustTier), app.vowed.ui.components.trustTone(result.trustTier))
+                app.vowed.ui.components.StatusBadge("Token: test USDC", app.vowed.ui.components.Tone.Warning)
+            }
+            Text("How it is proved: ${proofLabel(type)}", fontWeight = FontWeight.Bold)
             Text(trustExplanation(result.trustTier), style = MaterialTheme.typography.bodySmall)
             plan["window"]?.let { w -> (w as? kotlinx.serialization.json.JsonObject)?.let { Text("Window: ${(it["startLocalTime"] as? kotlinx.serialization.json.JsonPrimitive)?.content} to ${(it["endLocalTime"] as? kotlinx.serialization.json.JsonPrimitive)?.content}") } }
             result.limitations.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
@@ -435,14 +376,14 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
     OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true)
     if (overCap) Text("Above the limit of ${fmt(tierCap.toString())} for this kind of goal in this kind of pool.", color = MaterialTheme.colorScheme.error)
     Text("Test tokens on Solana devnet. No real money. Need some? Use \"Get test tokens\" on the Today screen.", style = MaterialTheme.typography.bodySmall)
-    Button(
-        enabled = valid && state.flow !is TxFlow.Working,
-        onClick = {
+    app.vowed.ui.components.PrimaryButton(
+        "Review",
+        {
             val edit = app.vowed.goals.Edit(title = title, value = amountN, totalDays = totalN, requiredDays = requiredN, app = appName.takeIf { result.needsApp }, place = placeName.takeIf { result.needsPlace })
             onStart(edit, mode, stakeUnits!!, demo && demoOn, daySecs, place, if (squadId != null) "private" else visibility, squadId)
         },
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text("Review") }
+        enabled = valid && state.flow !is TxFlow.Working,
+    )
     if (result.needsPlace && place == null) Text("Save the spot first.", style = MaterialTheme.typography.bodySmall)
     FlowStatus(state.flow)
 }
@@ -451,7 +392,7 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
 fun FlowStatus(flow: TxFlow) {
     when (flow) {
         is TxFlow.Working -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CircularProgressIndicator(Modifier.height(24.dp)); Text(flow.message)
+            app.vowed.ui.components.Spinner(size = 24.dp); Text(flow.message)
         }
         is TxFlow.Failed -> Text(flow.message, color = MaterialTheme.colorScheme.error)
         is TxFlow.Done -> Text(flow.message, color = MaterialTheme.colorScheme.primary)
@@ -464,18 +405,22 @@ fun FlowStatus(flow: TxFlow) {
 @Composable
 fun ReviewScreen(tx: PendingTx, onSign: () -> Unit, onCancel: () -> Unit) {
     Page("Check before you sign") {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(tx.review.title, style = MaterialTheme.typography.titleMedium)
-            Text("This app decoded the transaction itself and re-derived every address. It matches what you chose.", style = MaterialTheme.typography.bodySmall)
-            tx.review.lines.forEach { (k, v) ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(k, Modifier.weight(0.4f))
-                    Text(v, Modifier.weight(0.6f), fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            AppCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(tx.review.title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("This app decoded the transaction itself and re-derived every address. It matches what you chose.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    tx.review.lines.forEach { (k, v) ->
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Text(k, Modifier.weight(0.4f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(v, Modifier.weight(0.6f), fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                        }
+                    }
                 }
-                HorizontalDivider()
             }
-            Button(onClick = onSign, Modifier.fillMaxWidth()) { Text("Sign with wallet") }
-            OutlinedButton(onClick = onCancel, Modifier.fillMaxWidth()) { Text("Cancel") }
+            app.vowed.ui.components.PrimaryButton("Sign with wallet", onSign)
+            app.vowed.ui.components.SoftButton("Cancel", onCancel)
         }
     }
 }
@@ -499,47 +444,75 @@ fun DetailScreen(
     val now = rememberNowSeconds()
     Page("Challenge", onBack = onBack, actions = { TextButton(onClick = onLoad) { Text("Refresh") } }) {
         if (d == null) {
-            if (state.detailError != null) Text(state.detailError, color = MaterialTheme.colorScheme.error) else CircularProgressIndicator()
+            if (state.detailError != null) Text(state.detailError, color = MaterialTheme.colorScheme.error) else app.vowed.ui.components.Spinner()
             return@Page
         }
         val c: Challenge = d.challenge
         val me = d.participants.firstOrNull { it.wallet == myWallet }
         val dv = if (me != null) CheckInLogic.dayView(c, me, now) else null
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val cat = planCategory(c)
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // hero header
+            Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(androidx.compose.ui.graphics.Brush.linearGradient(app.vowed.ui.components.CategoryStyle.colors(cat))).padding(18.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    app.vowed.ui.art.GlyphIcon(app.vowed.ui.art.categoryGlyph(cat), androidx.compose.ui.graphics.Color.White, 34.dp)
+                    Text(planTitle(c), style = MaterialTheme.typography.headlineSmall, color = androidx.compose.ui.graphics.Color.White)
+                    Text("Status: ${c.status} · ${c.mode} mode", style = MaterialTheme.typography.bodyMedium, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f))
+                }
+            }
             if (c.isDemo) DemoBadge(c.demoLabel)
-            Text(planTitle(c), style = MaterialTheme.typography.titleLarge)
-            Text("Status: ${c.status} · ${c.mode} mode")
-            Text("${c.durationDays} days, ${c.requiredDays} needed · day length ${if (c.daySecs >= 3600) "${c.daySecs / 3600} h" else "${c.daySecs} s"}")
-            Text("Pot ${fmt(c.totalDeposits)} · forfeited ${fmt(c.totalForfeit)} test USDC")
-            val sim = SimulatedYield.estimateTokens(c.totalDeposits, c.durationDays)
-            Text("Yield: SIMULATED, about ${"%.4f".format(sim)} tokens at an assumed ${SimulatedYield.ASSUMED_APY_PERCENT.toInt()}% a year. Not earned, not paid.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            c.trustTier?.let { Text("Proof trust: $it", style = MaterialTheme.typography.bodySmall) }
+            AppCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("${c.durationDays} days, ${c.requiredDays} needed · day length ${if (c.daySecs >= 3600) "${c.daySecs / 3600} h" else "${c.daySecs} s"}", style = MaterialTheme.typography.bodyMedium)
+                    Text("Pot ${fmt(c.totalDeposits)} · forfeited ${fmt(c.totalForfeit)} test USDC", style = MaterialTheme.typography.titleSmall)
+                    val sim = SimulatedYield.estimateTokens(c.totalDeposits, c.durationDays)
+                    app.vowed.ui.components.StatusBadge("Yield: SIMULATED, about ${"%.4f".format(sim)} tokens at an assumed ${SimulatedYield.ASSUMED_APY_PERCENT.toInt()}% a year. Not earned, not paid.", app.vowed.ui.components.Tone.Danger)
+                    c.trustTier?.let { app.vowed.ui.components.StatusBadge("Proof trust: $it", app.vowed.ui.components.trustTone(it)) }
+                }
+            }
             if (me != null) {
-                Text("Your days", style = MaterialTheme.typography.titleMedium)
-                DayDots(dv!!.doneBits, if (c.status == "Open") dv.day else c.durationDays, c.durationDays)
-                Text("Streak ${dv.streak} · ${me.daysCompleted} of ${c.requiredDays} needed days done")
-                if (c.status == "Open") {
-                    if (dv.done) Text("Today is recorded.", color = MaterialTheme.colorScheme.primary)
-                    else if (dv.dayOpen) Button(onClick = onCheckIn, modifier = Modifier.fillMaxWidth()) { Text("Check in for today") }
-                    else Text("Check-ins are not open right now.", style = MaterialTheme.typography.bodySmall)
+                AppCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Your days", style = MaterialTheme.typography.titleMedium)
+                        DayDots(dv!!.doneBits, if (c.status == "Open") dv.day else c.durationDays, c.durationDays)
+                        Text("Streak ${dv.streak} · ${me.daysCompleted} of ${c.requiredDays} needed days done", style = MaterialTheme.typography.bodyMedium)
+                        if (c.status == "Open") {
+                            if (dv.done) app.vowed.ui.components.StatusBadge("Today is recorded.", app.vowed.ui.components.Tone.Success)
+                            else if (dv.dayOpen) app.vowed.ui.components.PrimaryButton("Check in for today", onCheckIn)
+                            else Text("Check-ins are not open right now.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
             Text("Players", style = MaterialTheme.typography.titleMedium)
-            d.participants.forEach { p ->
-                Text("${if (p.wallet == myWallet) "You" else short(p.wallet)} · stake ${fmt(p.stake)} · ${p.daysCompleted} days done · ${p.status}")
+            AppCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    d.participants.forEach { p ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            app.vowed.ui.components.Avatar(p.wallet, 40.dp)
+                            Column(Modifier.weight(1f)) {
+                                Text(if (p.wallet == myWallet) "You" else short(p.wallet), style = MaterialTheme.typography.titleSmall)
+                                Text("stake ${fmt(p.stake)} · ${p.daysCompleted} days done · ${p.status}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
             }
-            Spacer(Modifier.height(8.dp))
             val canJoin = !d.me.joined && c.status == "Open"
             if (canJoin) {
-                OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true)
-                val units = runCatching { BigDecimal(stake).movePointRight(6).toBigIntegerExact() }.getOrNull()
-                Button(enabled = units != null && units.signum() > 0 && state.flow !is TxFlow.Working, onClick = { onJoin(units.toString()) }, modifier = Modifier.fillMaxWidth()) { Text("Join with this stake") }
+                AppCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        val units = runCatching { BigDecimal(stake).movePointRight(6).toBigIntegerExact() }.getOrNull()
+                        app.vowed.ui.components.PrimaryButton("Join with this stake", { onJoin(units.toString()) }, enabled = units != null && units.signum() > 0 && state.flow !is TxFlow.Working)
+                    }
+                }
             }
             val claimable = runCatching { BigInteger(d.me.claimable) }.getOrDefault(BigInteger.ZERO)
             if (d.me.joined && claimable.signum() > 0) {
-                Button(onClick = onClaim, Modifier.fillMaxWidth()) { Text("Claim ${fmt(d.me.claimable)} test USDC") }
+                app.vowed.ui.components.PrimaryButton("Claim ${fmt(d.me.claimable)} test USDC", onClaim)
             } else if (d.me.joined && c.status != "Open") {
-                Text(if (c.status == "Settled") "Nothing left to claim." else "Settling soon. Payouts are claimable once the challenge settles.")
+                Text(if (c.status == "Settled") "Nothing left to claim." else "Settling soon. Payouts are claimable once the challenge settles.", style = MaterialTheme.typography.bodyMedium)
             }
             FlowStatus(state.flow)
         }
@@ -549,31 +522,58 @@ fun DetailScreen(
 // ---------------------------------------------------------------- settings
 
 @Composable
+private fun HubRow(title: String, subtitle: String, glyph: app.vowed.ui.art.Glyph, colors: List<androidx.compose.ui.graphics.Color>, onClick: () -> Unit) {
+    AppCard(onClick = onClick, Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            app.vowed.ui.components.GradientTile(colors, Modifier.size(46.dp)) { app.vowed.ui.art.GlyphIcon(glyph, androidx.compose.ui.graphics.Color.White, 26.dp) }
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            app.vowed.ui.art.GlyphIcon(app.vowed.ui.art.Glyph.Chevron, MaterialTheme.colorScheme.onSurfaceVariant, 22.dp)
+        }
+    }
+}
+
+@Composable
 fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit) {
     val ctx = LocalContext.current
-    Page("You", onBack = onBack) {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onCoach, modifier = Modifier.fillMaxWidth()) { Text("Coach: what to try next") }
-            Button(onClick = onRewards, modifier = Modifier.fillMaxWidth()) { Text("SKR rewards and streak freezes") }
-            Button(onClick = onLetters, modifier = Modifier.fillMaxWidth()) { Text("Letters to future me") }
-            OutlinedButton(onClick = { app.vowed.widget.requestPinWidget(ctx) }, modifier = Modifier.fillMaxWidth()) { Text("Add the Vowed widget to my home screen") }
-            Text("Wallet: ${state.account?.wallet?.let(::short) ?: "not connected"}")
-            Text("Proof key trust cap: ${state.account?.trustCap ?: "-"}")
-            Text("Network: ${state.meta?.network ?: "devnet"} (test tokens only)")
-            Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall)
+    Page("You") {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            AppCard(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    app.vowed.ui.components.Avatar(state.account?.wallet ?: "?", 56.dp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(state.account?.wallet?.let(::short) ?: "not connected", style = MaterialTheme.typography.titleMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            app.vowed.ui.components.StatusBadge("Network: ${state.meta?.network ?: "devnet"} (test tokens only)", app.vowed.ui.components.Tone.Warning)
+                        }
+                        Text("Proof key trust cap: ${state.account?.trustCap ?: "-"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            HubRow("Coach", "What to try next, from your own history", app.vowed.ui.art.Glyph.Focus, app.vowed.ui.components.CategoryStyle.colors("study"), onCoach)
+            HubRow("SKR rewards and streak freezes", "Weekly top streaks, test SKR", app.vowed.ui.art.Glyph.Trophy, app.vowed.ui.components.CategoryStyle.colors("focus"), onRewards)
+            HubRow("Letters to future me", "Written now, delivered later, kept on this phone", app.vowed.ui.art.Glyph.Bell, app.vowed.ui.components.CategoryStyle.colors("fitness"), onLetters)
+            HubRow("Practice check-in", "Camera practice (nothing is sent)", app.vowed.ui.art.Glyph.Fitness, app.vowed.ui.components.CategoryStyle.colors("steps"), onPractice)
+            HubRow("Home screen widget", "Add the Vowed widget to my home screen", app.vowed.ui.art.Glyph.Home, app.vowed.ui.components.CategoryStyle.colors("detox")) { app.vowed.widget.requestPinWidget(ctx) }
+            Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (app.vowed.BuildConfig.DEBUG) {
                 // debug builds only: the release app always uses its built-in address
                 val prefs = remember { app.vowed.data.Prefs(ctx) }
                 var shown by remember { mutableStateOf(prefs.backendUrl) }
-                Text("Debug: backend address (restart the app after changing)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { prefs.backendUrl = "https://vowed-backend.onrender.com"; shown = prefs.backendUrl }) { Text("Hosted") }
-                    OutlinedButton(onClick = { prefs.backendUrl = "http://10.0.2.2:8787"; shown = prefs.backendUrl }) { Text("Local (emulator)") }
+                AppCard(Modifier.fillMaxWidth(), container = VowedTheme.extra.demoTint) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Debug: backend address (restart the app after changing)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            app.vowed.ui.components.SoftButton("Hosted", { prefs.backendUrl = "https://vowed-backend.onrender.com"; shown = prefs.backendUrl }, Modifier.weight(1f))
+                            app.vowed.ui.components.SoftButton("Local (emulator)", { prefs.backendUrl = "http://10.0.2.2:8787"; shown = prefs.backendUrl }, Modifier.weight(1f))
+                        }
+                        Text("Now: $shown", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
-                Text("Now: $shown", style = MaterialTheme.typography.bodySmall)
             }
-            OutlinedButton(onClick = onPractice) { Text("Practice check-in (nothing is sent)") }
-            OutlinedButton(onClick = onDisconnect) { Text("Disconnect wallet") }
+            app.vowed.ui.components.SoftButton("Disconnect wallet", onDisconnect)
         }
     }
 }
