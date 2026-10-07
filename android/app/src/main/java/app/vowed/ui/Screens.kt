@@ -34,6 +34,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import app.vowed.CheckInLogic
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -138,9 +145,51 @@ fun OnboardingScreen(state: UiState, onConnect: () -> Unit, onDismissError: () -
 
 // ---------------------------------------------------------------- home
 
+/** One square per day: done, missed, today, or still to come. */
 @Composable
-fun HomeScreen(state: UiState, onNew: () -> Unit, onOpen: (String) -> Unit, onRefresh: () -> Unit, onSettings: () -> Unit, onSignIn: () -> Unit) {
-    Page("My challenges", actions = { TextButton(onClick = onSettings) { Text("Settings") } }) {
+fun DayDots(bits: BigInteger, today: Int, total: Int, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        for (d in 0 until total.coerceAtMost(30)) {
+            val done = bits.testBit(d)
+            val color = when {
+                done -> MaterialTheme.colorScheme.primary
+                d < today -> MaterialTheme.colorScheme.error.copy(alpha = 0.55f)
+                d == today -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                else -> MaterialTheme.colorScheme.outlineVariant
+            }
+            Box(Modifier.size(18.dp).clip(RoundedCornerShape(4.dp)).background(color))
+        }
+    }
+}
+
+/** The current time in unix seconds, re-read every second so "is today's check-in open" stays correct on a screen that is just sitting there. */
+@Composable
+fun rememberNowSeconds(): Long {
+    var t by remember { androidx.compose.runtime.mutableLongStateOf(System.currentTimeMillis() / 1000) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1000)
+            t = System.currentTimeMillis() / 1000
+        }
+    }
+    return t
+}
+
+fun planTitle(c: Challenge): String = c.plan?.get("title")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } ?: "Challenge ${short(c.pool)}"
+
+@Composable
+fun HomeScreen(
+    state: UiState,
+    myWallet: String?,
+    onNew: () -> Unit,
+    onOpen: (String) -> Unit,
+    onCheckIn: (String) -> Unit,
+    onRefresh: () -> Unit,
+    onSettings: () -> Unit,
+    onSignIn: () -> Unit,
+) {
+    val now = rememberNowSeconds()
+    Page("Today", actions = { TextButton(onClick = onSettings) { Text("Settings") } }) {
         if (state.account == null || !state.signedIn) {
             Text("Sign in with your wallet to see your challenges.")
             Button(onClick = onSignIn) { Text("Sign in") }
@@ -152,17 +201,37 @@ fun HomeScreen(state: UiState, onNew: () -> Unit, onOpen: (String) -> Unit, onRe
             Button(onClick = onNew) { Text("New challenge") }
             OutlinedButton(onClick = onRefresh) { Text("Refresh") }
         }
-        Text("Daily proofs are not in this build yet: a joined challenge counts every day as missed, so Soft-mode challenges refund only the part that is not penalised.", style = MaterialTheme.typography.bodySmall)
         state.listError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (state.loadingList) CircularProgressIndicator()
-        if (state.challenges.isEmpty() && !state.loadingList) Text("Nothing yet. Start a challenge.")
+        if (state.challenges.isEmpty() && !state.loadingList) {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Nothing here yet", style = MaterialTheme.typography.titleMedium)
+                    Text("Start a challenge: pick a goal, put a small stake behind it, and check in each day.")
+                }
+            }
+        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(state.challenges, key = { it.pool }) { c ->
+                val detail = state.details[c.pool]
+                val me = detail?.participants?.firstOrNull { it.wallet == myWallet }
+                val dv = if (me != null) CheckInLogic.dayView(c, me, now) else null
                 Card(onClick = { onOpen(c.pool) }, Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (c.isDemo) DemoBadge(c.demoLabel)
-                        Text(c.plan?.get("title")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } ?: "Challenge ${short(c.pool)}", fontWeight = FontWeight.SemiBold)
-                        Text("${c.status} · ${c.mode} · ${c.durationDays} days (${c.requiredDays} needed) · ${c.participantCount} joined")
+                        Text(planTitle(c), fontWeight = FontWeight.SemiBold)
+                        Text("${c.status} · ${c.mode} · ${c.durationDays} days (${c.requiredDays} needed) · ${c.participantCount} joined", style = MaterialTheme.typography.bodySmall)
+                        if (dv != null && c.status == "Open") {
+                            DayDots(dv.doneBits, dv.day, c.durationDays)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text("Streak ${dv.streak}", fontWeight = FontWeight.Medium)
+                                if (dv.done) Text("Today done", color = MaterialTheme.colorScheme.primary)
+                                else if (dv.dayOpen) Button(onClick = { onCheckIn(c.pool) }) { Text("Check in") }
+                                else Text("Not open yet", style = MaterialTheme.typography.bodySmall)
+                            }
+                        } else if (me != null) {
+                            DayDots(java.math.BigInteger(me.checkinBitmap.ifBlank { "0" }), c.durationDays, c.durationDays)
+                        }
                         Text("Pot ${fmt(c.totalDeposits)} test USDC", style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -175,15 +244,45 @@ fun HomeScreen(state: UiState, onNew: () -> Unit, onOpen: (String) -> Unit, onRe
 
 @Composable
 fun NewGoalScreen(state: UiState, onBack: () -> Unit, onStart: (GoalDraft) -> Unit) {
+    val ctx = LocalContext.current
     var template by remember { mutableStateOf<GoalTemplate>(Templates.all.first()) }
     var mode by remember { mutableStateOf("Soft") }
     var demo by remember { mutableStateOf(true) }
+    var daySecs by remember { mutableStateOf(120) }
     var stake by remember { mutableStateOf("1") }
+    var appName by remember(template) { mutableStateOf(template.proofParams["app"] ?: "") }
+    var place by remember(template) { mutableStateOf<Pair<Double, Double>?>(null) }
+    var placeMsg by remember(template) { mutableStateOf<String?>(null) }
+
     val demoOn = state.meta?.config?.demoEnabled == true
     val stakeUnits = runCatching { BigDecimal(stake).movePointRight(6).toBigIntegerExact() }.getOrNull()
-    val cap = state.meta?.config?.let { if (demo) it.demoMaxStake else it.maxStake }?.let { runCatching { BigInteger(it) }.getOrNull() }
-    val overCap = stakeUnits != null && cap != null && stakeUnits > cap
-    val valid = stakeUnits != null && stakeUnits.signum() > 0 && !overCap
+    val cfg = state.meta?.config
+    val cap = cfg?.let { if (demo) it.demoMaxStake else it.maxStake }?.let { runCatching { BigInteger(it) }.getOrNull() }
+    // stakes are capped by how trustworthy the weakest proof is (backend/src/domain/plan.ts)
+    val tierPct = when (template.tier) { app.vowed.goals.TrustTier.High -> 100; app.vowed.goals.TrustTier.Medium -> 50; else -> 10 }
+    val tierCap = cap?.multiply(BigInteger.valueOf(tierPct.toLong()))?.divide(BigInteger.valueOf(100))
+    val overCap = stakeUnits != null && tierCap != null && stakeUnits > tierCap
+    val placeOk = !template.needsPlace || place != null
+    val valid = stakeUnits != null && stakeUnits.signum() > 0 && !overCap && placeOk
+
+    var wantLocation by remember { mutableStateOf(false) }
+    val ask = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) wantLocation = true else placeMsg = "Location permission was not given."
+    }
+    androidx.compose.runtime.LaunchedEffect(wantLocation) {
+        if (!wantLocation) return@LaunchedEffect
+        val probe = app.vowed.proof.LocationProbe(ctx)
+        if (!probe.start()) { placeMsg = "Location is switched off on this phone."; wantLocation = false; return@LaunchedEffect }
+        placeMsg = "Looking for your location…"
+        var tries = 0
+        while (probe.fix.value == null && tries < 30) { kotlinx.coroutines.delay(500); tries++ }
+        val f = probe.fix.value
+        probe.stop()
+        if (f == null) placeMsg = "Could not get a location fix. Try outdoors or set a location in the emulator."
+        else { place = f.latitude to f.longitude; placeMsg = "Spot saved on this phone." }
+        wantLocation = false
+    }
+
     Page("New challenge", onBack = onBack) {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Choose a goal", style = MaterialTheme.typography.titleMedium)
@@ -192,6 +291,14 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onStart: (GoalDraft) -> Un
             }
             Text(template.summary)
             Text("${template.tier.label}: ${template.tier.explanation}", style = MaterialTheme.typography.bodySmall)
+            if (template.needsApp) OutlinedTextField(value = appName, onValueChange = { appName = it }, label = { Text("App to watch") }, singleLine = true)
+            if (template.needsPlace) {
+                OutlinedButton(onClick = {
+                    if (ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) wantLocation = true
+                    else ask.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                }) { Text(if (place == null) "Use my current location as the spot" else "Update the spot to here") }
+                placeMsg?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            }
             Text("Mode", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = mode == "Soft", onClick = { mode = "Soft" }, label = { Text("Soft") })
@@ -204,17 +311,29 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onStart: (GoalDraft) -> Un
             if (demoOn) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Switch(checked = demo, onCheckedChange = { demo = it })
-                    Text("DEMO pool: days last one minute")
+                    Text("DEMO pool: a day lasts minutes")
+                }
+                if (demo) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(60 to "1 min", 120 to "2 min", 300 to "5 min").forEach { (secs, label) ->
+                            FilterChip(selected = daySecs == secs, onClick = { daySecs = secs }, label = { Text("$label days") })
+                        }
+                    }
+                    Text("Demo goals ask for a small amount (for example 20 seconds of focus) so a short day can be completed.", style = MaterialTheme.typography.bodySmall)
                 }
             }
             OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true)
-            if (overCap) Text("Above the limit of ${fmt(cap.toString())} for this kind of pool.", color = MaterialTheme.colorScheme.error)
+            if (overCap) Text("Above the limit of ${fmt(tierCap.toString())} for ${template.tier.label.lowercase()} goals in this kind of pool.", color = MaterialTheme.colorScheme.error)
             Text("Test tokens on Solana devnet. No real money.", style = MaterialTheme.typography.bodySmall)
             Button(
                 enabled = valid && state.flow !is TxFlow.Working,
-                onClick = { onStart(GoalDraft(template, 3, 2, mode, stakeUnits!!, demo && demoOn)) },
+                onClick = {
+                    val params = if (template.needsApp && appName.isNotBlank()) mapOf("app" to appName.trim()) else emptyMap()
+                    onStart(GoalDraft(template, 3, 2, mode, stakeUnits!!, demo && demoOn, daySecs, params, place))
+                },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Review") }
+            if (template.needsPlace && place == null) Text("Save the spot first.", style = MaterialTheme.typography.bodySmall)
             FlowStatus(state.flow)
         }
     }
@@ -256,26 +375,48 @@ fun ReviewScreen(tx: PendingTx, onSign: () -> Unit, onCancel: () -> Unit) {
 // ---------------------------------------------------------------- detail
 
 @Composable
-fun DetailScreen(state: UiState, pool: String, onBack: () -> Unit, onLoad: () -> Unit, onJoin: (String) -> Unit, onClaim: () -> Unit) {
+fun DetailScreen(
+    state: UiState,
+    pool: String,
+    myWallet: String?,
+    onBack: () -> Unit,
+    onLoad: () -> Unit,
+    onJoin: (String) -> Unit,
+    onClaim: () -> Unit,
+    onCheckIn: () -> Unit,
+) {
     LaunchedEffect(pool) { onLoad() }
     val d = state.detail?.takeIf { it.challenge.pool == pool }
     var stake by remember { mutableStateOf("1") }
+    val now = rememberNowSeconds()
     Page("Challenge", onBack = onBack, actions = { TextButton(onClick = onLoad) { Text("Refresh") } }) {
         if (d == null) {
             if (state.detailError != null) Text(state.detailError, color = MaterialTheme.colorScheme.error) else CircularProgressIndicator()
             return@Page
         }
         val c: Challenge = d.challenge
+        val me = d.participants.firstOrNull { it.wallet == myWallet }
+        val dv = if (me != null) CheckInLogic.dayView(c, me, now) else null
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (c.isDemo) DemoBadge(c.demoLabel)
-            Text(c.plan?.get("title")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } ?: short(c.pool), style = MaterialTheme.typography.titleLarge)
+            Text(planTitle(c), style = MaterialTheme.typography.titleLarge)
             Text("Status: ${c.status} · ${c.mode} mode")
             Text("${c.durationDays} days, ${c.requiredDays} needed · day length ${if (c.daySecs >= 3600) "${c.daySecs / 3600} h" else "${c.daySecs} s"}")
             Text("Pot ${fmt(c.totalDeposits)} · forfeited ${fmt(c.totalForfeit)} test USDC")
             c.trustTier?.let { Text("Proof trust: $it", style = MaterialTheme.typography.bodySmall) }
+            if (me != null) {
+                Text("Your days", style = MaterialTheme.typography.titleMedium)
+                DayDots(dv!!.doneBits, if (c.status == "Open") dv.day else c.durationDays, c.durationDays)
+                Text("Streak ${dv.streak} · ${me.daysCompleted} of ${c.requiredDays} needed days done")
+                if (c.status == "Open") {
+                    if (dv.done) Text("Today is recorded.", color = MaterialTheme.colorScheme.primary)
+                    else if (dv.dayOpen) Button(onClick = onCheckIn, modifier = Modifier.fillMaxWidth()) { Text("Check in for today") }
+                    else Text("Check-ins are not open right now.", style = MaterialTheme.typography.bodySmall)
+                }
+            }
             Text("Players", style = MaterialTheme.typography.titleMedium)
             d.participants.forEach { p ->
-                Text("${short(p.wallet)} · stake ${fmt(p.stake)} · ${p.daysCompleted} days done · ${p.status}")
+                Text("${if (p.wallet == myWallet) "You" else short(p.wallet)} · stake ${fmt(p.stake)} · ${p.daysCompleted} days done · ${p.status}")
             }
             Spacer(Modifier.height(8.dp))
             val canJoin = !d.me.joined && c.status == "Open"
@@ -287,8 +428,8 @@ fun DetailScreen(state: UiState, pool: String, onBack: () -> Unit, onLoad: () ->
             val claimable = runCatching { BigInteger(d.me.claimable) }.getOrDefault(BigInteger.ZERO)
             if (d.me.joined && claimable.signum() > 0) {
                 Button(onClick = onClaim, Modifier.fillMaxWidth()) { Text("Claim ${fmt(d.me.claimable)} test USDC") }
-            } else if (d.me.joined) {
-                Text(if (c.status == "Settled") "Nothing left to claim." else "You're in. Payouts are claimable once the challenge settles.")
+            } else if (d.me.joined && c.status != "Open") {
+                Text(if (c.status == "Settled") "Nothing left to claim." else "Settling soon. Payouts are claimable once the challenge settles.")
             }
             FlowStatus(state.flow)
         }

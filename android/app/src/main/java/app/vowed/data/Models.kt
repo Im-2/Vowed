@@ -93,6 +93,24 @@ data class MetaConfig(
 )
 @Serializable data class Meta(val programId: String, val network: String, val authDomain: String, val initialised: Boolean, val config: MetaConfig? = null)
 
+@Serializable data class ProofSessionRequest(val pool: String, val dayIndex: Int, val proofType: String)
+@Serializable data class ProofTarget(val metric: String, val value: Double, val unit: String, val direction: String)
+@Serializable data class ProofWindow(val opensAt: Long, val closesAt: Long)
+@Serializable
+data class ProofSession(
+    val sessionId: String,
+    val nonce: String,
+    val expiresAt: Long,
+    val proofType: String,
+    val dayIndex: Int,
+    val target: ProofTarget,
+    val window: ProofWindow,
+    val isDemo: Boolean = false,
+    val daySecs: Int = 86_400,
+)
+@Serializable data class CheckinOutcome(val status: String, val signature: String? = null, val error: String? = null)
+@Serializable data class ProofResult(val accepted: Boolean, val trustTier: String, val daysCompleted: Int, val streak: Int, val checkin: CheckinOutcome)
+
 @Serializable data class ApiErrorBody(val error: ApiErrorInfo)
 @Serializable data class ApiErrorInfo(val code: String, val message: String)
 

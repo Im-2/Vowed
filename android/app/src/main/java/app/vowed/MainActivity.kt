@@ -15,7 +15,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import app.vowed.ui.CheckInScreen
 import app.vowed.ui.DetailScreen
+import app.vowed.ui.Page
+import androidx.compose.material3.Text
 import app.vowed.ui.HomeScreen
 import app.vowed.ui.NewGoalScreen
 import app.vowed.ui.OnboardingScreen
@@ -64,7 +67,8 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         composable("home") {
             LaunchedEffect(state.signedIn) { if (state.signedIn) vm.refreshList() }
             HomeScreen(
-                state, onNew = { nav.navigate("new") }, onOpen = { nav.navigate("detail/$it") }, onRefresh = vm::refreshList,
+                state, state.account?.wallet, onNew = { nav.navigate("new") }, onOpen = { nav.navigate("detail/$it") },
+                onCheckIn = { pool -> vm.openCheckIn(pool); nav.navigate("checkin/$pool") }, onRefresh = vm::refreshList,
                 onSettings = { nav.navigate("settings") }, onSignIn = { vm.connect(sender) },
             )
         }
@@ -76,10 +80,25 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         composable("detail/{pool}") { entry ->
             val pool = entry.arguments?.getString("pool") ?: return@composable
             DetailScreen(
-                state, pool, onBack = { vm.clearDetail(); nav.popBackStack() }, onLoad = { vm.loadDetail(pool) },
+                state, pool, state.account?.wallet, onBack = { vm.clearDetail(); nav.popBackStack() }, onLoad = { vm.loadDetail(pool) },
                 onJoin = { stake -> state.detail?.challenge?.let { vm.prepareJoin(pool, it.mint, stake) } },
                 onClaim = { state.detail?.challenge?.let { vm.prepareClaim(pool, it.mint) } },
+                onCheckIn = { vm.openCheckIn(pool); nav.navigate("checkin/$pool") },
             )
+        }
+        composable("checkin/{pool}") {
+            val ci = state.checkIn
+            if (ci == null) {
+                Page("Check in", onBack = { nav.popBackStack() }) {
+                    if (state.detailError != null) Text(state.detailError!!, color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+                    else androidx.compose.material3.CircularProgressIndicator()
+                }
+            } else {
+                CheckInScreen(
+                    ci, onBack = { vm.closeCheckIn(); nav.popBackStack() }, onSubmit = vm::submitProof, onInject = vm::injectProof, onReplay = vm::replayLast,
+                    stepBaseline = vm::stepBaseline, saveStepBaseline = vm::saveStepBaseline, watchedApp = vm::watchedApp,
+                )
+            }
         }
         composable("settings") {
             SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onDisconnect = {

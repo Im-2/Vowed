@@ -43,6 +43,12 @@ class GoalDraft(
     val mode: String, // "Soft" or "Hard"
     val stakeBaseUnits: BigInteger,
     val demo: Boolean,
+    /** Length of a demo "day" in seconds (60..3600); only used when [demo]. */
+    val demoDaySecs: Int = 120,
+    /** Template choices such as the watched app. */
+    val params: Map<String, String> = emptyMap(),
+    /** The spot for place goals; stays on this phone. */
+    val place: Pair<Double, Double>? = null,
 )
 
 /** A transaction that passed the on-phone check and is waiting for the user's confirmation. */
@@ -75,6 +81,9 @@ data class UiState(
     val detail: ChallengeDetail? = null,
     val detailError: String? = null,
     val flow: TxFlow = TxFlow.Idle,
+    /** Detail of each of my open challenges (for today's status on the home screen). */
+    val details: Map<String, ChallengeDetail> = emptyMap(),
+    val checkIn: CheckInState? = null,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -138,6 +147,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val list = c.api.challenges(mine = true).challenges
                 _state.update { it.copy(challenges = list, loadingList = false) }
+                // today's status for my open challenges (a handful at most)
+                for (ch in list.filter { it.status == "Open" }.take(8)) {
+                    runCatching { c.api.challenge(ch.pool) }.onSuccess { d -> _state.update { st -> st.copy(details = st.details + (ch.pool to d)) } }
+                }
             } catch (e: Throwable) {
                 _state.update { it.copy(loadingList = false, listError = friendly(e)) }
             }
@@ -175,14 +188,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val mint = (if (draft.demo) cfg.demoMints else cfg.allowedMints).firstOrNull() ?: throw ApiException(0, "no_token", "No token is enabled for this kind of challenge.")
                 setFlow(TxFlow.Working("Preparing your challenge…"))
 
-                val daySecs = 60
+                val daySecs = draft.demoDaySecs
                 val now = System.currentTimeMillis() / 1000
                 // A demo pool starts in two minutes (its join window is one demo day); a normal pool starts in ten.
                 val startTs = now + if (draft.demo) 120L else 600L
                 val penaltyBps = if (draft.mode == "Hard") 10_000 else 3_000
                 val joinWindow = if (draft.demo) daySecs.toLong() else 3_600L
                 val maxParticipants = if (draft.demo) 10 else 50
-                val plan: JsonObject = draft.template.plan(draft.totalDays, draft.requiredDays)
+                val plan: JsonObject = draft.template.plan(draft.totalDays, draft.requiredDays, draft.demo, draft.params)
                 val goalHash = PlanHash.hash(plan)
 
                 val resp = c.api.createTx(
@@ -204,6 +217,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     ),
                 )
                 val pool = resp.pool
+                draft.place?.let { (lat, lon) -> c.prefs.setPlace(pool, lat, lon) }
+                draft.params["app"]?.let { c.prefs.setWatchedApp(pool, it) }
                 setFlow(
                     TxFlow.Review(
                         PendingTx("create", review, txBytes, pool) {
@@ -293,4 +308,83 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelReview() = setFlow(TxFlow.Idle)
 
     private fun hex(s: String) = ByteArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+
+    // ------------------------------------------------------------------ daily proofs
+
+    fun myParticipant(d: ChallengeDetail): app.vowed.data.Participant? = d.participants.firstOrNull { it.wallet == _state.value.account?.wallet }
+
+    fun openCheckIn(pool: String) {
+        viewModelScope.launch {
+            try {
+                val d = c.api.challenge(pool)
+                _state.update { it.copy(detail = d, details = it.details + (pool to d)) }
+                val ch = d.challenge
+                val me = myParticipant(d)
+                val kind = CheckInLogic.planKind(ch.plan) ?: throw ApiException(0, "no_plan", "This challenge has no goal plan to check in against.")
+                val target = CheckInLogic.planTarget(ch.plan) ?: throw ApiException(0, "no_plan", "This challenge's goal plan is incomplete.")
+                val dv = CheckInLogic.dayView(ch, me, System.currentTimeMillis() / 1000)
+                _state.update {
+                    it.copy(
+                        checkIn = CheckInState(pool, ch, me, kind, dv.day, dv.dayOpen, dv.done, target, CheckInLogic.planParams(ch.plan), c.prefs.place(pool)),
+                    )
+                }
+            } catch (e: Throwable) {
+                _state.update { it.copy(detailError = friendly(e)) }
+            }
+        }
+    }
+
+    fun closeCheckIn() = _state.update { it.copy(checkIn = null) }
+
+    private fun setSubmission(sub: Submission, pkg: JsonObject? = null) =
+        _state.update { st -> st.checkIn?.let { ci -> st.copy(checkIn = ci.copy(submission = sub, lastPackage = pkg ?: ci.lastPackage)) } ?: st }
+
+    /** Sends what a collector measured. The server decides; a refusal comes back with its reason and nothing is recorded. */
+    fun submitProof(collected: app.vowed.proof.Collected) {
+        val ci = _state.value.checkIn ?: return
+        setSubmission(Submission.Working)
+        viewModelScope.launch {
+            try {
+                val session = c.proofs.open(ci.pool, ci.day, ci.kind)
+                val pkg = c.proofs.buildPackage(session, ci.pool, ci.kind, collected)
+                setSubmission(Submission.Working, pkg)
+                val res = c.proofs.resubmit(pkg)
+                setSubmission(Submission.Accepted(res), pkg)
+                refreshList()
+                loadDetail(ci.pool)
+            } catch (e: ApiException) {
+                setSubmission(Submission.Rejected(if (e.code == "proof_rejected") "The server refused this proof: ${e.message}" else friendly(e)))
+            } catch (e: Throwable) {
+                setSubmission(Submission.Rejected(friendly(e)))
+            }
+        }
+    }
+
+    /** Debug builds only: produce test data for the proof type (good data meets the target, bad data misses it). */
+    fun injectProof(good: Boolean) {
+        if (!app.vowed.debug.DebugProofs.ENABLED) return
+        val ci = _state.value.checkIn ?: return
+        submitProof(app.vowed.debug.DebugProofs.inject(ci.kind, ci.target, System.currentTimeMillis() / 1000, good))
+    }
+
+    /** Debug builds only: send the last package again to show that a replay is refused. */
+    fun replayLast() {
+        if (!app.vowed.debug.DebugProofs.ENABLED) return
+        val ci = _state.value.checkIn ?: return
+        val pkg = ci.lastPackage ?: return
+        setSubmission(Submission.Working)
+        viewModelScope.launch {
+            try {
+                val res = c.proofs.resubmit(pkg)
+                setSubmission(Submission.Accepted(res))
+            } catch (e: Throwable) {
+                setSubmission(Submission.Rejected("Replay: " + friendly(e)))
+            }
+        }
+    }
+
+    fun stepBaseline(pool: String, day: Int) = c.prefs.stepBaseline(pool, day)
+    fun saveStepBaseline(pool: String, day: Int, total: Long) = c.prefs.setStepBaseline(pool, day, total)
+    fun watchedApp(pool: String) = c.prefs.watchedApp(pool)
+    val appContext get() = getApplication<Application>()
 }

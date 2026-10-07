@@ -55,6 +55,8 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     suspend fun createTx(req: CreateTxRequest): TxResponse = post("/v1/challenges/tx/create", req, idempotent = true)
     suspend fun joinTx(req: JoinTxRequest): TxResponse = post("/v1/challenges/tx/join", req, idempotent = true)
     suspend fun claimTx(req: ClaimTxRequest): TxResponse = post("/v1/challenges/tx/claim", req, idempotent = true)
+    suspend fun proofSession(req: ProofSessionRequest): ProofSession = post("/v1/proofs/session", req)
+    suspend fun submitProof(pkg: JsonObject): ProofResult = post("/v1/proofs/submit", pkg)
     suspend fun sync(signature: String): Unit = call("POST", "/v1/challenges/sync", AppJson.encodeToString(SyncRequest(signature))) { }
 
     companion object {

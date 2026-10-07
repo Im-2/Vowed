@@ -4,6 +4,7 @@ import android.app.Application
 import app.vowed.data.AccountRepository
 import app.vowed.data.BackendApi
 import app.vowed.data.Prefs
+import app.vowed.proof.ProofEngine
 import app.vowed.device.DeviceKey
 import app.vowed.wallet.WalletManager
 
@@ -14,6 +15,7 @@ class AppContainer(val app: Application) {
     val wallet = WalletManager(prefs)
     val deviceKey: (String) -> DeviceKey = { DeviceKey(app, it) }
     val account = AccountRepository(this)
+    val proofs = ProofEngine(api, { deviceKey(prefs.wallet ?: error("no wallet")) })
 }
 
 class VowedApp : Application() {

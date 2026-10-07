@@ -33,6 +33,19 @@ class Prefs(context: Context) {
         get() = if (BuildConfig.DEBUG) sp.getString("backend_url", null) ?: BuildConfig.BACKEND_URL else BuildConfig.BACKEND_URL
         set(v) = sp.edit().putString("backend_url", v).apply()
 
+    /** A goal's place (latitude, longitude) stays on the phone; the backend only ever hears "inside" and dwell seconds. */
+    fun setPlace(pool: String, lat: Double, lon: Double) = sp.edit().putString("place_$pool", "$lat,$lon").apply()
+    fun place(pool: String): Pair<Double, Double>? =
+        sp.getString("place_$pool", null)?.split(",")?.takeIf { it.size == 2 }?.let { it[0].toDoubleOrNull()?.let { a -> it[1].toDoubleOrNull()?.let { b -> a to b } } }
+
+    /** Step-counter reading taken when a day's check-in first opened; the day's steps are the difference to it. */
+    fun stepBaseline(pool: String, day: Int): Long? = sp.getLong("steps_${pool}_$day", -1L).takeIf { it >= 0 }
+    fun setStepBaseline(pool: String, day: Int, total: Long) = sp.edit().putLong("steps_${pool}_$day", total).apply()
+
+    /** Which app a usage goal watches, if the user changed it from the template. */
+    fun setWatchedApp(pool: String, name: String) = sp.edit().putString("app_$pool", name).apply()
+    fun watchedApp(pool: String): String? = sp.getString("app_$pool", null)
+
     fun clearAccount() {
         val w = wallet
         sp.edit().remove("wallet").remove("mwa_auth_token").apply()
