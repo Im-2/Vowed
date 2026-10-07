@@ -31,7 +31,8 @@ class WalletManager(private val prefs: Prefs) {
     private fun <T> TransactionResult<T>.unwrap(): T = when (this) {
         is TransactionResult.Success -> payload.also { prefs.mwaAuthToken = adapter.authToken }
         is TransactionResult.NoWalletFound -> throw WalletException("No Solana wallet app was found on this phone. Install a Mobile Wallet Adapter wallet first.")
-        is TransactionResult.Failure -> throw WalletException(message.ifBlank { "The wallet request failed." })
+        // The library reports declined requests, rejected transactions and a missing wallet with similar wording.
+        is TransactionResult.Failure -> throw WalletException("The wallet did not complete the request (${message.ifBlank { "no detail" }}). If you were signing a transaction, try again and approve right away: a transaction expires after about a minute.")
     }
 
     /**

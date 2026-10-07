@@ -241,7 +241,10 @@ fun ReviewScreen(tx: PendingTx, onSign: () -> Unit, onCancel: () -> Unit) {
             Text(tx.review.title, style = MaterialTheme.typography.titleMedium)
             Text("This app decoded the transaction itself and re-derived every address. It matches what you chose.", style = MaterialTheme.typography.bodySmall)
             tx.review.lines.forEach { (k, v) ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(k); Text(v, fontWeight = FontWeight.Medium) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(k, Modifier.weight(0.4f))
+                    Text(v, Modifier.weight(0.6f), fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                }
                 HorizontalDivider()
             }
             Button(onClick = onSign, Modifier.fillMaxWidth()) { Text("Sign with wallet") }
