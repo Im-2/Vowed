@@ -155,7 +155,7 @@ private fun ProofPanel(
         ProofKind.STEPS -> StepsPanel(ci, busy, onSubmit, stepBaseline, saveStepBaseline)
         ProofKind.GEOFENCE -> GeofencePanel(ci, busy, onSubmit)
         ProofKind.USAGE_LIMIT, ProofKind.NO_USE_WINDOW -> UsagePanel(ci, busy, onSubmit, watchedApp)
-        ProofKind.CAMERA_POSE -> Text("Camera rep counting is added in the next phase. On a debug build you can inject test data below.")
+        ProofKind.CAMERA_POSE -> PoseCheckInPanel(ci, busy, onSubmit)
     }
 }
 

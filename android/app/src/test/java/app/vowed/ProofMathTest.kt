@@ -2,7 +2,6 @@ package app.vowed
 
 import app.vowed.core.PlanHash
 import app.vowed.data.ProofTarget
-import app.vowed.goals.Templates
 import app.vowed.proof.DwellTracker
 import app.vowed.proof.FocusTimer
 import app.vowed.proof.ProofKind
@@ -85,20 +84,6 @@ class ProofMathTest {
         assertTrue(ProofMath.met(ProofKind.SELF_ATTEST, target(1.0, "x", "atLeast"), mapOf("done" to true)))
         assertFalse(ProofMath.met(ProofKind.SELF_ATTEST, target(1.0, "x", "atLeast"), mapOf("done" to false)))
         assertFalse(ProofMath.met(ProofKind.STEPS, target(1.0, "steps", "atLeast"), emptyMap()))
-    }
-
-    @Test fun demoTemplatesAskForSmallAmountsButKeepTheirProofType() {
-        for (t in Templates.all) {
-            val normal = t.plan(3, 2, false)
-            val demo = t.plan(3, 2, true)
-            assertEquals(t.id, normal["proofMethods"]!!.jsonArray[0].jsonObject["type"], demo["proofMethods"]!!.jsonArray[0].jsonObject["type"])
-            val nv = normal["target"]!!.jsonObject["value"]!!.jsonPrimitive.content.toDouble()
-            val dv = demo["target"]!!.jsonObject["value"]!!.jsonPrimitive.content.toDouble()
-            // a demo plan never asks for more than the normal one (units can differ: 20 seconds instead of 2 hours)
-            val ns = ProofMath.toSeconds(nv, normal["target"]!!.jsonObject["unit"]!!.jsonPrimitive.content)
-            val ds = ProofMath.toSeconds(dv, demo["target"]!!.jsonObject["unit"]!!.jsonPrimitive.content)
-            if (t.demo != null && ns != null && ds != null) assertTrue(t.id, ds <= ns) else if (t.demo != null) assertTrue(t.id, dv <= nv)
-        }
     }
 
     @Test fun canonicalJsonMatchesTheBackendProofVectors() {

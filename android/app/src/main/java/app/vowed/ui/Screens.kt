@@ -52,8 +52,6 @@ import app.vowed.UiState
 import app.vowed.core.TxChecker
 import app.vowed.data.Challenge
 import app.vowed.data.ConnectStep
-import app.vowed.goals.GoalTemplate
-import app.vowed.goals.Templates
 import java.math.BigDecimal
 import java.math.BigInteger
 
@@ -98,11 +96,12 @@ fun Page(title: String, onBack: (() -> Unit)? = null, actions: @Composable () ->
 // ---------------------------------------------------------------- onboarding
 
 @Composable
-fun OnboardingScreen(state: UiState, onConnect: () -> Unit, onDismissError: () -> Unit) {
+fun OnboardingScreen(state: UiState, onConnect: () -> Unit, onDismissError: () -> Unit, onPractice: () -> Unit) {
     val page = remember { mutableIntStateOf(0) }
     Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Spacer(Modifier.height(24.dp))
         Text("Vowed", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+        TextButton(onClick = onPractice) { Text("Try the camera rep counter first (no wallet needed)") }
         when (page.intValue) {
             0 -> {
                 Text("Put money behind your goal.", style = MaterialTheme.typography.titleLarge)
@@ -245,28 +244,129 @@ fun HomeScreen(
 
 // ---------------------------------------------------------------- new goal
 
+fun trustExplanation(tier: String?): String = when (tier) {
+    "high" -> "High trust: proved by the phone's camera or app-usage data, signed by a hardware-backed key."
+    "medium" -> "Medium trust: proved by phone sensors or a timer; harder to fake than a tap, easier than a camera."
+    "low" -> "Low trust: you confirm it yourself. Stakes are capped very low."
+    else -> ""
+}
+
+fun proofLabel(type: String): String = when (type) {
+    "CAMERA_POSE" -> "The camera counts your reps"
+    "STEPS" -> "Your step sensor counts steps"
+    "FOCUS_TIMER" -> "An in-app timer (it stops when you leave the app)"
+    "GEOFENCE" -> "Your phone checks you are at a place"
+    "USAGE_LIMIT" -> "Your app-usage data (Usage access)"
+    "NO_USE_WINDOW" -> "Your app-usage data during a time window"
+    "SELF_ATTEST" -> "You confirm it yourself"
+    else -> type
+}
+
+private fun sourceLabel(r: app.vowed.data.ParseResult) = when (r.source) {
+    "template" -> "Built-in template"
+    "ai" -> "Understood by AI (Gemini); check it carefully"
+    "cache" -> "Understood earlier by AI (Gemini); check it carefully"
+    "template-after-ai-failed" -> "Built-in template (the AI was not used)"
+    else -> ""
+}
+
+private fun amountText(v: Double) = if (v % 1.0 == 0.0) v.toLong().toString() else v.toString()
+
 @Composable
-fun NewGoalScreen(state: UiState, onBack: () -> Unit, onStart: (GoalDraft) -> Unit) {
+fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Unit, onParse: (String) -> Unit, onUseAi: (Boolean) -> Unit, onAlternative: (app.vowed.data.PlanOption) -> Unit, onClear: () -> Unit, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?) -> Unit) {
     val ctx = LocalContext.current
-    var template by remember { mutableStateOf<GoalTemplate>(Templates.all.first()) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { onLoadTemplates() }
+    val goal = state.goal
+    val result = goal.result
+    var text by remember { mutableStateOf("") }
+    Page("New challenge", onBack = { if (result != null) onClear() else onBack() }) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (result == null || result.status != "plan") {
+                // ---------------------------------------------------------------- 1. say what you want
+                Text("What do you want to commit to?", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = text, onValueChange = { if (it.length <= 300) text = it }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Your goal, in your own words") }, supportingText = { Text("For example: do 20 squats every day for a week") }, minLines = 2,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Switch(checked = goal.useAi, onCheckedChange = onUseAi)
+                    Text("Use AI for goals the templates do not understand")
+                }
+                Text(
+                    if (goal.useAi) "Only the text you type is sent, to Google's Gemini (free tier, which Google may use to improve its products). Do not put personal details in it. Nothing else about you is sent."
+                    else "AI is off: your text goes only to the Vowed server and is matched against the built-in templates.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Button(enabled = text.trim().length >= 3 && !goal.parsing, onClick = { onParse(text) }, modifier = Modifier.fillMaxWidth()) { Text("Preview plan") }
+                if (goal.parsing) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { CircularProgressIndicator(Modifier.height(24.dp)); Text("Working out a plan…") }
+                goal.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+
+                if (result != null && result.status == "unverifiable") {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("A phone cannot check this goal", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                            result.reason?.let { Text(it) }
+                            result.suggestedAlternative?.let { Text("Closest checkable version: $it") }
+                            result.alternatives.forEach { o -> OutlinedButton(onClick = { onAlternative(o) }, modifier = Modifier.fillMaxWidth()) { Text(o.label) } }
+                        }
+                    }
+                }
+                if (result != null && result.status == "unclear") {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("I need a little more", style = MaterialTheme.typography.titleMedium)
+                            result.clarifyingQuestions.forEach { Text(it) }
+                            result.reason?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                        }
+                    }
+                }
+                result?.ai?.note?.let { if (result.status != "plan") Text("AI note: $it", style = MaterialTheme.typography.bodySmall) }
+
+                val examples = if (result != null && result.examples.isNotEmpty()) result.examples else goal.templates.map { it.example }
+                if (examples.isNotEmpty()) {
+                    Text("Or start from an example", style = MaterialTheme.typography.titleSmall)
+                    examples.forEach { ex ->
+                        FilterChip(selected = false, onClick = { text = ex; onParse(ex) }, label = { Text(ex) })
+                    }
+                }
+            } else {
+                PlanPreview(result, ctx, state, onStart)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content.Context, state: UiState, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?) -> Unit) {
+    val plan = result.plan!!
+    val type = app.vowed.goals.PlanEdit.proofType(plan)
+    var title by remember(plan) { mutableStateOf(app.vowed.goals.PlanEdit.title(plan)) }
+    var amount by remember(plan) { mutableStateOf(amountText(app.vowed.goals.PlanEdit.value(plan))) }
+    var total by remember(plan) { mutableStateOf(app.vowed.goals.PlanEdit.totalDays(plan).toString()) }
+    var required by remember(plan) { mutableStateOf(app.vowed.goals.PlanEdit.requiredDays(plan).toString()) }
+    var appName by remember(plan) { mutableStateOf(app.vowed.goals.PlanEdit.param(plan, "app") ?: "") }
+    var placeName by remember(plan) { mutableStateOf(app.vowed.goals.PlanEdit.param(plan, "place") ?: "") }
+    var place by remember(plan) { mutableStateOf<Pair<Double, Double>?>(null) }
+    var placeMsg by remember(plan) { mutableStateOf<String?>(null) }
     var mode by remember { mutableStateOf("Soft") }
     var demo by remember { mutableStateOf(true) }
     var daySecs by remember { mutableStateOf(120) }
     var stake by remember { mutableStateOf("1") }
-    var appName by remember(template) { mutableStateOf(template.proofParams["app"] ?: "") }
-    var place by remember(template) { mutableStateOf<Pair<Double, Double>?>(null) }
-    var placeMsg by remember(template) { mutableStateOf<String?>(null) }
 
-    val demoOn = state.meta?.config?.demoEnabled == true
-    val stakeUnits = runCatching { BigDecimal(stake).movePointRight(6).toBigIntegerExact() }.getOrNull()
     val cfg = state.meta?.config
-    val cap = cfg?.let { if (demo) it.demoMaxStake else it.maxStake }?.let { runCatching { BigInteger(it) }.getOrNull() }
-    // stakes are capped by how trustworthy the weakest proof is (backend/src/domain/plan.ts)
-    val tierPct = when (template.tier) { app.vowed.goals.TrustTier.High -> 100; app.vowed.goals.TrustTier.Medium -> 50; else -> 10 }
-    val tierCap = cap?.multiply(BigInteger.valueOf(tierPct.toLong()))?.divide(BigInteger.valueOf(100))
+    val demoOn = cfg?.demoEnabled == true
+    val stakeUnits = runCatching { BigDecimal(stake).movePointRight(6).toBigIntegerExact() }.getOrNull()
+    val base = cfg?.let { if (demo && demoOn) it.demoMaxStake else it.maxStake }?.let { runCatching { BigInteger(it) }.getOrNull() }
+    val pct = when (result.trustTier) { "high" -> 100; "medium" -> 50; else -> 10 }
+    val tierCap = base?.multiply(BigInteger.valueOf(pct.toLong()))?.divide(BigInteger.valueOf(100))
     val overCap = stakeUnits != null && tierCap != null && stakeUnits > tierCap
-    val placeOk = !template.needsPlace || place != null
-    val valid = stakeUnits != null && stakeUnits.signum() > 0 && !overCap && placeOk
+    val totalN = total.toIntOrNull()
+    val requiredN = required.toIntOrNull()
+    val daysOk = totalN != null && requiredN != null && totalN in 1..60 && requiredN in 1..totalN
+    val amountN = amount.toDoubleOrNull()
+    val placeOk = !result.needsPlace || place != null
+    val appOk = !result.needsApp || appName.isNotBlank()
+    val valid = stakeUnits != null && stakeUnits.signum() > 0 && !overCap && daysOk && amountN != null && amountN >= 0 && placeOk && appOk && title.isNotBlank()
 
     var wantLocation by remember { mutableStateOf(false) }
     val ask = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
@@ -286,60 +386,72 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onStart: (GoalDraft) -> Un
         wantLocation = false
     }
 
-    Page("New challenge", onBack = onBack) {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Choose a goal", style = MaterialTheme.typography.titleMedium)
-            Templates.all.forEach { t ->
-                FilterChip(selected = t.id == template.id, onClick = { template = t }, label = { Text(t.title) })
-            }
-            Text(template.summary)
-            Text("${template.tier.label}: ${template.tier.explanation}", style = MaterialTheme.typography.bodySmall)
-            if (template.needsApp) OutlinedTextField(value = appName, onValueChange = { appName = it }, label = { Text("App to watch") }, singleLine = true)
-            if (template.needsPlace) {
-                OutlinedButton(onClick = {
-                    if (ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) wantLocation = true
-                    else ask.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
-                }) { Text(if (place == null) "Use my current location as the spot" else "Update the spot to here") }
-                placeMsg?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            }
-            Text("Mode", style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = mode == "Soft", onClick = { mode = "Soft" }, label = { Text("Soft") })
-                FilterChip(selected = mode == "Hard", onClick = { mode = "Hard" }, label = { Text("Hard") })
-            }
-            Text(
-                if (mode == "Soft") "Soft: if you miss days you lose only a share of your stake; the rest comes back." else "Hard: finish all required days or lose the whole stake to the finishers.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            if (demoOn) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Switch(checked = demo, onCheckedChange = { demo = it })
-                    Text("DEMO pool: a day lasts minutes")
-                }
-                if (demo) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(60 to "1 min", 120 to "2 min", 300 to "5 min").forEach { (secs, label) ->
-                            FilterChip(selected = daySecs == secs, onClick = { daySecs = secs }, label = { Text("$label days") })
-                        }
-                    }
-                    Text("Demo goals ask for a small amount (for example 20 seconds of focus) so a short day can be completed.", style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true)
-            if (overCap) Text("Above the limit of ${fmt(tierCap.toString())} for ${template.tier.label.lowercase()} goals in this kind of pool.", color = MaterialTheme.colorScheme.error)
-            Text("Test tokens on Solana devnet. No real money. Need some? Use \"Get test tokens\" on the Today screen.", style = MaterialTheme.typography.bodySmall)
-            Button(
-                enabled = valid && state.flow !is TxFlow.Working,
-                onClick = {
-                    val params = if (template.needsApp && appName.isNotBlank()) mapOf("app" to appName.trim()) else emptyMap()
-                    onStart(GoalDraft(template, 3, 2, mode, stakeUnits!!, demo && demoOn, daySecs, params, place))
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Review") }
-            if (template.needsPlace && place == null) Text("Save the spot first.", style = MaterialTheme.typography.bodySmall)
-            FlowStatus(state.flow)
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Your plan", style = MaterialTheme.typography.titleMedium)
+            Text(sourceLabel(result), style = MaterialTheme.typography.labelMedium, color = if (result.source == "ai" || result.source == "cache") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+            Text("How it is proved: ${proofLabel(type)}")
+            Text(trustExplanation(result.trustTier), style = MaterialTheme.typography.bodySmall)
+            plan["window"]?.let { w -> (w as? kotlinx.serialization.json.JsonObject)?.let { Text("Window: ${(it["startLocalTime"] as? kotlinx.serialization.json.JsonPrimitive)?.content} to ${(it["endLocalTime"] as? kotlinx.serialization.json.JsonPrimitive)?.content}") } }
+            result.limitations.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+            result.notes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            result.ai.note?.let { Text("AI note: $it", style = MaterialTheme.typography.bodySmall) }
         }
     }
+    Text("Edit if you like", style = MaterialTheme.typography.titleSmall)
+    OutlinedTextField(value = title, onValueChange = { if (it.length <= 120) title = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    if (type != "NO_USE_WINDOW") OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount (${app.vowed.goals.PlanEdit.unit(plan)})") }, singleLine = true)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(value = total, onValueChange = { total = it.filter(Char::isDigit).take(2) }, label = { Text("Days") }, singleLine = true, modifier = Modifier.weight(1f))
+        OutlinedTextField(value = required, onValueChange = { required = it.filter(Char::isDigit).take(2) }, label = { Text("Days needed") }, singleLine = true, modifier = Modifier.weight(1f))
+    }
+    if (!daysOk) Text("Days needed must be between 1 and the number of days (at most 60).", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+    if (result.needsApp) OutlinedTextField(value = appName, onValueChange = { appName = it }, label = { Text("App to watch") }, singleLine = true)
+    if (result.needsPlace) {
+        OutlinedTextField(value = placeName, onValueChange = { placeName = it }, label = { Text("Name of the place") }, singleLine = true)
+        OutlinedButton(onClick = {
+            if (ctx.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) wantLocation = true
+            else ask.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+        }) { Text(if (place == null) "Use my current location as the spot" else "Update the spot to here") }
+        placeMsg?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    }
+
+    Text("Mode", style = MaterialTheme.typography.titleMedium)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(selected = mode == "Soft", onClick = { mode = "Soft" }, label = { Text("Soft") })
+        FilterChip(selected = mode == "Hard", onClick = { mode = "Hard" }, label = { Text("Hard") })
+    }
+    Text(
+        if (mode == "Soft") "Soft: if you miss days you lose only a share of your stake; the rest comes back." else "Hard: finish all required days or lose the whole stake to the finishers.",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    if (demoOn) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Switch(checked = demo, onCheckedChange = { demo = it })
+            Text("DEMO pool: a day lasts minutes")
+        }
+        if (demo) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(60 to "1 min", 120 to "2 min", 300 to "5 min").forEach { (secs, label) ->
+                    FilterChip(selected = daySecs == secs, onClick = { daySecs = secs }, label = { Text("$label days") })
+                }
+            }
+            Text("A demo pool asks for a small amount (for example 20 seconds of focus) so a short day can be completed. Test money only.", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true)
+    if (overCap) Text("Above the limit of ${fmt(tierCap.toString())} for this kind of goal in this kind of pool.", color = MaterialTheme.colorScheme.error)
+    Text("Test tokens on Solana devnet. No real money. Need some? Use \"Get test tokens\" on the Today screen.", style = MaterialTheme.typography.bodySmall)
+    Button(
+        enabled = valid && state.flow !is TxFlow.Working,
+        onClick = {
+            val edit = app.vowed.goals.Edit(title = title, value = amountN, totalDays = totalN, requiredDays = requiredN, app = appName.takeIf { result.needsApp }, place = placeName.takeIf { result.needsPlace })
+            onStart(edit, mode, stakeUnits!!, demo && demoOn, daySecs, place)
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) { Text("Review") }
+    if (result.needsPlace && place == null) Text("Save the spot first.", style = MaterialTheme.typography.bodySmall)
+    FlowStatus(state.flow)
 }
 
 @Composable
@@ -442,12 +554,13 @@ fun DetailScreen(
 // ---------------------------------------------------------------- settings
 
 @Composable
-fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onDisconnect: () -> Unit) {
+fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onDisconnect: () -> Unit) {
     Page("Settings", onBack = onBack) {
         Text("Wallet: ${state.account?.wallet?.let(::short) ?: "not connected"}")
         Text("Proof key trust cap: ${state.account?.trustCap ?: "-"}")
         Text("Network: ${state.meta?.network ?: "devnet"} (test tokens only)")
         Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick = onPractice) { Text("Camera practice (nothing is sent)") }
         OutlinedButton(onClick = onDisconnect) { Text("Disconnect wallet") }
     }
 }

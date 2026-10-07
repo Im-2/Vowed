@@ -127,6 +127,35 @@ data class FaucetStatus(
 @Serializable data class FaucetMinted(val tUSDC: String, val tSKR: String)
 @Serializable data class FaucetClaim(val signature: String, val minted: FaucetMinted, val nextClaimAt: Long, val label: String)
 
+@Serializable data class ParseRequest(val text: String, val useAi: Boolean = true)
+@Serializable data class PlanExtras(val needsPlace: Boolean = false, val needsApp: Boolean = false, val limitations: List<String> = emptyList())
+@Serializable data class PlanOption(val label: String, val plan: JsonObject, val demoPlan: JsonObject? = null, val extras: PlanExtras = PlanExtras())
+@Serializable data class AiInfo(val used: Boolean = false, val note: String? = null)
+@Serializable
+data class ParseResult(
+    val status: String,
+    val source: String = "none",
+    val plan: JsonObject? = null,
+    val demoPlan: JsonObject? = null,
+    val templateId: String? = null,
+    val trustTier: String? = null,
+    val needsPlace: Boolean = false,
+    val needsApp: Boolean = false,
+    val limitations: List<String> = emptyList(),
+    val notes: List<String> = emptyList(),
+    val confidence: String = "low",
+    val reason: String? = null,
+    val suggestedAlternative: String? = null,
+    val alternatives: List<PlanOption> = emptyList(),
+    val clarifyingQuestions: List<String> = emptyList(),
+    val examples: List<String> = emptyList(),
+    val ai: AiInfo = AiInfo(),
+)
+@Serializable data class TemplateInfo(val id: String, val title: String, val example: String, val summary: String, val proofType: String, val category: String, val needsPlace: Boolean = false, val needsApp: Boolean = false)
+@Serializable data class TemplateList(val templates: List<TemplateInfo>)
+@Serializable data class ValidateRequest(val plan: JsonObject, val demo: Boolean = false)
+@Serializable data class ValidateResult(val ok: Boolean, val plan: JsonObject? = null, val demoPlan: JsonObject? = null, val reason: String? = null, val notes: List<String> = emptyList())
+
 @Serializable data class ApiErrorBody(val error: ApiErrorInfo)
 @Serializable data class ApiErrorInfo(val code: String, val message: String)
 

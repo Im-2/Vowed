@@ -63,7 +63,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
     }
 
     NavHost(nav, startDestination = start) {
-        composable("onboarding") { OnboardingScreen(state, onConnect = { vm.connect(sender) }, onDismissError = vm::dismissConnectError) }
+        composable("onboarding") { OnboardingScreen(state, onConnect = { vm.connect(sender) }, onDismissError = vm::dismissConnectError, onPractice = { nav.navigate("practice") }) }
         composable("home") {
             LaunchedEffect(state.signedIn) { if (state.signedIn) vm.refreshList() }
             HomeScreen(
@@ -73,7 +73,12 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
                 onLoadFaucet = vm::loadFaucet, onClaimFaucet = vm::claimTestTokens,
             )
         }
-        composable("new") { NewGoalScreen(state, onBack = { vm.resetFlow(); nav.popBackStack() }, onStart = vm::startChallenge) }
+        composable("new") {
+            NewGoalScreen(
+                state, onBack = { vm.resetFlow(); nav.popBackStack() }, onLoadTemplates = vm::loadTemplates, onParse = vm::parseGoal, onUseAi = vm::setUseAi,
+                onAlternative = vm::useAlternative, onClear = { vm.clearGoal(); vm.resetFlow() }, onStart = vm::startFromPreview,
+            )
+        }
         composable("review") {
             val f = state.flow
             if (f is TxFlow.Review) ReviewScreen(f.tx, onSign = { vm.confirm(sender) }, onCancel = { vm.cancelReview() })
@@ -101,8 +106,9 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
                 )
             }
         }
+        composable("practice") { app.vowed.ui.PracticeScreen(onBack = { nav.popBackStack() }) }
         composable("settings") {
-            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onDisconnect = {
+            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onDisconnect = {
                 vm.disconnect(sender)
                 nav.navigate("onboarding") { popUpTo(0) }
             })

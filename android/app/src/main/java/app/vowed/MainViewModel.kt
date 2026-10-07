@@ -22,7 +22,6 @@ import app.vowed.data.CreateTxRequest
 import app.vowed.data.DemoRequest
 import app.vowed.data.JoinTxRequest
 import app.vowed.data.Meta
-import app.vowed.goals.GoalTemplate
 import app.vowed.wallet.WalletException
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import kotlinx.coroutines.delay
@@ -37,19 +36,21 @@ import java.util.TimeZone
 
 /** What the new-goal screen collected. All amounts are in token base units (6 decimals). */
 class GoalDraft(
-    val template: GoalTemplate,
-    val totalDays: Int,
-    val requiredDays: Int,
+    /** The exact plan for the pool (the server-validated plan; the demo version for demo pools). It is hashed and shown as it is. */
+    val plan: JsonObject,
     val mode: String, // "Soft" or "Hard"
     val stakeBaseUnits: BigInteger,
     val demo: Boolean,
     /** Length of a demo "day" in seconds (60..3600); only used when [demo]. */
     val demoDaySecs: Int = 120,
-    /** Template choices such as the watched app. */
-    val params: Map<String, String> = emptyMap(),
+    /** The app a usage goal watches. */
+    val appName: String? = null,
     /** The spot for place goals; stays on this phone. */
     val place: Pair<Double, Double>? = null,
-)
+) {
+    val totalDays: Int get() = app.vowed.goals.PlanEdit.totalDays(plan)
+    val requiredDays: Int get() = app.vowed.goals.PlanEdit.requiredDays(plan)
+}
 
 /** A transaction that passed the on-phone check and is waiting for the user's confirmation. */
 class PendingTx(
@@ -68,6 +69,15 @@ sealed interface TxFlow {
     data class Done(val pool: String, val message: String) : TxFlow
     data class Failed(val message: String) : TxFlow
 }
+
+/** State of the goal text box and the plan preview. */
+data class GoalUi(
+    val parsing: Boolean = false,
+    val result: app.vowed.data.ParseResult? = null,
+    val error: String? = null,
+    val templates: List<app.vowed.data.TemplateInfo> = emptyList(),
+    val useAi: Boolean = true,
+)
 
 /** State of the "Get test tokens" card. */
 data class FaucetUi(
@@ -94,6 +104,7 @@ data class UiState(
     val details: Map<String, ChallengeDetail> = emptyMap(),
     val checkIn: CheckInState? = null,
     val faucet: FaucetUi = FaucetUi(),
+    val goal: GoalUi = GoalUi(),
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -205,7 +216,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val penaltyBps = if (draft.mode == "Hard") 10_000 else 3_000
                 val joinWindow = if (draft.demo) daySecs.toLong() else 3_600L
                 val maxParticipants = if (draft.demo) 10 else 50
-                val plan: JsonObject = draft.template.plan(draft.totalDays, draft.requiredDays, draft.demo, draft.params)
+                val plan: JsonObject = draft.plan
                 val goalHash = PlanHash.hash(plan)
 
                 val resp = c.api.createTx(
@@ -228,7 +239,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 val pool = resp.pool
                 draft.place?.let { (lat, lon) -> c.prefs.setPlace(pool, lat, lon) }
-                draft.params["app"]?.let { c.prefs.setWatchedApp(pool, it) }
+                draft.appName?.let { c.prefs.setWatchedApp(pool, it) }
                 setFlow(
                     TxFlow.Review(
                         PendingTx("create", review, txBytes, pool) {
@@ -424,6 +435,61 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Throwable) {
                 val st = runCatching { c.api.faucet() }.getOrNull()
                 _state.update { it.copy(faucet = it.faucet.copy(claiming = false, status = st ?: it.faucet.status, error = friendly(e))) }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ goals in plain words
+
+    fun loadTemplates() {
+        if (_state.value.goal.templates.isNotEmpty() || !c.account.signedIn) return
+        viewModelScope.launch {
+            runCatching { c.api.goalTemplates() }.onSuccess { t -> _state.update { it.copy(goal = it.goal.copy(templates = t.templates)) } }
+        }
+    }
+
+    fun setUseAi(on: Boolean) = _state.update { it.copy(goal = it.goal.copy(useAi = on)) }
+
+    /** Sends the typed text to the server (and, if AI is on and the templates are not sure, to the language model). Nothing else leaves the phone. */
+    fun parseGoal(text: String) {
+        val useAi = _state.value.goal.useAi
+        _state.update { it.copy(goal = it.goal.copy(parsing = true, error = null)) }
+        viewModelScope.launch {
+            try {
+                val r = c.api.parseGoal(text.trim(), useAi)
+                _state.update { it.copy(goal = it.goal.copy(parsing = false, result = r)) }
+            } catch (e: Throwable) {
+                _state.update { it.copy(goal = it.goal.copy(parsing = false, error = friendly(e))) }
+            }
+        }
+    }
+
+    /** Shows one of the alternatives (for example the low-trust self-report version) as the plan. */
+    fun useAlternative(o: app.vowed.data.PlanOption) = _state.update {
+        it.copy(goal = it.goal.copy(result = app.vowed.data.ParseResult(
+            status = "plan", source = it.goal.result?.source ?: "template", plan = o.plan, demoPlan = o.demoPlan, trustTier = "low", needsPlace = o.extras.needsPlace,
+            needsApp = o.extras.needsApp, limitations = o.extras.limitations, confidence = "high",
+        )))
+    }
+
+    fun clearGoal() = _state.update { it.copy(goal = it.goal.copy(result = null, error = null, parsing = false)) }
+
+    /**
+     * The user pressed Review on the preview: apply their edits, have the server validate the exact plan, then continue exactly like
+     * a template goal (the phone re-checks the transaction against this plan before it asks the wallet to sign).
+     */
+    fun startFromPreview(edit: app.vowed.goals.Edit, mode: String, stakeBaseUnits: BigInteger, demo: Boolean, demoDaySecs: Int, place: Pair<Double, Double>?) {
+        val base = _state.value.goal.result?.plan ?: return
+        setFlow(TxFlow.Working("Checking your plan…"))
+        viewModelScope.launch {
+            try {
+                val edited = app.vowed.goals.PlanEdit.apply(base, edit)
+                val v = c.api.validateGoal(edited, demo = false)
+                if (!v.ok || v.plan == null) throw ApiException(0, "plan_invalid", v.reason ?: "That plan cannot be staked on.")
+                val chosen = if (demo) v.demoPlan ?: throw ApiException(0, "no_demo_version", "This goal has no demo version; turn off the demo pool.") else v.plan
+                startChallenge(GoalDraft(chosen, mode, stakeBaseUnits, demo, demoDaySecs, edit.app, place))
+            } catch (e: Throwable) {
+                setFlow(TxFlow.Failed(friendly(e)))
             }
         }
     }

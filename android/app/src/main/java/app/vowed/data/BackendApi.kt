@@ -57,6 +57,9 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     suspend fun claimTx(req: ClaimTxRequest): TxResponse = post("/v1/challenges/tx/claim", req, idempotent = true)
     suspend fun proofSession(req: ProofSessionRequest): ProofSession = post("/v1/proofs/session", req)
     suspend fun submitProof(pkg: JsonObject): ProofResult = post("/v1/proofs/submit", pkg)
+    suspend fun goalTemplates(): TemplateList = get("/v1/goals/templates")
+    suspend fun parseGoal(text: String, useAi: Boolean): ParseResult = post("/v1/goals/parse", ParseRequest(text, useAi))
+    suspend fun validateGoal(plan: JsonObject, demo: Boolean): ValidateResult = post("/v1/goals/validate", ValidateRequest(plan, demo))
     suspend fun faucet(): FaucetStatus = get("/v1/faucet")
     suspend fun faucetClaim(): FaucetClaim = post("/v1/faucet/claim", JsonObject(emptyMap()))
     suspend fun sync(signature: String): Unit = call("POST", "/v1/challenges/sync", AppJson.encodeToString(SyncRequest(signature))) { }
