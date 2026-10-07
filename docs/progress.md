@@ -114,3 +114,15 @@ Tests: 9 demo tests + shared demo vectors in the program suite (71 Rust tests), 
 **Next:** Phase 3 (Android skeleton and wallet) after your review. The IDL (`programs/vowed/idl/vowed.json`, copy in `backend/src/program/`) now includes demo pools; the app must show the DEMO label for pools with `isDemo`.
 
 **Balances after the gate (devnet, read back at the end):** deployer 2.9448 SOL; alice 0.00144, bob 0.00166, oracle 0.00079, crank 0.00099 SOL. A second gate round would need about 0.0123 SOL moved from the deployer to the test wallets (`npm run gate:devnet -- --fund --fund-only`; nothing was moved yet, no faucet involved).
+
+
+## Phase 3: Android skeleton and wallet, GATE PASSED on the emulator (2026-10-07), awaiting user review
+
+Gate: "stake-join-claim runs end to end on the emulator against devnet." Done through the app, with the Mock MWA Wallet, against the real devnet program:
+connect wallet, sign in (SIWS), register this phone's proof key, create a Soft-mode DEMO pool from a template, join with 1 test USDC, wait for the backend crank to settle, claim. Alice's test USDC went 110, 109 after the stake, **109.7** after the claim (30% Soft penalty on a missed run, as designed). Screens: `docs/phase3-joined.png`, `docs/phase3-claimed.png`.
+
+What exists: navigation (onboarding, my challenges, new challenge, review-before-sign, challenge detail with join and claim, settings), theme (light/dark), MWA connect and sign-in, device-key registration with the attested-then-fallback path, template goals (squats, steps, focus, no-TikTok), and an **independent transaction check on the phone** (strict legacy decoder, PDA derivation with on-curve check, argument comparison, plan hash recomputed locally) that runs before the wallet is ever opened. 11 JVM unit tests run from `scripts/android-test.ps1`; the plan-hash vector is shared with the backend test.
+
+Not in this build (and the UI says so): daily proofs, so a joined challenge counts every day as missed; plain-language goals; squads UI; push; release APK; a real phone.
+Known rough edges: the app keeps the backend token in memory only, so every app start asks the wallet to sign in again; the detail screen does not poll (pull Refresh); wallet failures from the client library are worded generically.
+Next: Phase 4 after your review.

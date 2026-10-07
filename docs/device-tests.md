@@ -22,3 +22,13 @@ This file grows with each phase; the sections below are what the backend needs v
 | S2 | Wallet signs the device registration message through MWA `signMessages` | Backend accepts the 64-byte ed25519 signature | |
 
 ## Later phases add: pose counting, usage stats, step counting, geofence, notifications.
+
+
+## Phase 3: wallet and app flow (real phone / Seeker)
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| W1 | Install the debug APK and a real MWA wallet (Phantom, Solflare or Seed Vault); connect from onboarding | Wallet shows "Vowed wants to connect"; the app signs in and registers the phone | |
+| W2 | Create a demo pool, join, wait, claim (devnet) | Same result as the emulator run; stake leaves and returns to the wallet | |
+| W3 | Approve a transaction after waiting more than a minute | App shows the wallet-did-not-complete message; retrying works | |
+| W4 | Backend URL: the debug build points at `http://10.0.2.2:8787` (emulator only). On a phone set the backend URL to a reachable HTTPS host or the PC's LAN address through the debug override | Connect works | |

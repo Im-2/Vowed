@@ -165,3 +165,14 @@ Never hardcode these from memory; re-check before mainnet.
   What worked: `backend/scripts/fill-buffer.ts` reads the buffer, writes only the 900-byte chunks that differ at 5 tx/s with backoff, repeats until byte-identical (404 chunks in about 2 minutes), then `solana program upgrade <buffer>` (`scripts/program-finish-upgrade.sh`).
   A buffer's rent (about 2 SOL) is refunded on upgrade or `solana program close --buffers`, so a failed attempt costs nothing but time. A paid RPC key would avoid this entirely; none was needed or created.
 - **Tooling lessons recorded for next time:** PowerShell expands `$HOME` inside double-quoted strings (use script files for WSL commands); WSL does not reliably keep orphaned background jobs alive after the launching command returns (run long jobs as a tool background task with a local log); Windows Python could not write a file while a WSL job was rsyncing it (retry).
+
+
+## Phase 3: Android app on the emulator against devnet (2026-10-07)
+
+Verified by running it (emulator `vowed_api36`, Mock MWA Wallet with alice's throwaway devnet key, backend on devnet via `scripts/dev-backend.ps1`):
+
+- MWA `clientlib-ktx` 2.2.0: `transact` + `authorize` gives the account; `signMessagesDetached` signs the Sign-In-With-Solana text built with `SignInWithSolana.Payload(...).prepareMessage`; `signAndSendTransactions` returns the transaction signature. The Mock wallet **submits to https://api.devnet.solana.com itself**.
+- The Mock wallet shows a PIN prompt (BiometricPrompt, test PIN 1234 on the emulator) after "Connect"; screenshots of it are black (secure window). Its key is auth-bound: if the stored authorization is silently reused after the PIN window has lapsed, the wallet **crashes** with `UserNotAuthenticatedException` and the app only sees a generic failure. Workaround for tests: clear the wallet's data (`pm clear com.solana.mwallet`) or reconnect so the Connect + PIN prompt appears again. This is a Mock wallet quirk, not something to ship around.
+- A transaction built by the backend has a recent blockhash; approving more than about a minute later makes devnet reject it (the wallet logs `payloads invalid for signing`). Emulator wallet start-up can take 35+ seconds the first time and the library's association then times out ("Failed establishing local association"); retry once the wallet is warm.
+- The emulator cannot produce hardware key attestation: the backend answered 400 `attestation_failed` for the attested attempt, the app retried without a chain and registered with trust cap `low`, as designed.
+- On-chain account roles in a real transaction: when the wallet is also the fee payer, its account is signer **and writable** in every instruction that lists it (found by the unit test against the real claim transaction; the checker now expects that).

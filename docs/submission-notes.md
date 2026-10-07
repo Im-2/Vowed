@@ -130,3 +130,20 @@ Honest limits of the devnet run: the "device" was a software key held by the scr
 - The lifecycle test is a faithful narrated script of the product loop (create, join, prove, miss, settle, claim) against the real program; its steps map to demo beats 3-6 of SPEC 13.3 once the app UI exists.
 - The devnet gate log is a ready-made demo script: create, join, two proofs, settle, claim, sweep in about six minutes, with explorer links for every transaction (`docs/verified-facts.md`). With the app UI it becomes the 3-minute video, on a demo pool labelled as such.
 - Verified numbers safe to quote (reproducible with the commands above): 71 program tests, 100 backend tests, 10/10 program and 10/10 backend mutations caught, 6 real attestation chains verified, 1,391 shared vectors, 26 documented API endpoints, devnet loop in 389 s.
+
+
+---
+
+## Phase 3 additions (Android app on the emulator)
+
+| Feature that really works | Proof | Commit |
+|---|---|---|
+| Native Compose app with onboarding, challenge list, new-challenge flow, review screen, challenge detail, settings (no WebView) | Run on the emulator; screenshots `docs/phase3-joined.png`, `docs/phase3-claimed.png` | `6501cb0`, `06f6553` |
+| Mobile Wallet Adapter connect + Sign-In-With-Solana, backend session, phone proof-key registration (emulator falls back to the low trust cap) | Backend log shows nonce, verify, device register 400 then 200; app lands on the challenge list | `6501cb0` |
+| **Stake-join-claim from the app against devnet**: create a demo pool, join with 1 test USDC, backend crank settles, claim 0.7 back (30% Soft penalty) | alice test USDC 110, 109, 109.7 read from chain; transactions `4HRF662n...` (create), `4RDmUcXG...` (join), `669FYTaj...` (claim) | `6501cb0`, `d533985` |
+| The phone re-checks every backend-built transaction before opening the wallet (decode, derive all addresses, compare amounts, mode, dates, plan hash, device binding) | 11 JVM unit tests incl. tampered-byte and wrong-intent rejections (`scripts/android-test.ps1`); the on-screen review shows the decoded values | `6501cb0` |
+| DEMO pools are labelled in the app (red banner on list and detail, "DEMO POOL" row on review) | Screenshots | `6501cb0` |
+
+Limits to state honestly: emulator and Mock wallet only (not a real phone or Seeker); test tokens; demo pool only; daily proofs are not in the app yet, so the claim was the Soft-mode refund after a fully missed run, not a success payout; the first wallet connection on a cold emulator can take over 30 seconds.
+
+Do not claim yet (additions): any proof captured by the app, a release APK, a real-device run, or squads in the UI.
