@@ -45,6 +45,15 @@ object Notifier {
         val notif = NotificationCompat.Builder(ctx, CHANNEL).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(text).setAutoCancel(true).setContentIntent(open).build()
         runCatching { NotificationManagerCompat.from(ctx).notify(n.id.toInt(), notif) }
     }
+
+    /** Only the fact that a letter arrived is shown; the text of the letter is never put in a notification. */
+    fun showLetter(ctx: Context, l: app.vowed.letters.Letter) {
+        if (!allowed(ctx)) return
+        ensureChannel(ctx)
+        val notif = NotificationCompat.Builder(ctx, CHANNEL).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("A letter from your past self")
+            .setContentText(l.deliveredBecause ?: "It has arrived.").setAutoCancel(true).setContentIntent(PendingIntentOpen.main(ctx)).build()
+        runCatching { NotificationManagerCompat.from(ctx).notify(("letter" + l.id).hashCode(), notif) }
+    }
 }
 
 internal object PendingIntentOpen {

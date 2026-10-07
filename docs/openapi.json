@@ -2573,6 +2573,57 @@
         }
       }
     },
+    "/v1/letters/trigger-events": {
+      "post": {
+        "summary": "The app reports that one of the person's own letters was delivered; the server only sends a push that says a letter is waiting, with no content",
+        "tags": [
+          "letters"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "event": {
+                    "type": "string",
+                    "enum": [
+                      "milestone",
+                      "streak_broken"
+                    ]
+                  }
+                },
+                "required": [
+                  "event"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "delivered": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "delivered"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/faucet": {
       "get": {
         "summary": "Test-token faucet status for the signed-in wallet (devnet only). Show `label` next to the tokens",

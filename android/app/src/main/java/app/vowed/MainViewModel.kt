@@ -100,6 +100,21 @@ data class ExploreUi(
     val message: String? = null,
 )
 
+/** Letters to my future self (stored encrypted on this phone), and the letter being read. */
+data class LettersUi(
+    val list: List<app.vowed.letters.Letter> = emptyList(),
+    val reading: app.vowed.letters.Letter? = null,
+    val message: String? = null,
+)
+
+/** The adaptive coach's suggestions from the backend. */
+data class CoachUi(
+    val items: List<app.vowed.data.CoachSuggestion> = emptyList(),
+    val loading: Boolean = false,
+    val loaded: Boolean = false,
+    val error: String? = null,
+)
+
 /** Squads: my list, and one open squad with its feed and leaderboard. */
 data class SquadsUi(
     val list: List<app.vowed.data.Squad> = emptyList(),
@@ -141,6 +156,8 @@ data class UiState(
     val goal: GoalUi = GoalUi(),
     val explore: ExploreUi = ExploreUi(),
     val squads: SquadsUi = SquadsUi(),
+    val lettersUi: LettersUi = LettersUi(),
+    val coachUi: CoachUi = CoachUi(),
     /** goal text to try as soon as the new-challenge screen opens (a tapped quick challenge or example) */
     val pendingGoalText: String? = null,
     val pendingDemo: Boolean = false,
@@ -215,6 +232,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 for (ch in list.filter { it.status == "Open" }.take(8)) {
                     runCatching { c.api.challenge(ch.pool) }.onSuccess { d -> _state.update { st -> st.copy(details = st.details + (ch.pool to d)) } }
                 }
+                afterListRefreshed()
             } catch (e: Throwable) {
                 _state.update { it.copy(loadingList = false, listError = friendly(e)) }
             }
@@ -654,6 +672,89 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (since > 0) n.items.sortedBy { it.id }.forEach { _incoming.emit(it) } // the first look only sets the clock: no flood of old news
                 c.prefs.notesSince = n.now
             } catch (_: Throwable) {
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ widget and letters (both read the same synced state as the Today screen)
+
+    private fun myProgress(): app.vowed.letters.LetterProgress {
+        val me = _state.value.account?.wallet
+        val now = System.currentTimeMillis() / 1000
+        var most = 0
+        var broken = false
+        for (d in _state.value.details.values) {
+            val p = d.participants.firstOrNull { it.wallet == me } ?: continue
+            val bits = runCatching { java.math.BigInteger(p.checkinBitmap.ifBlank { "0" }) }.getOrDefault(java.math.BigInteger.ZERO)
+            most = maxOf(most, p.daysCompleted)
+            val today = if (d.challenge.status == "Open") CheckInLogic.dayView(d.challenge, p, now).day else d.challenge.durationDays
+            if (app.vowed.letters.LetterRules.brokenAfterStreak(bits, today)) broken = true
+        }
+        return app.vowed.letters.LetterProgress(most, broken)
+    }
+
+    private fun afterListRefreshed() {
+        val me = _state.value.account?.wallet
+        val now = System.currentTimeMillis() / 1000
+        var due = 0
+        var done = 0
+        var best = 0
+        for (d in _state.value.details.values) {
+            val p = d.participants.firstOrNull { it.wallet == me } ?: continue
+            if (d.challenge.status != "Open") continue
+            val dv = CheckInLogic.dayView(d.challenge, p, now)
+            best = maxOf(best, dv.streak)
+            if (dv.done) done++ else if (dv.dayOpen) due++
+        }
+        val snap = app.vowed.widget.WidgetSnapshot(c.account.signedIn, due, done, best, System.currentTimeMillis())
+        viewModelScope.launch { app.vowed.widget.VowedWidget.refresh(getApplication(), snap) }
+        loadLetters()
+        evaluateLetters(myProgress())
+    }
+
+    fun loadLetters() = _state.update { it.copy(lettersUi = it.lettersUi.copy(list = runCatching { c.letters.all() }.getOrDefault(emptyList()))) }
+
+    fun addLetter(text: String, trigger: app.vowed.letters.Trigger, deleteAfterReading: Boolean) {
+        val t = text.trim()
+        if (t.isEmpty()) return
+        c.letters.add(app.vowed.letters.Letter(java.util.UUID.randomUUID().toString(), System.currentTimeMillis() / 1000, t.take(2_000), trigger, deleteAfterReading))
+        loadLetters()
+        _state.update { it.copy(lettersUi = it.lettersUi.copy(message = "Sealed. It stays on this phone, encrypted, until it is delivered.")) }
+    }
+
+    fun deleteLetter(id: String) { c.letters.delete(id); loadLetters() }
+
+    private val _lettersDelivered = kotlinx.coroutines.flow.MutableSharedFlow<app.vowed.letters.Letter>(extraBufferCapacity = 8)
+    val lettersDelivered: kotlinx.coroutines.flow.SharedFlow<app.vowed.letters.Letter> = _lettersDelivered
+
+    /** Delivers every letter whose trigger [progress] meets (once each) and announces it. Also used by the debug "simulate" buttons with simulated progress. */
+    fun evaluateLetters(progress: app.vowed.letters.LetterProgress) {
+        val due = app.vowed.letters.LetterRules.due(runCatching { c.letters.all() }.getOrDefault(emptyList()), progress)
+        if (due.isEmpty()) return
+        val delivered = c.letters.deliver(due.map { it.id }.toSet(), System.currentTimeMillis() / 1000) { app.vowed.letters.LetterRules.reason(it.trigger, progress) }
+        loadLetters()
+        delivered.forEach { _lettersDelivered.tryEmit(it) }
+    }
+
+    fun readLetter(l: app.vowed.letters.Letter) = _state.update { it.copy(lettersUi = it.lettersUi.copy(reading = l)) }
+
+    fun closeLetter() {
+        _state.value.lettersUi.reading?.let { c.letters.finishedReading(it.id) }
+        _state.update { it.copy(lettersUi = it.lettersUi.copy(reading = null)) }
+        loadLetters()
+    }
+
+    // ------------------------------------------------------------------ coach
+
+    fun loadCoach() {
+        if (!c.account.signedIn) return
+        _state.update { it.copy(coachUi = it.coachUi.copy(loading = true, error = null)) }
+        viewModelScope.launch {
+            try {
+                val r = c.api.coach()
+                _state.update { it.copy(coachUi = CoachUi(r.suggestions, false, true, null)) }
+            } catch (e: Throwable) {
+                _state.update { it.copy(coachUi = it.coachUi.copy(loading = false, error = friendly(e))) }
             }
         }
     }

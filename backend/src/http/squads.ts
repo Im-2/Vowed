@@ -374,4 +374,27 @@ export function registerSquadRoutes(app: FastifyInstance, s: Services) {
       };
     },
   );
+
+  // ---------------------------------------------------------------- letters (the letters themselves never reach the server)
+  r.post(
+    "/v1/letters/trigger-events",
+    {
+      preHandler: auth,
+      schema: {
+        tags: ["letters"],
+        summary: "The app reports that one of the person's own letters was delivered; the server only sends a push that says a letter is waiting, with no content",
+        body: z.object({ event: z.enum(["milestone", "streak_broken"]) }),
+        response: { 200: z.object({ delivered: z.number() }) },
+      },
+    },
+    async (req) => {
+      enforce(s, `wallet:${req.wallet}:letter-event`, 10, 3_600);
+      const delivered = await pushToWallet(s, req.wallet!, {
+        title: "A letter from your past self",
+        body: req.body.event === "milestone" ? "You reached a milestone. Open Vowed to read it." : "Your streak broke. Open Vowed to read what you wrote.",
+        data: { type: "letter" },
+      });
+      return { delivered };
+    },
+  );
 }

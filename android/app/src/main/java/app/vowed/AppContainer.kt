@@ -4,6 +4,8 @@ import android.app.Application
 import app.vowed.data.AccountRepository
 import app.vowed.data.BackendApi
 import app.vowed.data.Prefs
+import app.vowed.letters.LetterCipher
+import app.vowed.letters.LetterStore
 import app.vowed.proof.ProofEngine
 import app.vowed.device.DeviceKey
 import app.vowed.wallet.WalletManager
@@ -14,6 +16,7 @@ class AppContainer(val app: Application) {
     val api = BackendApi(baseUrl = { prefs.backendUrl })
     val wallet = WalletManager(prefs)
     val deviceKey: (String) -> DeviceKey = { DeviceKey(app, it) }
+    val letters = LetterStore(java.io.File(app.filesDir, "letters.bin"), LetterCipher { LetterCipher.keystoreKey() })
     val account = AccountRepository(this)
     val proofs = ProofEngine(api, { deviceKey(prefs.wallet ?: error("no wallet")) })
 }

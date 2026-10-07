@@ -603,13 +603,30 @@ fun DetailScreen(
 // ---------------------------------------------------------------- settings
 
 @Composable
-fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onDisconnect: () -> Unit) {
-    Page("Settings", onBack = onBack) {
-        Text("Wallet: ${state.account?.wallet?.let(::short) ?: "not connected"}")
-        Text("Proof key trust cap: ${state.account?.trustCap ?: "-"}")
-        Text("Network: ${state.meta?.network ?: "devnet"} (test tokens only)")
-        Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = onPractice) { Text("Camera practice (nothing is sent)") }
-        OutlinedButton(onClick = onDisconnect) { Text("Disconnect wallet") }
+fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit) {
+    val ctx = LocalContext.current
+    Page("You", onBack = onBack) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onCoach, modifier = Modifier.fillMaxWidth()) { Text("Coach: what to try next") }
+            Button(onClick = onLetters, modifier = Modifier.fillMaxWidth()) { Text("Letters to future me") }
+            OutlinedButton(onClick = { app.vowed.widget.requestPinWidget(ctx) }, modifier = Modifier.fillMaxWidth()) { Text("Add the Vowed widget to my home screen") }
+            Text("Wallet: ${state.account?.wallet?.let(::short) ?: "not connected"}")
+            Text("Proof key trust cap: ${state.account?.trustCap ?: "-"}")
+            Text("Network: ${state.meta?.network ?: "devnet"} (test tokens only)")
+            Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = onPractice) { Text("Practice check-in (nothing is sent)") }
+            OutlinedButton(onClick = onDisconnect) { Text("Disconnect wallet") }
+        }
     }
+}
+
+/** What to type in the new-challenge box when the coach suggests a kind of goal; the plan screen lets the person set the size. */
+fun coachStarterText(category: String): String = when (category) {
+    "study" -> "study for 30 minutes every day for a week"
+    "steps" -> "walk 6000 steps a day for a week"
+    "fitness" -> "do 20 squats a day for a week"
+    "detox" -> "keep Instagram under 30 minutes a day for a week"
+    "sleep" -> "sleep 7 hours a night for a week"
+    "location" -> "go to the gym 3 times a week for a month"
+    else -> "read for 20 minutes every day for a week"
 }

@@ -31,5 +31,9 @@
                 <data android:scheme="https" android:host="vowed.app" android:pathPrefix="/join/" />
             </intent-filter>
         </activity>
+        <receiver android:name=".widget.VowedWidgetReceiver" android:exported="true" android:label="Vowed today">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/vowed_widget_info" />
+        </receiver>
     </application>
 </manifest>

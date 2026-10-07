@@ -99,6 +99,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         }
     }
     LaunchedEffect(Unit) { vm.incoming.collect { Notifier.show(ctx, it) } }
+    LaunchedEffect(Unit) { vm.lettersDelivered.collect { Notifier.showLetter(ctx, it) } }
     // an invite link opens the Squads tab with the code filled in
     LaunchedEffect(state.pendingJoinCode, state.signedIn) {
         if (state.pendingJoinCode != null && state.signedIn) nav.navigate("squads") { launchSingleTop = true }
@@ -110,7 +111,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
     LaunchedEffect(openedSquad) {
         if (openedSquad != null && nav.currentDestination?.route == "squads") nav.navigate("squad/$openedSquad") { launchSingleTop = true }
     }
-    val tabs = listOf("home" to "Today", "explore" to "Explore", "squads" to "Squads", "settings" to "Settings")
+    val tabs = listOf("home" to "Today", "explore" to "Explore", "squads" to "Squads", "settings" to "You")
     Scaffold(bottomBar = {
         if (route in tabs.map { it.first }) NavigationBar {
             tabs.forEach { (r, label) ->
@@ -191,9 +192,21 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
                 onNewChallenge = { vm.setNewGoalSquad(id); nav.navigate("new") },
             )
         }
+        composable("coach") {
+            app.vowed.ui.CoachScreen(
+                state, onBack = { nav.popBackStack() }, onLoad = vm::loadCoach,
+                onTry = { category -> vm.setNewGoalSquad(null); vm.tryGoal(app.vowed.ui.coachStarterText(category), false); nav.navigate("new") },
+            )
+        }
+        composable("letters") {
+            app.vowed.ui.LettersScreen(
+                state, onBack = { nav.popBackStack() }, onLoad = vm::loadLetters, onAdd = vm::addLetter, onDelete = vm::deleteLetter,
+                onRead = vm::readLetter, onCloseReading = vm::closeLetter, onSimulate = vm::evaluateLetters,
+            )
+        }
         composable("practice") { app.vowed.ui.PracticeScreen(onBack = { nav.popBackStack() }) }
         composable("settings") {
-            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onDisconnect = {
+            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onLetters = { nav.navigate("letters") }, onDisconnect = {
                 vm.disconnect(sender)
                 nav.navigate("onboarding") { popUpTo(0) }
             })

@@ -212,3 +212,17 @@ data class ExploreItem(
 
 /** A failed API call with the backend's stable error code (see docs/openapi.json). */
 class ApiException(val status: Int, val code: String, override val message: String) : Exception(message)
+
+@Serializable
+data class CoachSuggestion(
+    val category: String,
+    val action: String,
+    val reason: String,
+    val successRate: Double? = null,
+    val suggestedDifficulty: Int? = null,
+    val targetScale: Double = 1.0,
+    val hints: List<String> = emptyList(),
+    val appliesTo: String = "next_challenge",
+    val message: String,
+)
+@Serializable data class CoachResponse(val suggestions: List<CoachSuggestion>)

@@ -91,3 +91,11 @@ Pose counting must be tested by a real person on a real phone; the emulator came
 | G1 | Type a free-form goal that the templates do not know, with AI on, on a network that can reach Google | A plan labelled "Understood by AI (Gemini); check it carefully" | |
 | G2 | Same with AI off | "I need a little more" with examples; nothing sent to Google | |
 | G3 | Type "lose 5 kg" | "A phone cannot check this goal", with a checkable alternative and a low-trust option | |
+## Phase 7 and wallet-session checklist (to run on a real phone, or an emulator with enough memory)
+- W1. Connect a wallet, then start a challenge and sign create then join in a row; neither wallet request should show "cancelled before connected". If one does, the app retries once by itself; a second failure must show the "closed before it connected" message and sign nothing.
+- W2. Open Squads on a phone that has not granted notification permission: no dialog appears until you tap "Turn on notifications".
+- L1. Letters: write a "Day 3" letter and a "Streak breaks" letter; both show as Sealed with no text. Finish 3 days in a (demo) pool: the first is delivered with a notification that does not contain the text; open it. Miss a day after a done day: the second is delivered.
+- L2. Debug build only: use "Simulate" on the Letters screen; the reason line starts with SIMULATED.
+- L3. "Erase it after I have read it": the letter is gone after Close.
+- C1. Coach: after a real (non-demo) challenge with missed days, Coach shows "go a little easier"; with all days done twice, "ready for a harder one".
+- X1. Widget: You > Add the widget; accept the system dialog; open Today and refresh; the widget shows the count of check-ins due, then "All done today" after a check-in, and the best streak.
