@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import app.vowed.ui.components.AppCard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -69,7 +70,7 @@ fun DemoBadge(label: String?) {
 
 @Composable
 fun Page(title: String, onBack: (() -> Unit)? = null, actions: @Composable () -> Unit = {}, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 20.dp).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (onBack != null) {
@@ -87,56 +88,6 @@ fun Page(title: String, onBack: (() -> Unit)? = null, actions: @Composable () ->
 }
 
 // ---------------------------------------------------------------- onboarding
-
-@Composable
-fun OnboardingScreen(state: UiState, onConnect: () -> Unit, onDismissError: () -> Unit, onPractice: () -> Unit) {
-    val page = remember { mutableIntStateOf(0) }
-    Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Spacer(Modifier.height(24.dp))
-        Text("Vowed", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-        val ideas = remember { onboardingIdeas() }
-        when (page.intValue) {
-            0 -> {
-                Text("Put money behind your goal.", style = MaterialTheme.typography.titleLarge)
-                Text("Say any goal in your own words, stake a little, prove it each day with your phone. Finish and you get your stake back. Miss days and the missed part goes to the people who showed up.")
-                Text("Things people vow", style = MaterialTheme.typography.titleSmall)
-                ideas.forEach { (label, text) -> Text("• $label: \"$text\"", style = MaterialTheme.typography.bodyMedium) }
-                TextButton(onClick = onPractice) { Text("Try a practice check-in first (no wallet needed)") }
-                Button(onClick = { page.intValue = 1 }, Modifier.fillMaxWidth()) { Text("Next") }
-            }
-            1 -> {
-                Text("Your wallet stays in charge.", style = MaterialTheme.typography.titleLarge)
-                Text("Vowed never holds a key. Every stake is approved in your Solana wallet app, and the app checks each transaction on your phone before it asks the wallet to sign.")
-                Text("This build runs on Solana devnet with test tokens only.", color = MaterialTheme.colorScheme.error)
-                Button(onClick = { page.intValue = 2 }, Modifier.fillMaxWidth()) { Text("Next") }
-            }
-            else -> {
-                Text("Connect a wallet", style = MaterialTheme.typography.titleLarge)
-                Text("You will approve a sign-in message and register this phone's proof key. No funds move.")
-                val step = state.connecting
-                if (step != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CircularProgressIndicator(Modifier.height(24.dp))
-                        Text(
-                            when (step) {
-                                ConnectStep.Wallet -> "Waiting for your wallet…"
-                                ConnectStep.SigningIn -> "Signing in…"
-                                ConnectStep.RegisteringDevice -> "Registering this phone…"
-                                ConnectStep.Done -> "Done"
-                            },
-                        )
-                    }
-                } else {
-                    Button(onClick = onConnect, Modifier.fillMaxWidth()) { Text("Connect wallet") }
-                }
-                state.connectError?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = onDismissError) { Text("Dismiss") }
-                }
-            }
-        }
-    }
-}
 
 /** A different handful each time the app starts: one idea from each of several kinds of goal, so no single kind is the face of the app. */
 private val ONBOARDING_POOL = listOf(

@@ -3,6 +3,7 @@ package app.vowed
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -28,6 +29,7 @@ import app.vowed.ui.SettingsScreen
 import app.vowed.ui.theme.VowedTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -44,10 +46,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         // Must be created before the activity is STARTED.
         val sender = ActivityResultSender(this)
         handleLink(intent)
-        setContent { VowedTheme { Surface(Modifier.fillMaxSize()) { Root(vm, sender) } } }
+        setContent { VowedTheme { Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { Root(vm, sender) } } }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -65,12 +68,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
     val state by vm.state.collectAsState()
+    var splash by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
     val nav: NavHostController = rememberNavController()
     val start = if (vm.prefs.onboarded && state.account != null) "home" else "onboarding"
 
     LaunchedEffect(Unit) { vm.loadMeta() }
     // After a successful connect from onboarding, go home.
     LaunchedEffect(state.signedIn) {
+        // the connect screen shows its own "Wallet connected" pop-up first and then navigates; only the old onboarding route jumps ahead
         if (state.signedIn && nav.currentDestination?.route == "onboarding") nav.navigate("home") { popUpTo("onboarding") { inclusive = true } }
     }
     // A transaction that passed the on-phone check opens the review screen; a finished one returns to the pool.
@@ -112,7 +117,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         if (openedSquad != null && nav.currentDestination?.route == "squads") nav.navigate("squad/$openedSquad") { launchSingleTop = true }
     }
     val tabs = listOf("home" to "Today", "explore" to "Explore", "squads" to "Squads", "settings" to "You")
-    Scaffold(bottomBar = {
+    Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0), bottomBar = {
         if (route in tabs.map { it.first }) NavigationBar {
             tabs.forEach { (r, label) ->
                 NavigationBarItem(
@@ -122,9 +127,15 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
                 )
             }
         }
-    }) { pad -> Box(Modifier.padding(pad)) {
+    }) { pad -> Box(Modifier.padding(pad).then(if (route in tabs.map { it.first }) Modifier else Modifier.navigationBarsPadding())) {
     NavHost(nav, startDestination = start) {
-        composable("onboarding") { OnboardingScreen(state, onConnect = { vm.connect(sender) }, onDismissError = vm::dismissConnectError, onPractice = { nav.navigate("practice") }) }
+        composable("onboarding") { OnboardingScreen(state, onGetStarted = { nav.navigate("connect") }, onPractice = { nav.navigate("practice") }) }
+        composable("connect") {
+            app.vowed.ui.ConnectScreen(
+                state, onBack = { nav.popBackStack() }, onConnect = { vm.connect(sender) }, onDismissError = vm::dismissConnectError,
+                onConnected = { nav.navigate("home") { popUpTo("onboarding") { inclusive = true } } },
+            )
+        }
         composable("home") {
             LaunchedEffect(state.signedIn) { if (state.signedIn) vm.refreshList() }
             HomeScreen(
@@ -216,4 +227,5 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         }
     }
     } }
+    if (splash) app.vowed.ui.SplashScreen { splash = false }
 }
