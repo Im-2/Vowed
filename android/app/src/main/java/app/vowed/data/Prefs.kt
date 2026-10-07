@@ -46,6 +46,15 @@ class Prefs(context: Context) {
     fun setWatchedApp(pool: String, name: String) = sp.edit().putString("app_$pool", name).apply()
     fun watchedApp(pool: String): String? = sp.getString("app_$pool", null)
 
+    var askedNotify: Boolean
+        get() = sp.getBoolean("asked_notify", false)
+        set(v) = sp.edit().putBoolean("asked_notify", v).apply()
+
+    /** The time of the last squad-notification check (unix seconds); 0 means never looked. */
+    var notesSince: Long
+        get() = sp.getLong("notes_since", 0L)
+        set(v) = sp.edit().putLong("notes_since", v).apply()
+
     fun clearAccount() {
         val w = wallet
         sp.edit().remove("wallet").remove("mwa_auth_token").apply()

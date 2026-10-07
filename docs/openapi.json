@@ -706,11 +706,18 @@
                     "type": "string"
                   },
                   "kind": {
-                    "default": "Squad",
                     "type": "string",
                     "enum": [
                       "Squad",
                       "Open"
+                    ]
+                  },
+                  "visibility": {
+                    "default": "private",
+                    "type": "string",
+                    "enum": [
+                      "public",
+                      "private"
                     ]
                   },
                   "mode": {
@@ -2125,11 +2132,18 @@
                     },
                     "squadId": {
                       "type": "string"
+                    },
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "private"
+                      ]
                     }
                   },
                   "required": [
                     "pool",
-                    "squadId"
+                    "squadId",
+                    "visibility"
                   ],
                   "additionalProperties": false
                 }
@@ -2715,6 +2729,385 @@
         }
       }
     },
+    "/v1/explore": {
+      "get": {
+        "summary": "Public challenges you can join, with filters and pages. Only the goal text and public pool data are returned",
+        "tags": [
+          "explore"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fitness",
+                "study",
+                "detox",
+                "sleep",
+                "steps",
+                "location",
+                "custom"
+              ]
+            },
+            "in": "query",
+            "name": "category",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 44
+            },
+            "in": "query",
+            "name": "mint",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": "include",
+              "type": "string",
+              "enum": [
+                "include",
+                "only",
+                "exclude"
+              ]
+            },
+            "in": "query",
+            "name": "demo",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            },
+            "in": "query",
+            "name": "endingSoon",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "pool": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "proofType": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "trustTier": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "mode": {
+                            "type": "string"
+                          },
+                          "mint": {
+                            "type": "string"
+                          },
+                          "tokenSymbol": {
+                            "type": "string"
+                          },
+                          "tokenIsTest": {
+                            "type": "boolean"
+                          },
+                          "durationDays": {
+                            "type": "number"
+                          },
+                          "requiredDays": {
+                            "type": "number"
+                          },
+                          "startTs": {
+                            "type": "number"
+                          },
+                          "joinDeadlineTs": {
+                            "type": "number"
+                          },
+                          "participantCount": {
+                            "type": "number"
+                          },
+                          "maxParticipants": {
+                            "type": "number"
+                          },
+                          "totalDeposits": {
+                            "type": "string"
+                          },
+                          "stakeCap": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "isDemo": {
+                            "type": "boolean"
+                          },
+                          "daySecs": {
+                            "type": "number"
+                          },
+                          "demoLabel": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "sample": {
+                            "type": "boolean"
+                          },
+                          "createdByYou": {
+                            "type": "boolean"
+                          },
+                          "joined": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "pool",
+                          "title",
+                          "category",
+                          "proofType",
+                          "trustTier",
+                          "mode",
+                          "mint",
+                          "tokenSymbol",
+                          "tokenIsTest",
+                          "durationDays",
+                          "requiredDays",
+                          "startTs",
+                          "joinDeadlineTs",
+                          "participantCount",
+                          "maxParticipants",
+                          "totalDeposits",
+                          "stakeCap",
+                          "isDemo",
+                          "daySecs",
+                          "demoLabel",
+                          "sample",
+                          "createdByYou",
+                          "joined"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextCursor": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/explore/{pool}/report": {
+      "post": {
+        "summary": "Report a public challenge (spam, offensive, scam, other). Several reports from different people hide it",
+        "tags": [
+          "explore"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "spam",
+                      "offensive",
+                      "scam",
+                      "other"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "pool",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications": {
+      "get": {
+        "summary": "New nudges for you and activity in your squads since a time (poll this; push is optional)",
+        "tags": [
+          "squads"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "since",
+            "required": false
+          },
+          {
+            "schema": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "now": {
+                      "type": "number"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "number"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "squadId": {
+                            "type": "string"
+                          },
+                          "squadName": {
+                            "type": "string"
+                          },
+                          "wallet": {
+                            "type": "string"
+                          },
+                          "pool": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "data": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "squadId",
+                          "squadName",
+                          "wallet",
+                          "pool",
+                          "data",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "now",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/goals/templates": {
       "get": {
         "summary": "The built-in goal templates (they work without any AI)",
@@ -2775,6 +3168,86 @@
                   },
                   "required": [
                     "templates"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/goals/examples": {
+      "get": {
+        "summary": "A rotating, mixed list of example goals (study, steps, screen time, sleep, places and more; rep counting is one of many)",
+        "tags": [
+          "goals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 8,
+              "type": "integer",
+              "minimum": 3,
+              "maximum": 13
+            },
+            "in": "query",
+            "name": "count",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000000000
+            },
+            "in": "query",
+            "name": "seed",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "examples": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string"
+                          },
+                          "templateId": {
+                            "type": "string"
+                          },
+                          "family": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "proofType": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "text",
+                          "templateId",
+                          "family",
+                          "category",
+                          "proofType"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "examples"
                   ],
                   "additionalProperties": false
                 }

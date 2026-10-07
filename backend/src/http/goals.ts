@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { CATALOG } from "../goals/catalog.js";
+import { CATALOG, diverseExamples } from "../goals/catalog.js";
 import { MAX_GOAL_CHARS, parseGoal } from "../goals/parser.js";
 import { demoize } from "../goals/catalog.js";
 import { validatePlan } from "../goals/validate.js";
@@ -59,6 +59,22 @@ export function registerGoalRoutes(app: FastifyInstance, s: Services) {
     async () => ({
       templates: CATALOG.map((t) => ({ id: t.id, title: t.title, example: t.example, summary: t.summary, proofType: t.proofType, category: t.category, needsPlace: t.needsPlace, needsApp: t.needsApp })),
     }),
+  );
+
+  r.get(
+    "/v1/goals/examples",
+    {
+      preHandler: auth,
+      schema: {
+        tags: ["goals"],
+        summary: "A rotating, mixed list of example goals (study, steps, screen time, sleep, places and more; rep counting is one of many)",
+        querystring: z.object({ count: z.coerce.number().int().min(3).max(13).default(8), seed: z.coerce.number().int().min(0).max(2_000_000_000).optional() }),
+        response: {
+          200: z.object({ examples: z.array(z.object({ text: z.string(), templateId: z.string(), family: z.string(), category: z.string(), proofType: z.string() })) }),
+        },
+      },
+    },
+    async (req) => ({ examples: diverseExamples(req.query.count, req.query.seed ?? Math.floor(Math.random() * 1e9)) }),
   );
 
   r.post(

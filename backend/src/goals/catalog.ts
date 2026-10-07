@@ -5,6 +5,8 @@ export interface CatalogTemplate {
   id: string;
   title: string;
   example: string;
+  /** several differently-worded examples of this goal (all of them must parse back to this template; a test checks it) */
+  examples: string[];
   summary: string;
   category: GoalPlan["category"];
   metric: string;
@@ -118,4 +120,84 @@ export function extrasFor(plan: GoalPlan, templateId?: string): PlanExtras {
   if ((type === "USAGE_LIMIT" || type === "NO_USE_WINDOW") && !out.some((l) => /Usage access/.test(l))) out.push("Needs Usage access on this phone. Only the minutes for the app you name are read.");
   if (plan.window && type !== "NO_USE_WINDOW") out.push("The time of day is shown but not checked yet.");
   return { needsPlace: type === "GEOFENCE", needsApp: type === "USAGE_LIMIT" || type === "NO_USE_WINDOW", limitations: [...new Set(out)] };
+}
+
+/** The kinds of goal, so that example lists show a real mix and the camera is one option among many. */
+export type Family = "reps" | "steps" | "study" | "place" | "screen" | "sleep" | "custom";
+
+export function familyOf(t: CatalogTemplate): Family {
+  if (t.proofType === "CAMERA_POSE") return "reps";
+  if (t.proofType === "GEOFENCE") return "place";
+  if (t.proofType === "USAGE_LIMIT" || t.id === "no-use-window") return "screen";
+  if (t.id === "early-wake" || t.id === "sleep-window") return "sleep";
+  if (t.proofType === "STEPS") return "steps";
+  if (t.proofType === "FOCUS_TIMER") return "study";
+  return "custom";
+}
+
+export interface ExampleGoal {
+  text: string;
+  templateId: string;
+  family: Family;
+  category: string;
+  proofType: ProofType;
+}
+
+/** Small seeded generator, so a seed gives the same list (tests) and a random seed gives a fresh rotation. */
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A rotating, deliberately mixed list of example goals: one per kind of goal first (study, steps, screen time, sleep, place, custom,
+ * and only then reps), then more from the non-rep kinds. Rep counting never appears more than once in a list of eight or fewer.
+ */
+export function diverseExamples(count: number, seed: number): ExampleGoal[] {
+  const rnd = mulberry32(seed);
+  const shuffle = <T,>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [a[i], a[j]] = [a[j]!, a[i]!];
+    }
+    return a;
+  };
+  const families = shuffle(["steps", "study", "place", "screen", "sleep", "custom"] as Family[]);
+  const byFamily = new Map<Family, CatalogTemplate[]>();
+  for (const t of CATALOG) byFamily.set(familyOf(t), [...(byFamily.get(familyOf(t)) ?? []), t]);
+  const out: ExampleGoal[] = [];
+  const used = new Set<string>();
+  const add = (t: CatalogTemplate) => {
+    const pool = shuffle(t.examples.filter((e) => !used.has(e)));
+    const text = pool[0] ?? t.example;
+    used.add(text);
+    out.push({ text, templateId: t.id, family: familyOf(t), category: t.category, proofType: t.proofType });
+  };
+  // round one: one from every non-rep family
+  for (const f of families) {
+    if (out.length >= count) break;
+    const options = shuffle(byFamily.get(f) ?? []);
+    if (options[0]) add(options[0]);
+  }
+  // round two: the camera appears once (late in the list), then more variety from the other kinds
+  const rest = shuffle(CATALOG.filter((t) => familyOf(t) !== "reps" && !out.some((o) => o.templateId === t.id)));
+  const reps = shuffle(byFamily.get("reps") ?? []);
+  const tail: CatalogTemplate[] = [];
+  if (count >= 7 && reps[0]) tail.push(reps[0]);
+  for (const t of rest) {
+    if (out.length + tail.length >= count) break;
+    tail.splice(Math.floor(rnd() * (tail.length + 1)), 0, t);
+  }
+  for (const t of tail) {
+    if (out.length >= count) break;
+    add(t);
+  }
+  return shuffle(out).slice(0, count);
 }

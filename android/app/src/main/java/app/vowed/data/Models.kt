@@ -25,7 +25,8 @@ val AppJson = Json {
 @Serializable
 data class CreateTxRequest(
     val mint: String,
-    val kind: String = "Squad",
+    val kind: String? = null,
+    val visibility: String = "private",
     val mode: String,
     val penaltyBps: Int? = null,
     val startTs: Long,
@@ -155,6 +156,56 @@ data class ParseResult(
 @Serializable data class TemplateList(val templates: List<TemplateInfo>)
 @Serializable data class ValidateRequest(val plan: JsonObject, val demo: Boolean = false)
 @Serializable data class ValidateResult(val ok: Boolean, val plan: JsonObject? = null, val demoPlan: JsonObject? = null, val reason: String? = null, val notes: List<String> = emptyList())
+
+@Serializable data class ExampleGoal(val text: String, val templateId: String, val family: String, val category: String, val proofType: String)
+@Serializable data class ExampleList(val examples: List<ExampleGoal>)
+
+@Serializable
+data class ExploreItem(
+    val pool: String,
+    val title: String,
+    val category: String,
+    val proofType: String? = null,
+    val trustTier: String? = null,
+    val mode: String,
+    val mint: String,
+    val tokenSymbol: String,
+    val tokenIsTest: Boolean = true,
+    val durationDays: Int,
+    val requiredDays: Int,
+    val startTs: Long,
+    val joinDeadlineTs: Long,
+    val participantCount: Int,
+    val maxParticipants: Int,
+    val totalDeposits: String = "0",
+    val stakeCap: String? = null,
+    val isDemo: Boolean = false,
+    val daySecs: Int = 86_400,
+    val demoLabel: String? = null,
+    val sample: Boolean = false,
+    val createdByYou: Boolean = false,
+    val joined: Boolean = false,
+)
+@Serializable data class ExplorePage(val items: List<ExploreItem>, val nextCursor: String? = null)
+@Serializable data class ReportRequest(val reason: String, val note: String? = null)
+
+@Serializable data class Squad(val id: String, val name: String, val owner: String, val inviteCode: String, val deepLink: String, val memberCount: Int)
+@Serializable data class SquadList(val squads: List<Squad>)
+@Serializable data class SquadMember(val wallet: String, val joinedAt: Long)
+@Serializable data class SquadChallenge(val pool: String, val status: String, val startTs: Long, val endTs: Long, val durationDays: Int)
+@Serializable data class SquadDetail(val squad: Squad, val members: List<SquadMember>, val challenges: List<SquadChallenge>)
+@Serializable data class SquadCreate(val name: String)
+@Serializable data class SquadJoin(val code: String)
+@Serializable data class LinkPool(val pool: String)
+@Serializable data class LinkResult(val pool: String, val squadId: String, val visibility: String)
+@Serializable data class FeedEvent(val id: Long, val kind: String, val wallet: String, val pool: String? = null, val data: JsonObject = JsonObject(emptyMap()), val createdAt: Long)
+@Serializable data class FeedPage(val events: List<FeedEvent>)
+@Serializable data class LeaderRow(val rank: Int, val wallet: String, val daysCompleted: Int, val bestStreak: Int, val checkedInToday: Boolean)
+@Serializable data class Leaderboard(val rows: List<LeaderRow>)
+@Serializable data class NudgeRequest(val recipient: String)
+@Serializable data class NudgeResult(val delivered: Int = 0)
+@Serializable data class NoteItem(val id: Long, val kind: String, val squadId: String, val squadName: String, val wallet: String, val pool: String? = null, val data: JsonObject = JsonObject(emptyMap()), val createdAt: Long)
+@Serializable data class Notes(val now: Long, val items: List<NoteItem>)
 
 @Serializable data class ApiErrorBody(val error: ApiErrorInfo)
 @Serializable data class ApiErrorInfo(val code: String, val message: String)

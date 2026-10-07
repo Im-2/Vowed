@@ -47,6 +47,9 @@ class GoalDraft(
     val appName: String? = null,
     /** The spot for place goals; stays on this phone. */
     val place: Pair<Double, Double>? = null,
+    /** "private" (default), "public" (listed in Explore) or, with [squadId], a squad challenge (always private). */
+    val visibility: String = "private",
+    val squadId: String? = null,
 ) {
     val totalDays: Int get() = app.vowed.goals.PlanEdit.totalDays(plan)
     val requiredDays: Int get() = app.vowed.goals.PlanEdit.requiredDays(plan)
@@ -76,7 +79,38 @@ data class GoalUi(
     val result: app.vowed.data.ParseResult? = null,
     val error: String? = null,
     val templates: List<app.vowed.data.TemplateInfo> = emptyList(),
+    /** a rotating, mixed set of example goals from the server (never mostly reps) */
+    val examples: List<app.vowed.data.ExampleGoal> = emptyList(),
     val useAi: Boolean = true,
+)
+
+/** The Explore list: public challenges, filters, and the DEMO quick-challenge section. */
+data class ExploreUi(
+    val items: List<app.vowed.data.ExploreItem> = emptyList(),
+    val demoPools: List<app.vowed.data.ExploreItem> = emptyList(),
+    val quick: List<app.vowed.data.ExampleGoal> = emptyList(),
+    val loading: Boolean = false,
+    val loadingMore: Boolean = false,
+    val loaded: Boolean = false,
+    val nextCursor: String? = null,
+    val error: String? = null,
+    val category: String? = null,
+    val mint: String? = null,
+    val endingSoon: Boolean = false,
+    val message: String? = null,
+)
+
+/** Squads: my list, and one open squad with its feed and leaderboard. */
+data class SquadsUi(
+    val list: List<app.vowed.data.Squad> = emptyList(),
+    val loading: Boolean = false,
+    val loaded: Boolean = false,
+    val error: String? = null,
+    val detail: app.vowed.data.SquadDetail? = null,
+    val feed: List<app.vowed.data.FeedEvent> = emptyList(),
+    val board: List<app.vowed.data.LeaderRow> = emptyList(),
+    val busy: Boolean = false,
+    val message: String? = null,
 )
 
 /** State of the "Get test tokens" card. */
@@ -105,6 +139,15 @@ data class UiState(
     val checkIn: CheckInState? = null,
     val faucet: FaucetUi = FaucetUi(),
     val goal: GoalUi = GoalUi(),
+    val explore: ExploreUi = ExploreUi(),
+    val squads: SquadsUi = SquadsUi(),
+    /** goal text to try as soon as the new-challenge screen opens (a tapped quick challenge or example) */
+    val pendingGoalText: String? = null,
+    val pendingDemo: Boolean = false,
+    /** set when a challenge is started from a squad: it is created for that squad and stays private */
+    val newGoalSquadId: String? = null,
+    /** an invite code from a link, waiting for the Squads screen */
+    val pendingJoinCode: String? = null,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -221,7 +264,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 val resp = c.api.createTx(
                     CreateTxRequest(
-                        mint = mint, kind = "Squad", mode = draft.mode, penaltyBps = if (draft.mode == "Soft") penaltyBps else null,
+                        mint = mint, kind = null, visibility = if (draft.squadId != null) "private" else draft.visibility, mode = draft.mode, penaltyBps = if (draft.mode == "Soft") penaltyBps else null,
                         startTs = startTs, joinWindowSecs = joinWindow, maxParticipants = maxParticipants, plan = plan,
                         demo = if (draft.demo) DemoRequest(daySecs) else null,
                     ),
@@ -243,7 +286,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 setFlow(
                     TxFlow.Review(
                         PendingTx("create", review, txBytes, pool) {
-                            // After the pool exists, the creator joins it with the chosen stake.
+                            // a squad challenge is linked to its squad as soon as the pool exists, then the creator joins with the chosen stake
+                            draft.squadId?.let { sid -> runCatching { c.api.linkPool(sid, pool) } }
                             prepareJoin(pool, mint, draft.stakeBaseUnits.toString(), final = true)
                         },
                     ),
@@ -448,6 +492,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loadExamples(force: Boolean = false) {
+        if (!c.account.signedIn || (!force && _state.value.goal.examples.isNotEmpty())) return
+        viewModelScope.launch {
+            runCatching { c.api.goalExamples(8) }.onSuccess { e -> _state.update { it.copy(goal = it.goal.copy(examples = e.examples)) } }
+        }
+    }
+
+    fun setNewGoalSquad(id: String?) = _state.update { it.copy(newGoalSquadId = id) }
+    fun setPendingJoinCode(code: String?) = _state.update { it.copy(pendingJoinCode = code) }
+
     fun setUseAi(on: Boolean) = _state.update { it.copy(goal = it.goal.copy(useAi = on)) }
 
     /** Sends the typed text to the server (and, if AI is on and the templates are not sure, to the language model). Nothing else leaves the phone. */
@@ -478,7 +532,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * The user pressed Review on the preview: apply their edits, have the server validate the exact plan, then continue exactly like
      * a template goal (the phone re-checks the transaction against this plan before it asks the wallet to sign).
      */
-    fun startFromPreview(edit: app.vowed.goals.Edit, mode: String, stakeBaseUnits: BigInteger, demo: Boolean, demoDaySecs: Int, place: Pair<Double, Double>?) {
+    fun startFromPreview(edit: app.vowed.goals.Edit, mode: String, stakeBaseUnits: BigInteger, demo: Boolean, demoDaySecs: Int, place: Pair<Double, Double>?, visibility: String = "private", squadId: String? = null) {
         val base = _state.value.goal.result?.plan ?: return
         setFlow(TxFlow.Working("Checking your plan…"))
         viewModelScope.launch {
@@ -487,9 +541,119 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val v = c.api.validateGoal(edited, demo = false)
                 if (!v.ok || v.plan == null) throw ApiException(0, "plan_invalid", v.reason ?: "That plan cannot be staked on.")
                 val chosen = if (demo) v.demoPlan ?: throw ApiException(0, "no_demo_version", "This goal has no demo version; turn off the demo pool.") else v.plan
-                startChallenge(GoalDraft(chosen, mode, stakeBaseUnits, demo, demoDaySecs, edit.app, place))
+                startChallenge(GoalDraft(chosen, mode, stakeBaseUnits, demo, demoDaySecs, edit.app, place, visibility, squadId))
             } catch (e: Throwable) {
                 setFlow(TxFlow.Failed(friendly(e)))
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ Explore
+
+    fun loadExplore(reset: Boolean = true) {
+        if (!c.account.signedIn) return
+        val ex0 = _state.value.explore
+        if (ex0.loading || ex0.loadingMore) return
+        _state.update { it.copy(explore = it.explore.copy(loading = reset, loadingMore = !reset, error = null)) }
+        viewModelScope.launch {
+            try {
+                val e = _state.value.explore
+                val page = c.api.explore(e.category, e.mint, "exclude", e.endingSoon, if (reset) null else e.nextCursor)
+                val demo = if (reset) runCatching { c.api.explore(null, null, "only", false, null).items }.getOrDefault(emptyList()) else e.demoPools
+                val quick = if (reset && e.quick.isEmpty()) runCatching { c.api.goalExamples(13).examples.filter { it.family != "screen" && it.family != "sleep" }.take(5) }.getOrDefault(emptyList()) else e.quick
+                _state.update {
+                    it.copy(explore = it.explore.copy(items = if (reset) page.items else it.explore.items + page.items, demoPools = demo, quick = quick, nextCursor = page.nextCursor, loading = false, loadingMore = false, loaded = true))
+                }
+            } catch (ex: Throwable) {
+                _state.update { it.copy(explore = it.explore.copy(loading = false, loadingMore = false, error = friendly(ex))) }
+            }
+        }
+    }
+
+    fun setExploreFilter(category: String? = _state.value.explore.category, mint: String? = _state.value.explore.mint, endingSoon: Boolean = _state.value.explore.endingSoon) {
+        _state.update { it.copy(explore = it.explore.copy(category = category, mint = mint, endingSoon = endingSoon, nextCursor = null)) }
+        loadExplore(true)
+    }
+
+    fun reportChallenge(pool: String, reason: String) {
+        viewModelScope.launch {
+            try {
+                c.api.report(pool, reason)
+                _state.update { it.copy(explore = it.explore.copy(message = "Thanks. Your report was sent.")) }
+            } catch (e: Throwable) {
+                _state.update { it.copy(explore = it.explore.copy(message = friendly(e))) }
+            }
+        }
+    }
+
+    fun clearExploreMessage() = _state.update { it.copy(explore = it.explore.copy(message = null)) }
+
+    /** Starts the new-challenge flow with a goal already typed (a quick challenge or an example). */
+    fun tryGoal(text: String, demo: Boolean) = _state.update { it.copy(pendingGoalText = text, pendingDemo = demo, goal = it.goal.copy(result = null, error = null)) }
+    fun goalTextConsumed() = _state.update { it.copy(pendingGoalText = null) }
+
+    // ------------------------------------------------------------------ Squads
+
+    fun loadSquads() {
+        if (!c.account.signedIn) return
+        _state.update { it.copy(squads = it.squads.copy(loading = true, error = null)) }
+        viewModelScope.launch {
+            try {
+                val l = c.api.squads().squads
+                _state.update { it.copy(squads = it.squads.copy(list = l, loading = false, loaded = true)) }
+            } catch (e: Throwable) {
+                _state.update { it.copy(squads = it.squads.copy(loading = false, error = friendly(e))) }
+            }
+        }
+    }
+
+    fun createSquad(name: String) = squadAction("Squad created.") { val sq = c.api.createSquad(name.trim()); loadSquads(); openSquad(sq.id) }
+    fun joinSquad(code: String) = squadAction("You joined the squad.") { val sq = c.api.joinSquad(code.trim().uppercase()); loadSquads(); openSquad(sq.id) }
+
+    private fun squadAction(done: String, block: suspend () -> Unit) {
+        _state.update { it.copy(squads = it.squads.copy(busy = true, error = null, message = null)) }
+        viewModelScope.launch {
+            try {
+                block()
+                _state.update { it.copy(squads = it.squads.copy(busy = false, message = done)) }
+            } catch (e: Throwable) {
+                _state.update { it.copy(squads = it.squads.copy(busy = false, error = friendly(e))) }
+            }
+        }
+    }
+
+    fun openSquad(id: String) {
+        viewModelScope.launch {
+            try {
+                val d = c.api.squad(id)
+                val f = runCatching { c.api.feed(id).events }.getOrDefault(emptyList())
+                val b = runCatching { c.api.leaderboard(id).rows }.getOrDefault(emptyList())
+                _state.update { it.copy(squads = it.squads.copy(detail = d, feed = f, board = b, error = null)) }
+            } catch (e: Throwable) {
+                _state.update { it.copy(squads = it.squads.copy(error = friendly(e))) }
+            }
+        }
+    }
+
+    fun closeSquad() = _state.update { it.copy(squads = it.squads.copy(detail = null, feed = emptyList(), board = emptyList(), message = null)) }
+
+    fun nudge(squadId: String, wallet: String) = squadAction("Nudge sent.") { c.api.nudge(squadId, wallet); openSquad(squadId) }
+
+    // ------------------------------------------------------------------ squad notifications (a poll; push comes with a Firebase project)
+
+    private val _incoming = kotlinx.coroutines.flow.MutableSharedFlow<app.vowed.data.NoteItem>(extraBufferCapacity = 32)
+    val incoming: kotlinx.coroutines.flow.SharedFlow<app.vowed.data.NoteItem> = _incoming
+
+    /** Asks the server what happened in my squads since the last look, and emits each new item once. */
+    fun pollNotifications() {
+        if (!c.account.signedIn) return
+        viewModelScope.launch {
+            try {
+                val since = c.prefs.notesSince
+                val n = c.api.notifications(since)
+                if (since > 0) n.items.sortedBy { it.id }.forEach { _incoming.emit(it) } // the first look only sets the clock: no flood of old news
+                c.prefs.notesSince = n.now
+            } catch (_: Throwable) {
             }
         }
     }

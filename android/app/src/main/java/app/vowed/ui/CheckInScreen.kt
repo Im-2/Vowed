@@ -48,6 +48,7 @@ import app.vowed.proof.StepProbe
 import app.vowed.proof.UsageProbe
 import app.vowed.proof.hasPermission
 import kotlinx.coroutines.delay
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -148,7 +149,7 @@ private fun ProofPanel(
 ) {
     when (ci.kind) {
         ProofKind.SELF_ATTEST -> {
-            Text("You confirm it yourself. This is the lowest trust level, so the stake for this goal is capped low.")
+            Text("Nothing on this phone can check this one, so you confirm it yourself and your squad can see you did. It is the lowest trust level, so the stake is capped low. Be honest: it is your money and your friends.")
             Button(enabled = !busy, onClick = { val n = nowSec(); onSubmit(Collected(mapOf("done" to true), n - 1, n, "self-attest tap")) }, modifier = Modifier.fillMaxWidth()) { Text("I did it") }
         }
         ProofKind.FOCUS_TIMER -> FocusPanel(ci, busy, onSubmit)
@@ -273,9 +274,11 @@ private fun UsagePanel(ci: CheckInState, busy: Boolean, onSubmit: (Collected) ->
     }
     val packages = remember(appName) { probe.packagesNamed(appName) }
     Text("Checking: $appName" + if (packages.isEmpty()) " (not installed on this phone, so no use to count)" else "")
-    Button(enabled = !busy, onClick = {
+    val win = if (ci.kind == ProofKind.NO_USE_WINDOW) usageWindow(ci, nowSec()) else null
+    if (win != null && !win.finished) Text("This goal's time window has not finished yet. Come back after it ends and check in then.", color = MaterialTheme.colorScheme.error)
+    Button(enabled = !busy && (win == null || win.finished), onClick = {
         val end = nowSec()
-        val (from, to) = if (ci.kind == ProofKind.NO_USE_WINDOW) usageWindow(ci, end) else (localMidnight(end) to end)
+        val (from, to) = if (ci.kind == ProofKind.NO_USE_WINDOW) usageWindow(ci, end).let { it.from to it.to } else (localMidnight(end) to end)
         val used = if (packages.isEmpty()) 0L else probe.foregroundSeconds(packages, from, to)
         val key = if (ci.kind == ProofKind.NO_USE_WINDOW) "usageSecondsInWindow" else "usageSeconds"
         onSubmit(Collected(mapOf(key to used, "packagesChecked" to (if (packages.isEmpty()) listOf(appName) else packages.toList())), from, end, "usage stats $from..$to"))
@@ -284,17 +287,27 @@ private fun UsagePanel(ci: CheckInState, busy: Boolean, onSubmit: (Collected) ->
 
 private fun localMidnight(now: Long): Long = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toEpochSecond().coerceAtMost(now)
 
-/** The goal's daily window (for example 22:00 to 23:59) on today's local date, or yesterday's when it has not started yet. */
-private fun usageWindow(ci: CheckInState, now: Long): Pair<Long, Long> {
+/** One occurrence of the goal's daily window. [finished] is false while the window is still running, so the check-in waits for it to end. */
+data class UsageWindow(val from: Long, val to: Long, val finished: Boolean)
+
+/**
+ * The most recent daily window that has started: for example 22:00 to 23:59 today, or 23:00 to 06:00 (which runs overnight, so it
+ * ends on the next calendar day). Before today's window starts, yesterday's is used.
+ */
+fun usageWindowFor(start: LocalTime, end: LocalTime, now: Long, zone: ZoneId): UsageWindow {
+    var date = Instant.ofEpochSecond(now).atZone(zone).toLocalDate()
+    var from = date.atTime(start).atZone(zone).toEpochSecond()
+    if (from > now) { date = date.minusDays(1); from = date.atTime(start).atZone(zone).toEpochSecond() }
+    val endDate = if (!end.isAfter(start)) date.plusDays(1) else date
+    val to = endDate.atTime(end).atZone(zone).toEpochSecond()
+    return UsageWindow(from, minOf(now, to), now >= to)
+}
+
+private fun usageWindow(ci: CheckInState, now: Long): UsageWindow {
     val w = ci.challenge.plan?.get("window") as? kotlinx.serialization.json.JsonObject
     val s = (w?.get("startLocalTime") as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { LocalTime.parse(it) } ?: LocalTime.MIDNIGHT
     val e = (w?.get("endLocalTime") as? kotlinx.serialization.json.JsonPrimitive)?.content?.let { LocalTime.parse(it) } ?: LocalTime.of(23, 59)
-    val zone = ZoneId.systemDefault()
-    var date = LocalDate.now()
-    var from = date.atTime(s).atZone(zone).toEpochSecond()
-    if (from > now) { date = date.minusDays(1); from = date.atTime(s).atZone(zone).toEpochSecond() }
-    val to = minOf(now, date.atTime(e).atZone(zone).toEpochSecond())
-    return from to maxOf(from, to)
+    return usageWindowFor(s, e, now, ZoneId.systemDefault())
 }
 
 fun formatDuration(totalSeconds: Long): String {

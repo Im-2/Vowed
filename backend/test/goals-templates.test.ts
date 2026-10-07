@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildFromTemplate, CATALOG, demoize } from "../src/goals/catalog.js";
+import { buildFromTemplate, CATALOG, demoize, diverseExamples } from "../src/goals/catalog.js";
 import { matchGoal } from "../src/goals/matcher.js";
 import { validatePlan } from "../src/goals/validate.js";
 import { GoalPlanSchema, PROOF_TRUST } from "../src/domain/plan.js";
@@ -188,5 +188,54 @@ describe("plan validation", () => {
     const p = { ...good(), cadence: { periodDays: 1 as const, totalDays: 5, requiredDays: 5 } };
     expect(validatePlan(p).ok).toBe(true);
     expect(GoalPlanSchema.safeParse({ ...good(), cadence: { periodDays: 1, totalDays: 5, requiredDays: 9 } }).success).toBe(false);
+  });
+});
+
+describe("variety of examples", () => {
+  it("every worded example of every template parses back to that template with a valid plan", () => {
+    let n = 0;
+    for (const t of CATALOG) {
+      expect(t.examples.length, t.id).toBeGreaterThanOrEqual(2);
+      expect(t.examples).toContain(t.example);
+      for (const text of t.examples) {
+        const m = matchGoal(text);
+        expect(m?.kind, text).toBe("plan");
+        if (m?.kind === "plan") {
+          expect(m.templateId, text).toBe(t.id);
+          expect(validatePlan(m.plan).ok, text).toBe(true);
+        }
+        n++;
+      }
+    }
+    expect(n).toBeGreaterThanOrEqual(35);
+  });
+
+  it("a list of eight examples always mixes every kind of goal, and rep counting is at most one of them", () => {
+    for (let seed = 0; seed < 300; seed++) {
+      const list = diverseExamples(8, seed);
+      expect(list).toHaveLength(8);
+      const families = new Set(list.map((e) => e.family));
+      for (const f of ["steps", "study", "place", "screen", "sleep", "custom"]) expect(families.has(f as never), `seed ${seed} lacks ${f}`).toBe(true);
+      expect(list.filter((e) => e.proofType === "CAMERA_POSE").length, `seed ${seed}`).toBeLessThanOrEqual(1);
+      expect(new Set(list.map((e) => e.text)).size).toBe(8);
+      expect(new Set(list.map((e) => e.templateId)).size).toBe(8);
+    }
+  });
+
+  it("is repeatable for one seed and rotates across seeds", () => {
+    expect(diverseExamples(8, 42)).toEqual(diverseExamples(8, 42));
+    const firsts = new Set(Array.from({ length: 40 }, (_, i) => diverseExamples(8, i).map((e) => e.text).join("|")));
+    expect(firsts.size).toBeGreaterThan(25);
+    const heads = new Set(Array.from({ length: 40 }, (_, i) => diverseExamples(8, i)[0]!.family));
+    expect(heads.size).toBeGreaterThanOrEqual(5); // the first thing people see is not always the same kind of goal
+  });
+
+  it("short lists leave the camera out entirely", () => {
+    for (let seed = 0; seed < 100; seed++) expect(diverseExamples(5, seed).some((e) => e.proofType === "CAMERA_POSE")).toBe(false);
+  });
+
+  it("the example texts the API offers are all real examples", () => {
+    const all = new Set(CATALOG.flatMap((t) => t.examples));
+    for (const e of diverseExamples(13, 7)) expect(all.has(e.text)).toBe(true);
   });
 });

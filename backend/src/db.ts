@@ -214,6 +214,30 @@ CREATE TABLE goal_cache (
   created_at INTEGER NOT NULL
 );
 `,
+  // 5: Explore: how each pool is listed, and reports against public challenges
+  `
+CREATE TABLE challenge_meta (
+  pool TEXT PRIMARY KEY,
+  creator TEXT NOT NULL,
+  visibility TEXT NOT NULL DEFAULT 'private',   -- public | private (squad challenges are always private)
+  title TEXT NOT NULL,                           -- the goal text as shown (also what moderation checked)
+  category TEXT NOT NULL,
+  proof_type TEXT,
+  seeded INTEGER NOT NULL DEFAULT 0,             -- 1 for sample challenges created by the Vowed team
+  hidden INTEGER NOT NULL DEFAULT 0,             -- 1 after enough reports
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX idx_meta_listing ON challenge_meta (visibility, hidden, created_at);
+CREATE TABLE reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pool TEXT NOT NULL,
+  reporter TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  UNIQUE (pool, reporter)
+);
+`,
 ];
 
 export function openDb(path: string): Db {

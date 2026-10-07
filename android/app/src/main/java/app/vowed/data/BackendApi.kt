@@ -60,6 +60,28 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     suspend fun goalTemplates(): TemplateList = get("/v1/goals/templates")
     suspend fun parseGoal(text: String, useAi: Boolean): ParseResult = post("/v1/goals/parse", ParseRequest(text, useAi))
     suspend fun validateGoal(plan: JsonObject, demo: Boolean): ValidateResult = post("/v1/goals/validate", ValidateRequest(plan, demo))
+    suspend fun goalExamples(count: Int = 8): ExampleList = get("/v1/goals/examples?count=$count&seed=${(Math.random() * 1_000_000_000).toLong()}")
+    suspend fun explore(category: String?, mint: String?, demo: String, endingSoon: Boolean, cursor: String?): ExplorePage {
+        val q = buildList {
+            category?.let { add("category=$it") }
+            mint?.let { add("mint=$it") }
+            add("demo=$demo")
+            if (endingSoon) add("endingSoon=true")
+            cursor?.let { add("cursor=$it") }
+            add("limit=20")
+        }.joinToString("&")
+        return get("/v1/explore?$q")
+    }
+    suspend fun report(pool: String, reason: String, note: String? = null): Unit = call("POST", "/v1/explore/$pool/report", AppJson.encodeToString(ReportRequest(reason, note))) { }
+    suspend fun squads(): SquadList = get("/v1/squads")
+    suspend fun createSquad(name: String): Squad = post("/v1/squads", SquadCreate(name))
+    suspend fun joinSquad(code: String): Squad = post("/v1/squads/join", SquadJoin(code))
+    suspend fun squad(id: String): SquadDetail = get("/v1/squads/$id")
+    suspend fun linkPool(squadId: String, pool: String): LinkResult = post("/v1/squads/$squadId/challenges", LinkPool(pool))
+    suspend fun feed(squadId: String): FeedPage = get("/v1/squads/$squadId/feed?limit=40")
+    suspend fun leaderboard(squadId: String): Leaderboard = get("/v1/squads/$squadId/leaderboard")
+    suspend fun nudge(squadId: String, recipient: String): NudgeResult = post("/v1/squads/$squadId/nudge", NudgeRequest(recipient))
+    suspend fun notifications(since: Long): Notes = get("/v1/notifications?since=$since&limit=30")
     suspend fun faucet(): FaucetStatus = get("/v1/faucet")
     suspend fun faucetClaim(): FaucetClaim = post("/v1/faucet/claim", JsonObject(emptyMap()))
     suspend fun sync(signature: String): Unit = call("POST", "/v1/challenges/sync", AppJson.encodeToString(SyncRequest(signature))) { }

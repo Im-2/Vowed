@@ -192,3 +192,6 @@ Limits to state honestly: testers also need devnet SOL (the tokens do not includ
 | Camera pipeline starts on the emulator (CameraX preview, ML Kit pose, countdown, "I cannot see a person" with an empty scene) | Emulator run; the Camera practice screen needs no wallet or server | |
 
 Do not claim: that goals are understood by AI in practice (no live answer seen), that pose counting is accurate (no real-person test), or that the camera is liveness-proof against a determined second person off camera.
+
+## Phase 6 (2026-10-07)
+Built and tested (backend tests): squads, invites, feed, leaderboard, nudges, Explore listing with public/private rules, report and profanity moderation, mixed-category examples. Built and compiling (Android, not yet shown on a device): Explore, Squads screens, local squad notifications, invite deep link. **Do not claim:** push notifications when the app is closed (needs Firebase), sample public challenges seeded on devnet, a two-phone squad run, live Gemini.

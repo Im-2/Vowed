@@ -13,7 +13,9 @@ import type { Services } from "../services.js";
 import { registerAuthRoutes } from "./auth.js";
 import { registerChallengeRoutes } from "./challenges.js";
 import { registerDeviceRoutes } from "./devices.js";
+import { registerExploreRoutes } from "./explore.js";
 import { registerFaucetRoutes } from "./faucet.js";
+import { registerNotificationRoutes } from "./notifications.js";
 import { registerGoalRoutes } from "./goals.js";
 import { registerProofRoutes } from "./proofs.js";
 import { enforce } from "./ratelimit.js";
@@ -86,6 +88,8 @@ export async function buildApp(s: Services, opts: { logger?: boolean } = {}): Pr
   registerProofRoutes(app, s);
   registerSquadRoutes(app, s);
   registerFaucetRoutes(app, s);
+  registerExploreRoutes(app, s);
+  registerNotificationRoutes(app, s);
   registerGoalRoutes(app, s);
 
   await app.ready();

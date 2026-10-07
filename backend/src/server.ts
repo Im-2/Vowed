@@ -1,3 +1,4 @@
+import { seedPublicChallenges } from "./jobs/seed.js";
 import { GeminiClient } from "./goals/gemini.js";
 import { readFileSync } from "node:fs";
 import { Web3Chain } from "./chain/web3chain.js";
@@ -61,6 +62,15 @@ export function startJobs(s: Services, log: (msg: string) => void = console.erro
     every(300_000, "missed-days", () => recordMissedDays(s)),
     every(3_600_000, "reminders", () => sendReminders(s)),
     every(3_600_000, "prune", () => pruneRateLimits(s)),
+    // sample public challenges for Explore (only when a sample-wallet key is configured)
+    ...(s.config.SEED_SECRET_KEY
+      ? [
+          every(1_800_000, "seed-explore", async () => {
+            const r = await seedPublicChallenges(s);
+            for (const e of r.errors) log(`seed-explore: ${e}`);
+          }),
+        ]
+      : []),
   ];
   return () => timers.forEach(clearInterval);
 }

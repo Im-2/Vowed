@@ -57,6 +57,12 @@ const schema = z.object({
   GOALS_LLM_PER_WALLET_HOUR: z.coerce.number().int().min(1).default(12),
   GOALS_LLM_DAILY_CAP: z.coerce.number().int().min(1).default(300),
   /**
+   * Sample public challenges for Explore. A throwaway devnet key that creates a few real, joinable pools labelled as samples and keeps
+   * them topped up (each costs about 0.004 SOL of rent). Off unless the key is set. It holds no authority over anything else.
+   */
+  SEED_SECRET_KEY: secretKey.optional(),
+  SEED_TARGET: z.coerce.number().int().min(0).max(12).default(6),
+  /**
    * Test-token faucet (devnet/localnet only). Off unless the mint authority key is set. The key must be the mint authority of BOTH test mints;
    * it also pays the one-time token-account rent for new wallets. It never reaches the repo or the app.
    */

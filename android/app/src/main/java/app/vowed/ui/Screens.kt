@@ -101,11 +101,14 @@ fun OnboardingScreen(state: UiState, onConnect: () -> Unit, onDismissError: () -
     Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Spacer(Modifier.height(24.dp))
         Text("Vowed", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-        TextButton(onClick = onPractice) { Text("Try the camera rep counter first (no wallet needed)") }
+        val ideas = remember { onboardingIdeas() }
         when (page.intValue) {
             0 -> {
                 Text("Put money behind your goal.", style = MaterialTheme.typography.titleLarge)
-                Text("Pick a goal, stake a little, prove it each day with your phone. Finish and you get your stake back. Miss days and the missed part goes to the people who showed up.")
+                Text("Say any goal in your own words, stake a little, prove it each day with your phone. Finish and you get your stake back. Miss days and the missed part goes to the people who showed up.")
+                Text("Things people vow", style = MaterialTheme.typography.titleSmall)
+                ideas.forEach { (label, text) -> Text("• $label: \"$text\"", style = MaterialTheme.typography.bodyMedium) }
+                TextButton(onClick = onPractice) { Text("Try a practice check-in first (no wallet needed)") }
                 Button(onClick = { page.intValue = 1 }, Modifier.fillMaxWidth()) { Text("Next") }
             }
             1 -> {
@@ -140,6 +143,25 @@ fun OnboardingScreen(state: UiState, onConnect: () -> Unit, onDismissError: () -
             }
         }
     }
+}
+
+/** A different handful each time the app starts: one idea from each of several kinds of goal, so no single kind is the face of the app. */
+private val ONBOARDING_POOL = listOf(
+    "Reading" to listOf("read for 30 minutes every day for 2 weeks", "study for 45 minutes a day for 10 days"),
+    "Steps" to listOf("walk 8000 steps a day for a week", "hit 10000 steps every day for 5 days"),
+    "Wake-up" to listOf("be up and moving by 7am on weekdays", "get out of bed before 6:30 every day for a week"),
+    "Screen time" to listOf("keep Instagram under 30 minutes a day for a week", "no TikTok after 10pm for 10 days"),
+    "Focus" to listOf("do a 25 minute focus session every day for a week", "deep work for 1 hour a day for 5 days"),
+    "Gym" to listOf("go to the gym 4 times a week for a month", "be at the climbing wall 3 days this week"),
+    "Sleep" to listOf("sleep 7 hours a night for a week", "be in bed by 11pm for 10 days"),
+    "Self-report" to listOf("cook dinner at home every day for a week", "write in my journal each night for 10 days"),
+    "Fitness" to listOf("do 20 squats a day for a week", "do 15 push-ups every day for 2 weeks"),
+)
+
+fun onboardingIdeas(seed: Long = System.currentTimeMillis()): List<Pair<String, String>> {
+    val rnd = java.util.Random(seed)
+    // camera-based fitness is one of nine kinds, and is only shown when the shuffle happens to put it in the first four
+    return ONBOARDING_POOL.shuffled(rnd).take(4).map { (label, texts) -> label to texts[rnd.nextInt(texts.size)] }
 }
 
 // ---------------------------------------------------------------- home
@@ -209,7 +231,7 @@ fun HomeScreen(
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Nothing here yet", style = MaterialTheme.typography.titleMedium)
-                    Text("Start a challenge: pick a goal, put a small stake behind it, and check in each day.")
+                    Text("Start a challenge: type any goal (reading time, steps, waking up early, less screen time, the gym, a focus session, sleep, or something you simply confirm), put a small stake behind it, and check in each day. Or browse Explore to join someone else's.")
                 }
             }
         }
@@ -273,12 +295,17 @@ private fun sourceLabel(r: app.vowed.data.ParseResult) = when (r.source) {
 private fun amountText(v: Double) = if (v % 1.0 == 0.0) v.toLong().toString() else v.toString()
 
 @Composable
-fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Unit, onParse: (String) -> Unit, onUseAi: (Boolean) -> Unit, onAlternative: (app.vowed.data.PlanOption) -> Unit, onClear: () -> Unit, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?) -> Unit) {
+fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Unit, onLoadExamples: () -> Unit, onParse: (String) -> Unit, onUseAi: (Boolean) -> Unit, onAlternative: (app.vowed.data.PlanOption) -> Unit, onClear: () -> Unit, onTextConsumed: () -> Unit, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?, String, String?) -> Unit) {
     val ctx = LocalContext.current
-    androidx.compose.runtime.LaunchedEffect(Unit) { onLoadTemplates() }
+    androidx.compose.runtime.LaunchedEffect(Unit) { onLoadTemplates(); onLoadExamples() }
     val goal = state.goal
     val result = goal.result
     var text by remember { mutableStateOf("") }
+    // a tapped quick challenge or example arrives as ready-typed text
+    androidx.compose.runtime.LaunchedEffect(state.pendingGoalText) {
+        state.pendingGoalText?.let { text = it; onParse(it); onTextConsumed() }
+    }
+    val hint = remember(goal.examples) { goal.examples.firstOrNull()?.text ?: "read for 30 minutes every day for a week" }
     Page("New challenge", onBack = { if (result != null) onClear() else onBack() }) {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (result == null || result.status != "plan") {
@@ -286,7 +313,7 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Uni
                 Text("What do you want to commit to?", style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
                     value = text, onValueChange = { if (it.length <= 300) text = it }, modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Your goal, in your own words") }, supportingText = { Text("For example: do 20 squats every day for a week") }, minLines = 2,
+                    label = { Text("Your goal, in your own words") }, supportingText = { Text("For example: $hint") }, minLines = 2,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Switch(checked = goal.useAi, onCheckedChange = onUseAi)
@@ -322,12 +349,18 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Uni
                 }
                 result?.ai?.note?.let { if (result.status != "plan") Text("AI note: $it", style = MaterialTheme.typography.bodySmall) }
 
-                val examples = if (result != null && result.examples.isNotEmpty()) result.examples else goal.templates.map { it.example }
-                if (examples.isNotEmpty()) {
+                // a rotating mix from the server (every kind of goal, camera reps only now and then); the built-in list is the offline fallback
+                val shown: List<Pair<String, String>> = when {
+                    result != null && result.examples.isNotEmpty() -> result.examples.map { "" to it }
+                    goal.examples.isNotEmpty() -> goal.examples.map { categoryLabel(it.category) to it.text }
+                    else -> goal.templates.map { categoryLabel(it.category) to it.example }
+                }
+                if (shown.isNotEmpty()) {
                     Text("Or start from an example", style = MaterialTheme.typography.titleSmall)
-                    examples.forEach { ex ->
-                        FilterChip(selected = false, onClick = { text = ex; onParse(ex) }, label = { Text(ex) })
+                    shown.forEach { (label, ex) ->
+                        FilterChip(selected = false, onClick = { text = ex; onParse(ex) }, label = { Text(if (label.isEmpty()) ex else "$label: $ex") })
                     }
+                    OutlinedButton(onClick = onLoadExamples) { Text("Show other ideas") }
                 }
             } else {
                 PlanPreview(result, ctx, state, onStart)
@@ -337,7 +370,7 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Uni
 }
 
 @Composable
-private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content.Context, state: UiState, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?) -> Unit) {
+private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content.Context, state: UiState, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?, String, String?) -> Unit) {
     val plan = result.plan!!
     val type = app.vowed.goals.PlanEdit.proofType(plan)
     var title by remember(plan) { mutableStateOf(app.vowed.goals.PlanEdit.title(plan)) }
@@ -352,6 +385,8 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
     var demo by remember { mutableStateOf(true) }
     var daySecs by remember { mutableStateOf(120) }
     var stake by remember { mutableStateOf("1") }
+    var visibility by remember { mutableStateOf("private") }
+    val squadId = state.newGoalSquadId
 
     val cfg = state.meta?.config
     val demoOn = cfg?.demoEnabled == true
@@ -439,6 +474,20 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
             Text("A demo pool asks for a small amount (for example 20 seconds of focus) so a short day can be completed. Test money only.", style = MaterialTheme.typography.bodySmall)
         }
     }
+    Text("Who can see it", style = MaterialTheme.typography.titleMedium)
+    if (squadId != null) {
+        Text("This is a squad challenge, so it is private: only people with your squad's invite can find it.", style = MaterialTheme.typography.bodySmall)
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = visibility == "private", onClick = { visibility = "private" }, label = { Text("Private") })
+            FilterChip(selected = visibility == "public", onClick = { visibility = "public" }, label = { Text("Public (listed in Explore)") })
+        }
+        Text(
+            if (visibility == "public") "Anyone can find this in Explore and join it. They see the goal name, kind, mode, token, stake and who joined by wallet address; nothing else about you."
+            else "Private: only people you send the link or code to can join.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
     OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true)
     if (overCap) Text("Above the limit of ${fmt(tierCap.toString())} for this kind of goal in this kind of pool.", color = MaterialTheme.colorScheme.error)
     Text("Test tokens on Solana devnet. No real money. Need some? Use \"Get test tokens\" on the Today screen.", style = MaterialTheme.typography.bodySmall)
@@ -446,7 +495,7 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
         enabled = valid && state.flow !is TxFlow.Working,
         onClick = {
             val edit = app.vowed.goals.Edit(title = title, value = amountN, totalDays = totalN, requiredDays = requiredN, app = appName.takeIf { result.needsApp }, place = placeName.takeIf { result.needsPlace })
-            onStart(edit, mode, stakeUnits!!, demo && demoOn, daySecs, place)
+            onStart(edit, mode, stakeUnits!!, demo && demoOn, daySecs, place, if (squadId != null) "private" else visibility, squadId)
         },
         modifier = Modifier.fillMaxWidth(),
     ) { Text("Review") }

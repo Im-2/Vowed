@@ -1,4 +1,5 @@
 import { planProblemForStake } from "../goals/validate.js";
+import { assertPublicAllowed, recordMeta } from "../explore/service.js";
 import { randomBytes } from "node:crypto";
 import { PublicKey } from "@solana/web3.js";
 import type { FastifyInstance } from "fastify";
@@ -263,7 +264,10 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         summary: "Build the unsigned create-pool transaction for a goal plan (send an Idempotency-Key header to make retries safe)",
         body: z.object({
           mint: pubkeySchema,
-          kind: z.enum(["Squad", "Open"]).default("Squad"),
+          /** Default: Open for a public challenge, Squad for a private one. A public challenge must be Open. */
+          kind: z.enum(["Squad", "Open"]).optional(),
+          /** "public" lists the challenge in Explore (Open pools only); "private" (default) keeps it unlisted. Squad challenges are always private. */
+          visibility: z.enum(["public", "private"]).default("private"),
           mode: z.enum(["Soft", "Hard"]),
           /** Soft mode only: 1-5000. Hard is always 10000. */
           penaltyBps: z.number().int().min(1).max(10_000).optional(),
@@ -292,6 +296,8 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         if (!plan.verifiable) throw badRequest("plan_not_verifiable", plan.unverifiableReason ?? "this goal cannot be verified");
         const planProblem = planProblemForStake(plan, { demo: !!b.demo });
         if (planProblem) throw badRequest("plan_invalid", `this goal plan cannot be staked on: ${planProblem}`);
+        const kind = b.kind ?? (b.visibility === "public" ? "Open" : "Squad");
+        if (b.visibility === "public") assertPublicAllowed(s, wallet, plan, kind);
         const cfg = await getProgramConfig(s);
         if (cfg.paused) throw conflict("paused", "the program is paused");
         if (!cfg.allowed_mints.slice(0, cfg.allowed_mint_count).includes(b.mint)) throw badRequest("mint_not_allowed", "that token is not enabled");
@@ -316,7 +322,7 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         const creator = new PublicKey(wallet);
         const ix = s.program.ixCreatePool(creator, new PublicKey(b.mint), {
           pool_id: poolId,
-          kind: b.kind,
+          kind,
           mode: b.mode,
           penalty_bps: penaltyBps!,
           start_ts: BigInt(b.startTs),
@@ -330,6 +336,7 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         s.db.prepare("INSERT OR IGNORE INTO plans (goal_hash, creator, plan_json, created_at) VALUES (?,?,?,?)").run(goalHash, wallet, canonicalJson(plan), s.wallNow());
         const tx = await buildTransaction(s.chain, creator, [ix]);
         const pool = s.program.poolPda(creator, poolId).toBase58();
+        recordMeta(s, pool, wallet, b.visibility, plan.title, plan.category, plan.proofMethods[0]!.type);
         return {
           transaction: serializeTx(tx),
           blockhash: tx.recentBlockhash!,
@@ -350,6 +357,8 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
             trustTier: planTrustTier(plan),
             maxStake: (b.demo && cfg.demo_max_stake < maxStakeForPlan(plan, cfg.max_stake) ? cfg.demo_max_stake : maxStakeForPlan(plan, cfg.max_stake)).toString(),
             isDemo: !!b.demo,
+            kind,
+            visibility: b.visibility,
             daySecs: b.demo?.daySecs ?? 86_400,
             ...(b.demo ? { label: demoLabel(b.demo.daySecs) } : {}),
           },

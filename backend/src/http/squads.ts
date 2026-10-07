@@ -10,6 +10,7 @@ import { ApiError, conflict, forbidden, notFound, tooMany } from "../errors.js";
 import { pushToWallet } from "../push/service.js";
 import type { Services } from "../services.js";
 import { addFeed } from "../squads/feed.js";
+import { makePrivate } from "../explore/service.js";
 import { authenticate, pubkeySchema } from "./auth.js";
 import { enforce } from "./ratelimit.js";
 
@@ -162,7 +163,7 @@ export function registerSquadRoutes(app: FastifyInstance, s: Services) {
         summary: "Link a pool you created to this squad so members see it in the feed and leaderboard",
         params: idParam,
         body: z.object({ pool: pubkeySchema }),
-        response: { 200: z.object({ pool: z.string(), squadId: z.string() }) },
+        response: { 200: z.object({ pool: z.string(), squadId: z.string(), visibility: z.literal("private") }) },
       },
     },
     async (req) => {
@@ -172,7 +173,8 @@ export function registerSquadRoutes(app: FastifyInstance, s: Services) {
       if (c.creator !== req.wallet) throw forbidden("not_creator", "only the pool creator can link it to a squad");
       if (c.squad_id && c.squad_id !== row.id) throw conflict("already_linked", "this challenge belongs to another squad");
       s.db.prepare("UPDATE challenges SET squad_id = ? WHERE pool = ?").run(row.id, c.pool);
-      return { pool: c.pool, squadId: row.id };
+      makePrivate(s, c.pool); // squad challenges are never listed in Explore, even if they were public before
+      return { pool: c.pool, squadId: row.id, visibility: "private" as const };
     },
   );
 

@@ -11,9 +11,10 @@ import { PROOF_TRUST, type GoalPlan } from "../domain/plan.js";
 import { tooMany } from "../errors.js";
 import { hit } from "../http/ratelimit.js";
 import type { Services } from "../services.js";
-import { CATALOG, demoize, extrasFor, type PlanExtras } from "./catalog.js";
+import { CATALOG, demoize, diverseExamples, extrasFor, type PlanExtras } from "./catalog.js";
 import { GeminiError } from "./gemini.js";
 import { matchGoal, selfReportAlternative } from "./matcher.js";
+import { checkText, NOT_ALLOWED_MESSAGE } from "../moderation/text.js";
 import { cleanText, validatePlan } from "./validate.js";
 
 export const MAX_GOAL_CHARS = 300;
@@ -51,6 +52,9 @@ const empty = (): ParseOutcome => ({
   status: "unclear", source: "none", plan: null, demoPlan: null, templateId: null, trustTier: null, needsPlace: false, needsApp: false, limitations: [], notes: [],
   confidence: "low", reason: null, suggestedAlternative: null, alternatives: [], clarifyingQuestions: [], examples: [], ai: { used: false, note: null },
 });
+
+/** A fresh mix each time: different kinds of goal, never mostly reps. */
+const mixedExamples = () => diverseExamples(8, Math.floor(Math.random() * 1e9)).map((e) => e.text);
 
 const normalizeKey = (text: string) => createHash("sha256").update(text.toLowerCase().replace(/\s+/g, " ").trim()).digest("hex");
 
@@ -103,7 +107,11 @@ export async function parseGoal(s: Services, wallet: string, rawText: string, us
   const text = cleanText(rawText, MAX_GOAL_CHARS);
   const base = empty();
   if (text.length < 3) {
-    return { ...base, clarifyingQuestions: ["What do you want to commit to? For example: do 20 squats every day."], examples: CATALOG.slice(0, 6).map((t) => t.example) };
+    return { ...base, clarifyingQuestions: ["What do you want to commit to? For example: do 20 squats every day."], examples: mixedExamples() };
+  }
+  // language that is not allowed in public goals is stopped here, before it can reach the matcher, the cache or the language model
+  if (!checkText(text).ok) {
+    return { ...base, reason: NOT_ALLOWED_MESSAGE, clarifyingQuestions: [NOT_ALLOWED_MESSAGE], examples: mixedExamples(), ai: { used: false, note: null } };
   }
   const cfg = s.config;
   const match = matchGoal(text);
@@ -153,12 +161,12 @@ export async function parseGoal(s: Services, wallet: string, rawText: string, us
   if (match?.kind === "plan") {
     const v = validatePlan(match.plan);
     if (v.ok) return { ...fromPlan(base, v.plan, match.templateId, aiAllowed || aiNote ? "template-after-ai-failed" : "template", match.confidence, match.notes), ai: { used: false, note: aiNote } };
-    return { ...base, reason: v.reason, clarifyingQuestions: [`That did not work as a goal: ${v.reason}. Try a different amount.`], examples: CATALOG.slice(0, 6).map((t) => t.example), ai: { used: false, note: aiNote } };
+    return { ...base, reason: v.reason, clarifyingQuestions: [`That did not work as a goal: ${v.reason}. Try a different amount.`], examples: mixedExamples(), ai: { used: false, note: aiNote } };
   }
   return {
     ...base,
     clarifyingQuestions: ["I could not turn that into a goal a phone can check. How would you measure it each day (a number of reps, steps, minutes, or time away from an app)?"],
-    examples: CATALOG.map((t) => t.example),
+    examples: mixedExamples(),
     ai: { used: false, note: aiNote },
   };
 }
