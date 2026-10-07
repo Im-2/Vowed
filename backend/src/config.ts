@@ -44,6 +44,19 @@ const schema = z.object({
   RUN_JOBS: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
   /**
+   * Goal parser. The key stays on the server (never in the app); only the typed goal text is sent to the model.
+   * Without a key the deterministic template matcher is used. Config errors never echo values.
+   */
+  GEMINI_API_KEY: z.string().min(10).optional(),
+  GEMINI_MODEL: z.string().min(3).default("gemini-3.5-flash-lite"),
+  GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta"),
+  /** template_first: use a confident template match and ask the model only otherwise (saves free-tier quota); llm_first: always ask first (tests); template_only: never. */
+  GOALS_PARSER_MODE: z.enum(["template_first", "llm_first", "template_only"]).default("template_first"),
+  GOALS_LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(15_000),
+  /** Free-tier protection: model calls per wallet per hour, and across everyone per UTC day. */
+  GOALS_LLM_PER_WALLET_HOUR: z.coerce.number().int().min(1).default(12),
+  GOALS_LLM_DAILY_CAP: z.coerce.number().int().min(1).default(300),
+  /**
    * Test-token faucet (devnet/localnet only). Off unless the mint authority key is set. The key must be the mint authority of BOTH test mints;
    * it also pays the one-time token-account rent for new wallets. It never reaches the repo or the app.
    */

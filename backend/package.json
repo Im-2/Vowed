@@ -12,7 +12,8 @@
     "openapi": "tsx scripts/gen-openapi.ts",
     "gate:devnet": "tsx scripts/devnet-gate.ts",
     "gate:proofs": "tsx scripts/gate-proofs.ts",
-    "demo:friend": "tsx scripts/demo-friend.ts"
+    "demo:friend": "tsx scripts/demo-friend.ts",
+    "gate:goals": "tsx scripts/gate-goals.ts"
   },
   "dependencies": {
     "@anchor-lang/core": "1.2.0",

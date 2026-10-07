@@ -206,6 +206,14 @@ CREATE TABLE faucet_claims (
 CREATE INDEX faucet_claims_wallet ON faucet_claims (wallet, created_at);
 CREATE INDEX faucet_claims_day ON faucet_claims (day, status);
 `,
+  // 4: cache of language-model goal parses (keyed by a hash of the normalised text; only model answers are cached)
+  `
+CREATE TABLE goal_cache (
+  text_hash TEXT PRIMARY KEY,
+  result_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+`,
 ];
 
 export function openDb(path: string): Db {

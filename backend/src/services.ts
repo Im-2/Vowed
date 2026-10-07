@@ -3,6 +3,7 @@ import type { Chain } from "./chain/types.js";
 import type { Config } from "./config.js";
 import type { Db } from "./db.js";
 import type { AttestationVerifier } from "./devices/attestation.js";
+import type { GeminiClient } from "./goals/gemini.js";
 import type { VowedProgram } from "./program/client.js";
 import type { PushSender } from "./push/types.js";
 
@@ -18,6 +19,8 @@ export interface Services {
   crank: Keypair;
   push: PushSender;
   attestation: AttestationVerifier;
+  /** Language model for goal parsing; null when no key is configured. */
+  llm: GeminiClient | null;
   /** Cluster time in seconds (the program's clock is authoritative). */
   now(): number;
   /** Real wall-clock seconds: used for session expiry and rate limits so tests can warp the cluster clock. */

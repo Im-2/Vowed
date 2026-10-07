@@ -14,6 +14,7 @@ import { registerAuthRoutes } from "./auth.js";
 import { registerChallengeRoutes } from "./challenges.js";
 import { registerDeviceRoutes } from "./devices.js";
 import { registerFaucetRoutes } from "./faucet.js";
+import { registerGoalRoutes } from "./goals.js";
 import { registerProofRoutes } from "./proofs.js";
 import { enforce } from "./ratelimit.js";
 import { registerSquadRoutes } from "./squads.js";
@@ -85,6 +86,7 @@ export async function buildApp(s: Services, opts: { logger?: boolean } = {}): Pr
   registerProofRoutes(app, s);
   registerSquadRoutes(app, s);
   registerFaucetRoutes(app, s);
+  registerGoalRoutes(app, s);
 
   await app.ready();
   return app;

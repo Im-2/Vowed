@@ -1,3 +1,4 @@
+import { planProblemForStake } from "../goals/validate.js";
 import { randomBytes } from "node:crypto";
 import { PublicKey } from "@solana/web3.js";
 import type { FastifyInstance } from "fastify";
@@ -289,6 +290,8 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         const b = req.body;
         const plan = b.plan;
         if (!plan.verifiable) throw badRequest("plan_not_verifiable", plan.unverifiableReason ?? "this goal cannot be verified");
+        const planProblem = planProblemForStake(plan, { demo: !!b.demo });
+        if (planProblem) throw badRequest("plan_invalid", `this goal plan cannot be staked on: ${planProblem}`);
         const cfg = await getProgramConfig(s);
         if (cfg.paused) throw conflict("paused", "the program is paused");
         if (!cfg.allowed_mints.slice(0, cfg.allowed_mint_count).includes(b.mint)) throw badRequest("mint_not_allowed", "that token is not enabled");

@@ -18,12 +18,24 @@ scan() {
 scan "PEM private keys"                 -e '-----BEGIN ([A-Z ]+ )?PRIVATE KEY-----'
 scan "64-number secret-key arrays"      -e '\[ *([0-9]{1,3} *, *){63}[0-9]{1,3} *\]'
 scan "Google API keys"                  -e 'AIza[0-9A-Za-z_-]{30,}'
+scan "Google API keys (AQ. format)"     -e '(^|[^A-Za-z0-9_.])AQ\.[A-Za-z0-9_-]{30,}'
 scan "OpenAI/Anthropic-style keys"      -e 'sk-(ant-)?[A-Za-z0-9_-]{20,}'
 scan "GitHub/Slack/AWS tokens"          -e '(gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16})'
 scan "JWT-shaped tokens"                -e 'eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{10,}'
 scan "service-account private_key"      -e '"private_key" *: *"-----'
 scan "long hex assigned to secret names" -e '(SECRET|PRIVATE|TOKEN|PASSWORD|API_?KEY)[A-Z_]* *[=:] *"?[0-9a-fA-F]{40,}'
 scan "12/24-word lowercase lines (seed phrase heuristic)" -e '^[[:space:]]*([a-z]{3,8} ){11}[a-z]{3,8}[[:space:]]*$|^[[:space:]]*([a-z]{3,8} ){23}[a-z]{3,8}[[:space:]]*$'
+
+echo "== the exact local secrets (never printed): gemini key"
+if [ -f backend/.devnet/gemini-key.txt ]; then
+  K=$(tr -d '
+ ' < backend/.devnet/gemini-key.txt)
+  if [ -n "$K" ]; then
+    if git grep -I -q -F -e "$K" $REVS 2>/dev/null || git grep -I -q -F -e "$K" 2>/dev/null; then echo "FOUND the local Gemini key in the repository (working tree or history)"; fail=1; else echo "none"; fi
+    # also untracked, non-ignored files that are about to be added
+    if git ls-files --others --exclude-standard | xargs -r grep -I -l -F -e "$K" 2>/dev/null | grep -q .; then echo "FOUND the local Gemini key in an untracked file"; fail=1; fi
+  fi
+else echo "no local key file"; fi
 
 echo "== 64-byte base58 strings (checked: only valid secret keys fail)"
 cands=$(git grep -I -h -o -E '[1-9A-HJ-NP-Za-km-z]{85,90}' $REVS 2>/dev/null | sort -u)

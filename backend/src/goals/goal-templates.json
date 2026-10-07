@@ -1,0 +1,93 @@
+[
+  {
+    "id": "squats", "title": "{value} squats a day", "example": "Do 20 squats every day",
+    "summary": "Counted by the camera on your phone.", "category": "fitness", "metric": "squats", "value": 20, "unit": "reps", "direction": "atLeast",
+    "proofType": "CAMERA_POSE", "difficulty": 2, "window": null, "proofParams": { "exercise": "squat" }, "demo": { "value": 3, "unit": "reps" },
+    "keywords": ["squat", "squats"], "unitWords": ["squat", "squats", "rep", "reps"], "range": { "min": 5, "max": 300 }, "needsPlace": false, "needsApp": false,
+    "limitations": []
+  },
+  {
+    "id": "pushups", "title": "{value} push-ups a day", "example": "Do 15 push-ups every day",
+    "summary": "Counted by the camera on your phone.", "category": "fitness", "metric": "pushups", "value": 15, "unit": "reps", "direction": "atLeast",
+    "proofType": "CAMERA_POSE", "difficulty": 3, "window": null, "proofParams": { "exercise": "pushup" }, "demo": { "value": 3, "unit": "reps" },
+    "keywords": ["push-up", "push-ups", "pushup", "pushups", "push up", "push ups", "press-up", "press-ups"], "unitWords": ["push-up", "push-ups", "pushup", "pushups", "push", "rep", "reps"], "range": { "min": 3, "max": 300 }, "needsPlace": false, "needsApp": false,
+    "limitations": []
+  },
+  {
+    "id": "steps", "title": "Walk {value} steps a day", "example": "Walk 8000 steps every day",
+    "summary": "Counted by your phone's step sensor.", "category": "steps", "metric": "steps", "value": 8000, "unit": "steps", "direction": "atLeast",
+    "proofType": "STEPS", "difficulty": 3, "window": null, "proofParams": {}, "demo": { "value": 20, "unit": "steps" },
+    "keywords": ["steps", "step count", "10k", "8k", "walk 10000", "walk 8000"], "unitWords": ["steps", "step"], "range": { "min": 1000, "max": 40000 }, "needsPlace": false, "needsApp": false,
+    "limitations": ["Steps are counted from when you first open that day's check-in on this phone."]
+  },
+  {
+    "id": "walk-outside", "title": "Walk outside {value} steps a day", "example": "Go for a walk outside every day",
+    "summary": "A daily walk, measured by your step sensor (about 3,000 steps is a 30-minute walk).", "category": "steps", "metric": "steps", "value": 3000, "unit": "steps", "direction": "atLeast",
+    "proofType": "STEPS", "difficulty": 2, "window": null, "proofParams": {}, "demo": { "value": 20, "unit": "steps" },
+    "keywords": ["walk outside", "go for a walk", "walk outdoors", "daily walk", "take a walk", "go outside", "fresh air"], "unitWords": ["steps", "step"], "range": { "min": 1000, "max": 40000 }, "needsPlace": false, "needsApp": false,
+    "limitations": ["Vowed counts steps, not whether you are outdoors."]
+  },
+  {
+    "id": "gym", "title": "Be at the gym for {value} minutes", "example": "Go to the gym for 45 minutes",
+    "summary": "Your phone checks that you stay at the place for that long. The spot stays on your phone.", "category": "location", "metric": "gym", "value": 30, "unit": "minutes", "direction": "atLeast",
+    "proofType": "GEOFENCE", "difficulty": 3, "window": null, "proofParams": { "place": "Gym", "radiusM": "150" }, "demo": { "value": 10, "unit": "seconds" },
+    "keywords": ["gym", "fitness center", "fitness centre", "workout at", "library", "go to the", "be at the"], "unitWords": ["minute", "minutes", "min", "mins", "hour", "hours", "hr"], "range": { "min": 5, "max": 480 }, "needsPlace": true, "needsApp": false,
+    "limitations": ["You choose the spot when you create the challenge; it is saved on your phone only."]
+  },
+  {
+    "id": "focus", "title": "Focus for {value} {unit} a day", "example": "Study for 2 hours every day",
+    "summary": "An in-app timer that pauses when you leave the app.", "category": "study", "metric": "focus", "value": 2, "unit": "hours", "direction": "atLeast",
+    "proofType": "FOCUS_TIMER", "difficulty": 3, "window": null, "proofParams": {}, "demo": { "value": 20, "unit": "seconds" },
+    "keywords": ["study", "studying", "focus", "deep work", "homework", "revise", "revision", "concentrate", "work on"], "unitWords": ["minute", "minutes", "min", "mins", "hour", "hours", "hr", "hrs"], "range": { "min": 5, "max": 720 }, "needsPlace": false, "needsApp": false,
+    "limitations": ["The timer counts only while Vowed is open on screen."]
+  },
+  {
+    "id": "reading", "title": "Read for {value} minutes a day", "example": "Read for 20 minutes every day",
+    "summary": "An in-app timer that pauses when you leave the app. Put your book next to the phone.", "category": "study", "metric": "reading", "value": 20, "unit": "minutes", "direction": "atLeast",
+    "proofType": "FOCUS_TIMER", "difficulty": 2, "window": null, "proofParams": {}, "demo": { "value": 20, "unit": "seconds" },
+    "keywords": ["read", "reading", "book", "books", "pages"], "unitWords": ["minute", "minutes", "min", "mins", "hour", "hours", "hr"], "range": { "min": 5, "max": 480 }, "needsPlace": false, "needsApp": false,
+    "limitations": ["The timer cannot tell whether you are reading: it counts time with the app open."]
+  },
+  {
+    "id": "meditation", "title": "Meditate {value} minutes a day", "example": "Meditate for 10 minutes every day",
+    "summary": "An in-app timer that pauses when you leave the app.", "category": "custom", "metric": "meditation", "value": 10, "unit": "minutes", "direction": "atLeast",
+    "proofType": "FOCUS_TIMER", "difficulty": 2, "window": null, "proofParams": {}, "demo": { "value": 20, "unit": "seconds" },
+    "keywords": ["meditate", "meditation", "mindfulness", "breathing", "breathe"], "unitWords": ["minute", "minutes", "min", "mins", "hour", "hours", "hr"], "range": { "min": 2, "max": 180 }, "needsPlace": false, "needsApp": false,
+    "limitations": ["The timer counts time with the app open; it cannot tell whether you are meditating."]
+  },
+  {
+    "id": "usage-limit", "title": "Under {value} minutes a day on {app}", "example": "Spend less than 30 minutes on Instagram",
+    "summary": "Checked against your phone's app-usage data (you grant Usage access).", "category": "detox", "metric": "app-time", "value": 30, "unit": "minutes", "direction": "atMost",
+    "proofType": "USAGE_LIMIT", "difficulty": 3, "window": null, "proofParams": { "app": "Instagram" }, "demo": null,
+    "keywords": ["less than", "under", "limit", "at most", "no more than", "cut down", "reduce", "screen time", "scrolling"], "unitWords": ["minute", "minutes", "min", "mins", "hour", "hours", "hr"], "range": { "min": 0, "max": 600 }, "needsPlace": false, "needsApp": true,
+    "limitations": ["Needs Usage access on this phone. Only the minutes for the app you name are read."]
+  },
+  {
+    "id": "no-use-window", "title": "No {app} after {time}", "example": "No TikTok after 10pm",
+    "summary": "Checked against your phone's app-usage data during the window.", "category": "detox", "metric": "app-use", "value": 0, "unit": "minutes", "direction": "atMost",
+    "proofType": "NO_USE_WINDOW", "difficulty": 2, "window": { "startLocalTime": "22:00", "endLocalTime": "23:59" }, "proofParams": { "app": "TikTok" }, "demo": null,
+    "keywords": ["no tiktok", "no instagram", "no youtube", "no twitter", "no facebook", "no snapchat", "no reddit", "no netflix", "no games", "stay off", "off my phone", "no phone", "no social", "phone-free", "phone free", "after "], "unitWords": [], "range": { "min": 0, "max": 0 }, "needsPlace": false, "needsApp": true,
+    "limitations": ["Needs Usage access on this phone."]
+  },
+  {
+    "id": "early-wake", "title": "Be up and walking by {time}", "example": "Wake up by 6am every day",
+    "summary": "You walk at least 200 steps after waking. Vowed cannot see when you wake up.", "category": "sleep", "metric": "morning-steps", "value": 200, "unit": "steps", "direction": "atLeast",
+    "proofType": "STEPS", "difficulty": 3, "window": { "startLocalTime": "04:00", "endLocalTime": "06:00" }, "proofParams": {}, "demo": { "value": 20, "unit": "steps" },
+    "keywords": ["wake up", "wake-up", "get up", "early riser", "rise at", "up by", "alarm"], "unitWords": [], "range": { "min": 200, "max": 2000 }, "needsPlace": false, "needsApp": false,
+    "limitations": ["The time of day is shown but not checked yet: only the steps are verified."]
+  },
+  {
+    "id": "sleep-window", "title": "Phone-free sleep from {time}", "example": "No Instagram between 11pm and 6am",
+    "summary": "Checked against your phone's app-usage data overnight.", "category": "sleep", "metric": "night-use", "value": 0, "unit": "minutes", "direction": "atMost",
+    "proofType": "NO_USE_WINDOW", "difficulty": 3, "window": { "startLocalTime": "23:00", "endLocalTime": "06:00" }, "proofParams": { "app": "Instagram" }, "demo": null,
+    "keywords": ["sleep", "bedtime", "go to bed", "overnight", "at night", "night"], "unitWords": [], "range": { "min": 0, "max": 0 }, "needsPlace": false, "needsApp": true,
+    "limitations": ["Needs Usage access. Only the app you name is checked, not all phone use."]
+  },
+  {
+    "id": "hydration", "title": "Drink {value} glasses of water a day", "example": "Drink 8 glasses of water every day",
+    "summary": "You confirm it yourself. Lowest trust, so the stake cap is small.", "category": "custom", "metric": "glasses", "value": 8, "unit": "glasses", "direction": "atLeast",
+    "proofType": "SELF_ATTEST", "difficulty": 1, "window": null, "proofParams": {}, "demo": null,
+    "keywords": ["water", "hydrate", "hydration", "glasses", "drink"], "unitWords": ["glass", "glasses", "cup", "cups", "litre", "litres", "liter", "liters", "l"], "range": { "min": 1, "max": 20 }, "needsPlace": false, "needsApp": false,
+    "limitations": ["Self-reported: nothing checks it."]
+  }
+]

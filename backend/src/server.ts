@@ -1,3 +1,4 @@
+import { GeminiClient } from "./goals/gemini.js";
 import { readFileSync } from "node:fs";
 import { Web3Chain } from "./chain/web3chain.js";
 import { loadConfig, type Config } from "./config.js";
@@ -27,6 +28,7 @@ export function createServices(config: Config): Services {
     crank: config.CRANK_SECRET_KEY,
     push,
     attestation: new GoogleAttestationVerifier(roots, googleRevocationChecker()),
+    llm: config.GEMINI_API_KEY ? new GeminiClient({ apiKey: config.GEMINI_API_KEY, model: config.GEMINI_MODEL, baseUrl: config.GEMINI_BASE_URL, timeoutMs: config.GOALS_LLM_TIMEOUT_MS }) : null,
     now: () => chain.nowSec(),
     wallNow: () => Math.floor(Date.now() / 1000),
   };

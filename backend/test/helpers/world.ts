@@ -26,7 +26,8 @@ export class StubChain implements Chain {
   async latestBlockhash() {
     return { blockhash: "11111111111111111111111111111111", lastValidBlockHeight: 1 };
   }
-  async sendAndConfirm(): Promise<SendResult> {
+  async sendAndConfirm(_tx?: unknown): Promise<SendResult> {
+    void _tx;
     throw new Error("StubChain cannot send transactions");
   }
   nowSec() {
@@ -60,7 +61,7 @@ export interface World {
   crank: Keypair;
 }
 
-export async function makeWorld(opts: { chain?: Chain; attestation?: AttestationVerifier; requireAttestation?: boolean; jwtSecret?: string; env?: Record<string, string> } = {}): Promise<World> {
+export async function makeWorld(opts: { chain?: Chain; attestation?: AttestationVerifier; requireAttestation?: boolean; jwtSecret?: string; env?: Record<string, string>; llm?: import("../../src/goals/gemini.js").GeminiClient | null } = {}): Promise<World> {
   const oracle = Keypair.generate();
   const crank = Keypair.generate();
   const config = loadConfig({
@@ -85,6 +86,7 @@ export async function makeWorld(opts: { chain?: Chain; attestation?: Attestation
     crank,
     push,
     attestation: opts.attestation ?? new GoogleAttestationVerifier(roots),
+    llm: opts.llm ?? null,
     now: () => chain.nowSec(),
     wallNow: () => clock.wall,
   };
