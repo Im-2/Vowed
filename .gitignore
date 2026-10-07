@@ -21,3 +21,5 @@ backend/.devnet/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+scripts/.shot.png
+scripts/.*.log

@@ -3,6 +3,8 @@
  * Uses the throwaway test wallet bob (backend/.devnet/bob.json) and a software device key, and talks to a running backend over HTTP.
  *
  *   npx tsx scripts/demo-friend.ts <pool> [--stake 1] [--prove 0,1] [--url http://127.0.0.1:8787]
+ *   npx tsx scripts/demo-friend.ts --join-squad CODE            (the friend joins a squad by invite code, nothing else)
+ *   npx tsx scripts/demo-friend.ts --nudge WALLET --squad-id ID (the friend nudges a squad mate who has not checked in)
  *
  * Without --prove the friend never checks in, so their stake (or the penalty share, in Soft mode) is forfeited to the winner.
  * Test tokens only. Never touches a faucet.
@@ -18,13 +20,17 @@ import { canonicalPackageBytes } from "../src/proofs/verify.js";
 
 const DIR = new URL("../.devnet/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const argv = process.argv.slice(2);
-const pool = argv.find((a) => !a.startsWith("--") && argv[argv.indexOf(a) - 1]?.startsWith("--") !== true);
+const flagsWithValue = new Set(["stake", "prove", "url", "join-squad", "nudge", "squad-id"]);
+const pool = argv.find((a, i) => !a.startsWith("--") && !(i > 0 && argv[i - 1]!.startsWith("--") && flagsWithValue.has(argv[i - 1]!.slice(2))));
 const opt = (name: string, dflt: string) => {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 && argv[i + 1] ? argv[i + 1]! : dflt;
 };
-if (!pool) {
-  console.error("usage: demo-friend.ts <pool> [--stake 1] [--prove 0,1] [--url http://127.0.0.1:8787]");
+const joinSquad = argv.includes("--join-squad") ? argv[argv.indexOf("--join-squad") + 1] : undefined;
+const nudgeWallet = argv.includes("--nudge") ? argv[argv.indexOf("--nudge") + 1] : undefined;
+const squadIdArg = argv.includes("--squad-id") ? argv[argv.indexOf("--squad-id") + 1] : undefined;
+if (!pool && !joinSquad && !nudgeWallet) {
+  console.error("usage: demo-friend.ts <pool> [--stake 1] [--prove 0,1] [--url http://127.0.0.1:8787] | --join-squad CODE | --nudge WALLET --squad-id ID");
   process.exit(1);
 }
 const base = opt("url", "http://127.0.0.1:8787");
@@ -66,16 +72,30 @@ async function main() {
   const reg = new TextEncoder().encode(deviceRegistrationMessage(wallet, dev.id, challenge));
   await api("POST", "/v1/devices/register", token, { devicePublicKey: dev.spki.toString("base64"), challenge, walletSignature: Buffer.from(nacl.sign.detached(reg, bob.secretKey)).toString("base64") });
 
+  if (joinSquad) {
+    const sq = await api("POST", "/v1/squads/join", token, { code: joinSquad });
+    console.log(`friend joined squad "${sq.name}" (${sq.id})`);
+  }
+  if (nudgeWallet) {
+    if (!squadIdArg) throw new Error("--nudge needs --squad-id");
+    await api("POST", `/v1/squads/${squadIdArg}/nudge`, token, { recipient: nudgeWallet });
+    console.log(`friend nudged ${nudgeWallet.slice(0, 6)}...`);
+  }
+  if (!pool) return;
   const chain = new Web3Chain(RPC);
   const before = await api("GET", `/v1/challenges/${pool}`, token);
   const c = before.challenge;
   console.log(`friend (bob ${wallet.slice(0, 6)}...) joins ${c.isDemo ? "DEMO pool" : "pool"} ${pool!.slice(0, 6)}... "${c.plan?.title}" with ${Number(stake) / 1e6} test USDC`);
-  const j = await api("POST", "/v1/challenges/tx/join", token, { pool, stake: stake.toString(), tzOffsetMinutes: 0, deviceId: dev.id });
-  const tx = Transaction.from(Buffer.from(j.transaction, "base64"));
-  tx.partialSign(bob);
-  const sent = await chain.sendAndConfirm(tx);
-  await api("POST", "/v1/challenges/sync", token, { signature: sent.signature });
-  console.log(`joined: https://explorer.solana.com/tx/${sent.signature}?cluster=devnet`);
+  const already = (before.participants as { wallet: string }[] | undefined)?.some((p) => p.wallet === wallet);
+  if (already) console.log("friend is already in this pool; skipping the join");
+  else {
+    const j = await api("POST", "/v1/challenges/tx/join", token, { pool, stake: stake.toString(), tzOffsetMinutes: 0, deviceId: dev.id });
+    const tx = Transaction.from(Buffer.from(j.transaction, "base64"));
+    tx.partialSign(bob);
+    const sent = await chain.sendAndConfirm(tx);
+    await api("POST", "/v1/challenges/sync", token, { signature: sent.signature });
+    console.log(`joined: https://explorer.solana.com/tx/${sent.signature}?cluster=devnet`);
+  }
 
   for (const day of proveDays) {
     const plan = c.plan;

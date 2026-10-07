@@ -108,6 +108,11 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
     }
 
     val route = nav.currentBackStackEntryAsState().value?.destination?.route
+    // creating or joining a squad opens it
+    val openedSquad = state.squads.detail?.squad?.id
+    LaunchedEffect(openedSquad) {
+        if (openedSquad != null && nav.currentDestination?.route == "squads") nav.navigate("squad/$openedSquad") { launchSingleTop = true }
+    }
     val tabs = listOf("home" to "Today", "explore" to "Explore", "squads" to "Squads", "settings" to "Settings")
     Scaffold(bottomBar = {
         if (route in tabs.map { it.first }) NavigationBar {
@@ -141,6 +146,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         composable("review") {
             val f = state.flow
             if (f is TxFlow.Review) ReviewScreen(f.tx, onSign = { vm.confirm(sender) }, onCancel = { vm.cancelReview() })
+            else Page("Working", onBack = { vm.cancelReview() }) { app.vowed.ui.FlowStatus(f) }
         }
         composable("detail/{pool}") { entry ->
             val pool = entry.arguments?.getString("pool") ?: return@composable
@@ -175,7 +181,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         composable("squads") {
             SquadsScreen(
                 state, onLoad = vm::loadSquads, onCreate = vm::createSquad, onJoin = { vm.joinSquad(it); vm.setPendingJoinCode(null) },
-                onOpen = { id -> vm.openSquad(id); nav.navigate("squad/$id") }, joinCode = state.pendingJoinCode,
+                onOpen = { id -> vm.openSquad(id); nav.navigate("squad/$id") { launchSingleTop = true } }, joinCode = state.pendingJoinCode,
             )
         }
         composable("squad/{id}") { entry ->

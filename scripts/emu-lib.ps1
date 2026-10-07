@@ -75,6 +75,8 @@ function Reset-And-Connect {
     }
     $end = (Get-Date).AddSeconds(300)
     while ((Get-Date) -lt $end -and -not (Has-Text "New challenge" 2)) {
+        if (Find-Node "Dismiss") { "  connect failed, retrying"; Tap-Text "Dismiss" 2 | Out-Null; Start-Sleep 2; Tap-Text "Connect wallet" 5 | Out-Null; Tap-Text "Connect" 60 | Out-Null }
+        if (Tap-Text "Allow" 1) { "  allowed notifications"; Start-Sleep 2 }
         if (Tap-Text "Approve" 4) { "  approved a wallet request"; Start-Sleep 3 }
     }
     "home: " + (Has-Text "New challenge" 30)
