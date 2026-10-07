@@ -5,7 +5,8 @@ import { planProblemForStake } from "../src/goals/validate.js";
 import { buildFromTemplate, CATALOG } from "../src/goals/catalog.js";
 import { makeWorld, signIn, type World } from "./helpers/world.js";
 
-const SECRET = "AQ.TestKeyDoNotUse-0123456789abcdefghijklmnopqrstuv";
+// an obviously fake key (not a real credential): it only has to look like one so we can prove it is never leaked
+const SECRET = "fake-key-for-tests-only-0123456789abcdefghijklmnop";
 
 type Reply = { status: number; body: string } | Error;
 interface Call {

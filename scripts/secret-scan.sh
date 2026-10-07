@@ -12,7 +12,8 @@ if [ -n "$bad" ]; then echo "FOUND:"; echo "$bad"; fail=1; else echo "none"; fi
 
 scan() {
   label="$1"; shift
-  out=$(git grep -I -n -E "$@" $REVS 2>/dev/null | sed -E 's/^[0-9a-f]{40}://' | sort -u | cut -c1-160)
+  # the one allowed exception: an obviously fake key inside a unit test (backend/test/goals-llm.test.ts, commit 238a077), used to prove keys are scrubbed
+  out=$(git grep -I -n -E "$@" $REVS 2>/dev/null | sed -E 's/^[0-9a-f]{40}://' | sort -u | grep -v 'TestKeyDoNotUse' | cut -c1-160)
   if [ -n "$out" ]; then echo "FOUND $label:"; echo "$out" | head -8; fail=1; else echo "none: $label"; fi
 }
 scan "PEM private keys"                 -e '-----BEGIN ([A-Z ]+ )?PRIVATE KEY-----'
@@ -29,6 +30,7 @@ scan "12/24-word lowercase lines (seed phrase heuristic)" -e '^[[:space:]]*([a-z
 echo "== the exact local secrets (never printed): gemini key"
 if [ -f backend/.devnet/gemini-key.txt ]; then
   K=$(tr -d '
+
  ' < backend/.devnet/gemini-key.txt)
   if [ -n "$K" ]; then
     if git grep -I -q -F -e "$K" $REVS 2>/dev/null || git grep -I -q -F -e "$K" 2>/dev/null; then echo "FOUND the local Gemini key in the repository (working tree or history)"; fail=1; else echo "none"; fi
