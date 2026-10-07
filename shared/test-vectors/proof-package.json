@@ -1,0 +1,93 @@
+[
+ {
+  "package": {
+   "sessionId": "0123456789abcdef0123456789abcdef",
+   "nonce": "fedcba9876543210fedcba9876543210",
+   "challengeId": "48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp",
+   "dayIndex": 1,
+   "startedAt": 1791369700,
+   "endedAt": 1791369725,
+   "evidenceHash": "0000000000000000000000000000000000000000000000000000000000000000",
+   "deviceKeyId": "abababababababababababababababababababababababababababababababab",
+   "proofType": "FOCUS_TIMER",
+   "metrics": {
+    "focusedSeconds": 23
+   }
+  },
+  "canonical": "{\"challengeId\":\"48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp\",\"dayIndex\":1,\"deviceKeyId\":\"abababababababababababababababababababababababababababababababab\",\"endedAt\":1791369725,\"evidenceHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"metrics\":{\"focusedSeconds\":23},\"nonce\":\"fedcba9876543210fedcba9876543210\",\"proofType\":\"FOCUS_TIMER\",\"sessionId\":\"0123456789abcdef0123456789abcdef\",\"startedAt\":1791369700}"
+ },
+ {
+  "package": {
+   "sessionId": "0123456789abcdef0123456789abcdef",
+   "nonce": "fedcba9876543210fedcba9876543210",
+   "challengeId": "48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp",
+   "dayIndex": 1,
+   "startedAt": 1791369700,
+   "endedAt": 1791369725,
+   "evidenceHash": "0000000000000000000000000000000000000000000000000000000000000000",
+   "deviceKeyId": "abababababababababababababababababababababababababababababababab",
+   "proofType": "STEPS",
+   "metrics": {
+    "steps": 8123
+   }
+  },
+  "canonical": "{\"challengeId\":\"48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp\",\"dayIndex\":1,\"deviceKeyId\":\"abababababababababababababababababababababababababababababababab\",\"endedAt\":1791369725,\"evidenceHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"metrics\":{\"steps\":8123},\"nonce\":\"fedcba9876543210fedcba9876543210\",\"proofType\":\"STEPS\",\"sessionId\":\"0123456789abcdef0123456789abcdef\",\"startedAt\":1791369700}"
+ },
+ {
+  "package": {
+   "sessionId": "0123456789abcdef0123456789abcdef",
+   "nonce": "fedcba9876543210fedcba9876543210",
+   "challengeId": "48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp",
+   "dayIndex": 1,
+   "startedAt": 1791369700,
+   "endedAt": 1791369725,
+   "evidenceHash": "0000000000000000000000000000000000000000000000000000000000000000",
+   "deviceKeyId": "abababababababababababababababababababababababababababababababab",
+   "proofType": "GEOFENCE",
+   "metrics": {
+    "inside": true,
+    "dwellSeconds": 1800
+   }
+  },
+  "canonical": "{\"challengeId\":\"48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp\",\"dayIndex\":1,\"deviceKeyId\":\"abababababababababababababababababababababababababababababababab\",\"endedAt\":1791369725,\"evidenceHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"metrics\":{\"dwellSeconds\":1800,\"inside\":true},\"nonce\":\"fedcba9876543210fedcba9876543210\",\"proofType\":\"GEOFENCE\",\"sessionId\":\"0123456789abcdef0123456789abcdef\",\"startedAt\":1791369700}"
+ },
+ {
+  "package": {
+   "sessionId": "0123456789abcdef0123456789abcdef",
+   "nonce": "fedcba9876543210fedcba9876543210",
+   "challengeId": "48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp",
+   "dayIndex": 1,
+   "startedAt": 1791369700,
+   "endedAt": 1791369725,
+   "evidenceHash": "0000000000000000000000000000000000000000000000000000000000000000",
+   "deviceKeyId": "abababababababababababababababababababababababababababababababab",
+   "proofType": "USAGE_LIMIT",
+   "metrics": {
+    "usageSeconds": 420,
+    "packagesChecked": [
+     "com.instagram.android",
+     "com.zhiliaoapp.musically"
+    ]
+   }
+  },
+  "canonical": "{\"challengeId\":\"48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp\",\"dayIndex\":1,\"deviceKeyId\":\"abababababababababababababababababababababababababababababababab\",\"endedAt\":1791369725,\"evidenceHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"metrics\":{\"packagesChecked\":[\"com.instagram.android\",\"com.zhiliaoapp.musically\"],\"usageSeconds\":420},\"nonce\":\"fedcba9876543210fedcba9876543210\",\"proofType\":\"USAGE_LIMIT\",\"sessionId\":\"0123456789abcdef0123456789abcdef\",\"startedAt\":1791369700}"
+ },
+ {
+  "package": {
+   "sessionId": "0123456789abcdef0123456789abcdef",
+   "nonce": "fedcba9876543210fedcba9876543210",
+   "challengeId": "48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp",
+   "dayIndex": 1,
+   "startedAt": 1791369700,
+   "endedAt": 1791369725,
+   "evidenceHash": "0000000000000000000000000000000000000000000000000000000000000000",
+   "deviceKeyId": "abababababababababababababababababababababababababababababababab",
+   "proofType": "SELF_ATTEST",
+   "metrics": {
+    "done": true,
+    "note": "quote \" slash  tab \t unicode é"
+   }
+  },
+  "canonical": "{\"challengeId\":\"48rCRD6sE199jJ51WGyRfsiBZ6pq8MXpx6sKXCPtcmJp\",\"dayIndex\":1,\"deviceKeyId\":\"abababababababababababababababababababababababababababababababab\",\"endedAt\":1791369725,\"evidenceHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"metrics\":{\"done\":true,\"note\":\"quote \\\" slash  tab \\t unicode é\"},\"nonce\":\"fedcba9876543210fedcba9876543210\",\"proofType\":\"SELF_ATTEST\",\"sessionId\":\"0123456789abcdef0123456789abcdef\",\"startedAt\":1791369700}"
+ }
+]

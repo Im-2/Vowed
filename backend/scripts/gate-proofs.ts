@@ -52,8 +52,8 @@ const CASES: Case[] = [
   { type: "FOCUS_TIMER", title: "Focus for 20 seconds", target: { metric: "focus", value: 20, unit: "seconds", direction: "atLeast" }, category: "study", params: {}, metrics: () => ({ focusedSeconds: 22 }), windowSecs: 30 },
   { type: "STEPS", title: "Walk 20 steps", target: { metric: "steps", value: 20, unit: "steps", direction: "atLeast" }, category: "steps", params: {}, metrics: () => ({ steps: 35 }), windowSecs: 60 },
   { type: "GEOFENCE", title: "Be at the gym for 10 seconds", target: { metric: "gym", value: 10, unit: "seconds", direction: "atLeast" }, category: "location", params: { place: "Gym", radiusM: "150" }, metrics: () => ({ inside: true, dwellSeconds: 14 }), windowSecs: 30 },
-  { type: "USAGE_LIMIT", title: "Under 30 minutes on Instagram", target: { metric: "instagram", value: 30, unit: "minutes", direction: "atMost" }, category: "detox", params: { app: "Instagram" }, metrics: () => ({ usageSeconds: 420, packagesChecked: ["com.instagram.android"] }), windowSecs: 3600 },
-  { type: "NO_USE_WINDOW", title: "No TikTok after 10pm", target: { metric: "tiktok", value: 0, unit: "minutes", direction: "atMost" }, category: "detox", params: { app: "TikTok" }, metrics: () => ({ usageSecondsInWindow: 0, packagesChecked: ["com.zhiliaoapp.musically"] }), windowSecs: 3600 },
+  { type: "USAGE_LIMIT", title: "Under 30 minutes on Instagram", target: { metric: "instagram", value: 30, unit: "minutes", direction: "atMost" }, category: "detox", params: { app: "Instagram" }, metrics: () => ({ usageSeconds: 420, packagesChecked: ["com.instagram.android"] }), windowSecs: 60 },
+  { type: "NO_USE_WINDOW", title: "No TikTok after 10pm", target: { metric: "tiktok", value: 0, unit: "minutes", direction: "atMost" }, category: "detox", params: { app: "TikTok" }, metrics: () => ({ usageSecondsInWindow: 0, packagesChecked: ["com.zhiliaoapp.musically"] }), windowSecs: 60 },
 ];
 
 async function main() {
@@ -70,8 +70,15 @@ async function main() {
   const s = createServices(config);
   const app = await buildApp(s);
   const call = async (method: "GET" | "POST", url: string, token: string | null, payload?: unknown) => {
-    const res = await app.inject({ method, url, headers: token ? { authorization: `Bearer ${token}` } : {}, payload: payload as object });
-    return { status: res.statusCode, body: res.json() as any };
+    // the public devnet RPC rate-limits now and then: retry only gateway-style failures (502/503), never a deliberate refusal
+    for (let attempt = 0; ; attempt++) {
+      const res = await app.inject({ method, url, headers: token ? { authorization: `Bearer ${token}` } : {}, payload: payload as object });
+      if ((res.statusCode === 502 || res.statusCode === 503) && attempt < 3) {
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+        continue;
+      }
+      return { status: res.statusCode, body: res.json() as any };
+    }
   };
   const ok = async (method: "GET" | "POST", url: string, token: string | null, payload?: unknown) => {
     const r = await call(method, url, token, payload);
@@ -154,13 +161,15 @@ async function main() {
     const pkg = { sessionId: sess.sessionId, nonce: sess.nonce, challengeId: target.pool, dayIndex: 0, proofType: target.c.type, metrics: target.c.metrics(now), startedAt: now - 5, endedAt: now - 1, evidenceHash: createHash("sha256").update("x").digest("hex"), deviceKeyId: dev.id };
     const signature = cryptoSign("sha256", canonicalPackageBytes(pkg), { key: stranger.priv, dsaEncoding: "der" }).toString("base64");
     await refused("signed by a key that is not the registered device", { ...pkg, signature });
-    const pkg2 = { ...pkg, deviceKeyId: stranger.id };
+    const sess2 = await ok("POST", "/v1/proofs/session", token, { pool: target.pool, dayIndex: 0, proofType: target.c.type });
+    const pkg2 = { ...pkg, sessionId: sess2.sessionId, nonce: sess2.nonce, deviceKeyId: stranger.id };
     await refused("signed and labelled with an unregistered device", { ...pkg2, signature: cryptoSign("sha256", canonicalPackageBytes(pkg2), { key: stranger.priv, dsaEncoding: "der" }).toString("base64") });
   }
   {
     // data that misses the goal: used the blocked app
-    const bad = { ...target.c, metrics: () => ({ usageSecondsInWindow: 900, packagesChecked: ["com.zhiliaoapp.musically"] }) };
-    await refused("data that misses the goal", await build(target.pool, bad, 0));
+    const bad = { ...target.c, windowSecs: 60, metrics: () => ({ usageSecondsInWindow: 900, packagesChecked: ["com.zhiliaoapp.musically"] }) };
+    const r = await call("POST", "/v1/proofs/submit", token, await build(target.pool, bad, 0));
+    check("data that misses the goal", r.status === 422 && /blocked window/.test(r.body.error?.message ?? ""), `${r.status} ${r.body.error?.message ?? ""}`);
   }
   {
     const fut = await call("POST", "/v1/proofs/session", token, { pool: target.pool, dayIndex: 1, proofType: target.c.type });

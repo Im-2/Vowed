@@ -83,3 +83,11 @@ token helpers and a Borsh codec ourselves. Re-run the audit before every release
 
 See `docs/verified-facts.md`: Gemini free tier uses submitted content to improve Google products (only goal text is ever sent, in Phase 5);
 public devnet RPC is rate limited; FCM is free but needs a Firebase project.
+
+
+## Phase 4 commands
+
+- Proof-types gate on devnet (about 8 minutes, needs alice funded; each demo pool costs about 0.005 SOL of rent): `cd backend; npm run gate:proofs`
+- Play a friend in a pool the app created (test wallet bob, no check-ins unless `--prove 0,1`): `cd backend; npm run demo:friend -- <pool> --stake 2`
+- Dev backend for the emulator: `powershell scripts/dev-backend.ps1` (run it as a background task with the longest timeout; it stops when the timeout ends)
+- Emulator helpers: `scripts/emu-lib.ps1` (dot-source; `Reset-And-Connect`, `Tap-Text`, `Sign-Reviewed`). The Mock wallet's key needs a recent PIN: if wallet requests start failing after a long idle, run `Reset-And-Connect`.

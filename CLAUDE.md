@@ -57,7 +57,8 @@ Vowed is an Android app (Kotlin + Jetpack Compose) built for the Solana Mobile "
 - Android unit tests + debug APK: `powershell scripts/android-test.ps1`
 - Dev backend for the emulator (devnet, port 8787, throwaway keys from backend/.devnet): `powershell scripts/dev-backend.ps1`
 - Drive the emulator through create/join/claim with the Mock wallet: `scripts/emu-drive.ps1`, `scripts/emu-claim.ps1` (the latter clears wallet and app data first). Mock wallet quirks are in `docs/verified-facts.md` ("Phase 3")
-- Build release APK: `TODO`
+- Phase 4 proof gate on devnet: `cd backend; npm run gate:proofs`; friend for demos: `npm run demo:friend -- <pool> --stake 2`; emulator helpers in `scripts/emu-lib.ps1`
+- Build release APK: `TODO` (the release lint step needs a network download and failed once with a network error; a signed release build is Phase 9)
 - Gotchas: run `wsl` commands from PowerShell (Git Bash rewrites /mnt paths); use a Windows-style `JAVA_HOME` for Gradle.
 
 ## Definition of done for the whole project

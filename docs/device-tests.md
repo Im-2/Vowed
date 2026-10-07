@@ -32,3 +32,26 @@ This file grows with each phase; the sections below are what the backend needs v
 | W2 | Create a demo pool, join, wait, claim (devnet) | Same result as the emulator run; stake leaves and returns to the wallet | |
 | W3 | Approve a transaction after waiting more than a minute | App shows the wallet-did-not-complete message; retrying works | |
 | W4 | Backend URL: the debug build points at `http://10.0.2.2:8787` (emulator only). On a phone set the backend URL to a reachable HTTPS host or the PC's LAN address through the debug override | Connect works | |
+
+
+## Phase 4: daily proofs (real phone / Seeker)
+
+Install the **release** build for anything that must prove the proof is real (it has no test-data buttons). The debug build adds an "Inject test data" panel; on a phone use it only to skip waiting.
+Use a demo pool with 2-minute days (New challenge: Demo pool on, "2 min days") so each test takes minutes. Demo goals ask for small amounts (20 s focus, 20 steps, 10 s at a place).
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| P1 | Focus timer: start it, keep the app open for the target, submit | "Recorded", a Solana transaction id, streak +1 | |
+| P2 | Focus timer: start it, press Home for 30 s, come back | The counter did not grow while away; submit stays disabled until enough foreground time | |
+| P3 | Steps: allow Physical activity, walk about 30 steps | The counter rises (it counts since the check-in screen first opened that day, and says so); Submit enables at the target | |
+| P4 | Steps: deny the permission | A clear explanation and an "Allow" button; nothing is sent | |
+| P5 | Place goal: create it at your current spot (New challenge, gym goal, "Use my current location") then check in standing there | "You are at the place", time there grows, Submit enables after the target | |
+| P6 | Place goal: walk 300 m away | "About N m away", the timer stops growing | |
+| P7 | Place goal on a second phone with the same wallet | "The spot ... is not on this one": coordinates never left the first phone | |
+| P8 | Usage goal (Instagram under 30 min): grant Usage access, open Instagram for a minute, check in | The reported usage matches reality within a few seconds; under the limit is accepted, over is refused with a reason | |
+| P9 | No-use window (TikTok after 10pm): use the app during the window, check in | Refused: "used the app during the blocked window" | |
+| P10 | Self-attest | Recorded with trust "low" and the lowest stake cap | |
+| P11 | Replay: submit, then press Replay (debug build) | Same result, the day count does not change | |
+| P12 | Release build | There is no "Inject" panel anywhere; `DebugProofs` in the APK only throws (verified on the compiled classes) | |
+| P13 | Proof after the day window closed | "the check-in window for that day is not open" | |
+| P14 | Phone clock set one hour ahead | Proof refused (timestamp in the future) | |

@@ -147,3 +147,20 @@ Honest limits of the devnet run: the "device" was a software key held by the scr
 Limits to state honestly: emulator and Mock wallet only (not a real phone or Seeker); test tokens; demo pool only; daily proofs are not in the app yet, so the claim was the Soft-mode refund after a fully missed run, not a success payout; the first wallet connection on a cold emulator can take over 30 seconds.
 
 Do not claim yet (additions): any proof captured by the app, a release APK, a real-device run, or squads in the UI.
+
+
+---
+
+## Phase 4 additions (daily proofs and the success payout)
+
+| Feature that really works | Proof | Commit |
+|---|---|---|
+| Daily proofs signed by a Keystore key and verified by the backend; the oracle writes the check-in on Solana | `npm run gate:proofs`: 6 proof types confirmed on devnet (tx links in the script output) | `8b82bf9` and later |
+| Replay, tamper, forged-device, missed-goal and early-day attempts refused | Same gate: 6 refusals + 3 replay checks pass | same |
+| Real focus-timer proof from the app (foreground-only counting) recorded on devnet | Emulator run: tx `4dpF...Kv1X`; screenshot `docs/phase4-checkin-recorded.png` | `8b82bf9` |
+| **Success payout end to end from the app**: stake 2, friend's 2 forfeited, claim 4; chain balance 107.7 to 111.7 | Emulator run, `docs/phase4-success-payout.png`, balances read from chain | `8b82bf9` |
+| Same day schedule in app, backend and program | 4 shared-vector suites; Android `ScheduleTest`, backend and program tests | `8b82bf9` |
+| Test-data injection exists only in debug builds | Release class `DebugProofs` decompiled: only throws "not available in release builds" | `8b82bf9` |
+
+Limits to state honestly: collectors for steps, location and usage were not run on real sensors yet (device checklist P1-P14); proofs from the emulator carry trust "low"; the "friend" in the payout demo was a script-controlled test wallet, not a second phone; camera proof is not built yet.
+Do not claim yet (additions): proofs from real sensors, a second phone in a squad, any AI, yield or SKR features.
