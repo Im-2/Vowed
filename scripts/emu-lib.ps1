@@ -1,4 +1,4 @@
-# Dev helpers for driving the emulator with adb + uiautomator (dot-source this file). Test PIN on the emulator: 1234.
+﻿# Dev helpers for driving the emulator with adb + uiautomator (dot-source this file). Test PIN on the emulator: 1234.
 $script:adb = "C:\Users\hp\Android\Sdk\platform-tools\adb.exe"
 
 function Focus { (& $script:adb shell dumpsys window | Select-String "mCurrentFocus" | Select-Object -First 1).Line }
@@ -49,7 +49,7 @@ function Screen-Texts { (Texts).SelectNodes("//node[@text!='']") | ForEach-Objec
 
 function Set-Field($label, $value) {
     # tap the text field whose label text is shown on screen, clear it, type the value
-    $n = Find-Node $label -Contains
+    $n = Find-Node $label  # exact label text, e.g. "Stake (test USDC)"
     if (-not $n) { return $false }
     $c = Center $n
     & $script:adb shell input tap $c[0] ($c[1] + 40)
@@ -57,7 +57,7 @@ function Set-Field($label, $value) {
     & $script:adb shell input keyevent KEYCODE_MOVE_END
     1..12 | ForEach-Object { & $script:adb shell input keyevent KEYCODE_DEL }
     & $script:adb shell input text $value
-    & $script:adb shell input keyevent KEYCODE_BACK  # close the keyboard
+    & $script:adb shell input keyevent KEYCODE_ENTER  # close the keyboard (a Back key would leave the screen)
     return $true
 }
 
@@ -85,3 +85,5 @@ function Sign-Reviewed($title, $timeoutSec = 90) {
     "sign: " + (Tap-Text "Sign with wallet" 20)
     "wallet approve: " + (Tap-Text "Approve" 120)
 }
+
+

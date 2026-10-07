@@ -111,6 +111,22 @@ data class ProofSession(
 @Serializable data class CheckinOutcome(val status: String, val signature: String? = null, val error: String? = null)
 @Serializable data class ProofResult(val accepted: Boolean, val trustTier: String, val daysCompleted: Int, val streak: Int, val checkin: CheckinOutcome)
 
+@Serializable data class FaucetToken(val symbol: String, val name: String, val mint: String, val amount: String, val decimals: Int)
+@Serializable data class FaucetBalances(val tUSDC: String = "0", val tSKR: String = "0")
+@Serializable
+data class FaucetStatus(
+    val enabled: Boolean,
+    val network: String,
+    val label: String,
+    val tokens: List<FaucetToken> = emptyList(),
+    val canClaim: Boolean = false,
+    val nextClaimAt: Long = 0,
+    val claimsLeftToday: Int = 0,
+    val balances: FaucetBalances = FaucetBalances(),
+)
+@Serializable data class FaucetMinted(val tUSDC: String, val tSKR: String)
+@Serializable data class FaucetClaim(val signature: String, val minted: FaucetMinted, val nextClaimAt: Long, val label: String)
+
 @Serializable data class ApiErrorBody(val error: ApiErrorInfo)
 @Serializable data class ApiErrorInfo(val code: String, val message: String)
 

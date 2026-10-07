@@ -187,6 +187,8 @@ fun HomeScreen(
     onRefresh: () -> Unit,
     onSettings: () -> Unit,
     onSignIn: () -> Unit,
+    onLoadFaucet: () -> Unit,
+    onClaimFaucet: () -> Unit,
 ) {
     val now = rememberNowSeconds()
     Page("Today", actions = { TextButton(onClick = onSettings) { Text("Settings") } }) {
@@ -202,6 +204,7 @@ fun HomeScreen(
             OutlinedButton(onClick = onRefresh) { Text("Refresh") }
         }
         state.listError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        FaucetCard(state.faucet, myWallet, onLoadFaucet, onClaimFaucet)
         if (state.loadingList) CircularProgressIndicator()
         if (state.challenges.isEmpty() && !state.loadingList) {
             Card(Modifier.fillMaxWidth()) {
@@ -324,7 +327,7 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onStart: (GoalDraft) -> Un
             }
             OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true)
             if (overCap) Text("Above the limit of ${fmt(tierCap.toString())} for ${template.tier.label.lowercase()} goals in this kind of pool.", color = MaterialTheme.colorScheme.error)
-            Text("Test tokens on Solana devnet. No real money.", style = MaterialTheme.typography.bodySmall)
+            Text("Test tokens on Solana devnet. No real money. Need some? Use \"Get test tokens\" on the Today screen.", style = MaterialTheme.typography.bodySmall)
             Button(
                 enabled = valid && state.flow !is TxFlow.Working,
                 onClick = {

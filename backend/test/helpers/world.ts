@@ -60,7 +60,7 @@ export interface World {
   crank: Keypair;
 }
 
-export async function makeWorld(opts: { chain?: Chain; attestation?: AttestationVerifier; requireAttestation?: boolean; jwtSecret?: string } = {}): Promise<World> {
+export async function makeWorld(opts: { chain?: Chain; attestation?: AttestationVerifier; requireAttestation?: boolean; jwtSecret?: string; env?: Record<string, string> } = {}): Promise<World> {
   const oracle = Keypair.generate();
   const crank = Keypair.generate();
   const config = loadConfig({
@@ -70,6 +70,7 @@ export async function makeWorld(opts: { chain?: Chain; attestation?: Attestation
     DATABASE_PATH: ":memory:",
     REQUIRE_ATTESTATION: opts.requireAttestation ? "true" : "false",
     NETWORK: "localnet",
+    ...opts.env,
   });
   const chain = opts.chain ?? new StubChain();
   const push = new MemoryPushSender();

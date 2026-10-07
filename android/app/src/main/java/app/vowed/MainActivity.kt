@@ -70,6 +70,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
                 state, state.account?.wallet, onNew = { nav.navigate("new") }, onOpen = { nav.navigate("detail/$it") },
                 onCheckIn = { pool -> vm.openCheckIn(pool); nav.navigate("checkin/$pool") }, onRefresh = vm::refreshList,
                 onSettings = { nav.navigate("settings") }, onSignIn = { vm.connect(sender) },
+                onLoadFaucet = vm::loadFaucet, onClaimFaucet = vm::claimTestTokens,
             )
         }
         composable("new") { NewGoalScreen(state, onBack = { vm.resetFlow(); nav.popBackStack() }, onStart = vm::startChallenge) }

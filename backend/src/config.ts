@@ -43,11 +43,30 @@ const schema = z.object({
   /** "true" enables the background indexer and crank loops. Tests drive them by hand. */
   RUN_JOBS: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   FCM_SERVICE_ACCOUNT_JSON: z.string().optional(),
+  /**
+   * Test-token faucet (devnet/localnet only). Off unless the mint authority key is set. The key must be the mint authority of BOTH test mints;
+   * it also pays the one-time token-account rent for new wallets. It never reaches the repo or the app.
+   */
+  FAUCET_AUTHORITY_SECRET_KEY: secretKey.optional(),
+  FAUCET_USDC_MINT: z.string().optional(),
+  FAUCET_SKR_MINT: z.string().optional(),
+  /** Base units (6 decimals): 20,000,000 = 20 test tokens. */
+  FAUCET_USDC_AMOUNT: z.coerce.bigint().min(1n).default(20_000_000n),
+  FAUCET_SKR_AMOUNT: z.coerce.bigint().min(1n).default(20_000_000n),
+  /** At most this many claims across all wallets per UTC day. */
+  FAUCET_GLOBAL_DAILY_CLAIMS: z.coerce.number().int().min(1).default(200),
+  /** A wallet may claim once per this many seconds (default: once per 24 hours). */
+  FAUCET_COOLDOWN_SECS: z.coerce.number().int().min(60).default(86_400),
   /** Reject proofs whose attestation is missing (otherwise they are accepted with a lower trust cap). */
   REQUIRE_ATTESTATION: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
 });
 
 export type Config = z.infer<typeof schema>;
+
+/** The faucet is usable only when its key and both mints are configured and the network is a test network. */
+export function faucetEnabled(c: Config): boolean {
+  return Boolean(c.FAUCET_AUTHORITY_SECRET_KEY && c.FAUCET_USDC_MINT && c.FAUCET_SKR_MINT);
+}
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const parsed = schema.safeParse(env);

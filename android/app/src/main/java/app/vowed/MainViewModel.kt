@@ -69,6 +69,15 @@ sealed interface TxFlow {
     data class Failed(val message: String) : TxFlow
 }
 
+/** State of the "Get test tokens" card. */
+data class FaucetUi(
+    val status: app.vowed.data.FaucetStatus? = null,
+    val loading: Boolean = false,
+    val claiming: Boolean = false,
+    val message: String? = null,
+    val error: String? = null,
+)
+
 data class UiState(
     val account: Account? = null,
     val signedIn: Boolean = false,
@@ -84,6 +93,7 @@ data class UiState(
     /** Detail of each of my open challenges (for today's status on the home screen). */
     val details: Map<String, ChallengeDetail> = emptyMap(),
     val checkIn: CheckInState? = null,
+    val faucet: FaucetUi = FaucetUi(),
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -387,4 +397,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun saveStepBaseline(pool: String, day: Int, total: Long) = c.prefs.setStepBaseline(pool, day, total)
     fun watchedApp(pool: String) = c.prefs.watchedApp(pool)
     val appContext get() = getApplication<Application>()
+
+    // ------------------------------------------------------------------ test tokens (devnet faucet)
+
+    fun loadFaucet() {
+        if (!c.account.signedIn) return
+        _state.update { it.copy(faucet = it.faucet.copy(loading = true, error = null)) }
+        viewModelScope.launch {
+            try {
+                val st = c.api.faucet()
+                _state.update { it.copy(faucet = it.faucet.copy(status = st, loading = false)) }
+            } catch (e: Throwable) {
+                _state.update { it.copy(faucet = it.faucet.copy(loading = false, error = friendly(e))) }
+            }
+        }
+    }
+
+    fun claimTestTokens() {
+        if (_state.value.faucet.claiming) return
+        _state.update { it.copy(faucet = it.faucet.copy(claiming = true, error = null, message = null)) }
+        viewModelScope.launch {
+            try {
+                val r = c.api.faucetClaim()
+                val st = runCatching { c.api.faucet() }.getOrNull()
+                _state.update { it.copy(faucet = it.faucet.copy(claiming = false, status = st ?: it.faucet.status, message = "Sent ${app.vowed.core.TxChecker.formatUnits(java.math.BigInteger(r.minted.tUSDC))} tUSDC and ${app.vowed.core.TxChecker.formatUnits(java.math.BigInteger(r.minted.tSKR))} tSKR (test tokens).")) }
+            } catch (e: Throwable) {
+                val st = runCatching { c.api.faucet() }.getOrNull()
+                _state.update { it.copy(faucet = it.faucet.copy(claiming = false, status = st ?: it.faucet.status, error = friendly(e))) }
+            }
+        }
+    }
 }

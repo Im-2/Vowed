@@ -190,6 +190,22 @@ CREATE TABLE plans (
 ALTER TABLE challenges ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE challenges ADD COLUMN day_secs INTEGER NOT NULL DEFAULT 86400;
 `,
+  // 3: test-token faucet claims
+  `
+CREATE TABLE faucet_claims (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  wallet TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  day INTEGER NOT NULL,                 -- UTC day number of created_at, for the global daily cap
+  status TEXT NOT NULL,                 -- pending | sent | failed (failed claims do not count toward any limit)
+  usdc TEXT NOT NULL,
+  skr TEXT NOT NULL,
+  signature TEXT,
+  error TEXT
+);
+CREATE INDEX faucet_claims_wallet ON faucet_claims (wallet, created_at);
+CREATE INDEX faucet_claims_day ON faucet_claims (day, status);
+`,
 ];
 
 export function openDb(path: string): Db {
