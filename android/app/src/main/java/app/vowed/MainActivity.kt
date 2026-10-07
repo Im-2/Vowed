@@ -1,65 +1,91 @@
 package app.vowed
 
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import app.vowed.ui.DetailScreen
+import app.vowed.ui.HomeScreen
+import app.vowed.ui.NewGoalScreen
+import app.vowed.ui.OnboardingScreen
+import app.vowed.ui.ReviewScreen
+import app.vowed.ui.SettingsScreen
+import app.vowed.ui.VowedTheme
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
-import com.solana.mobilewalletadapter.clientlib.ConnectionIdentity
-import com.solana.mobilewalletadapter.clientlib.MobileWalletAdapter
-import com.solana.mobilewalletadapter.clientlib.TransactionResult
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    private val walletAdapter = MobileWalletAdapter(
-        connectionIdentity = ConnectionIdentity(
-            identityUri = Uri.parse("https://vowed.app"),
-            iconUri = Uri.parse("favicon.ico"),
-            identityName = "Vowed",
-        ),
-    )
+    private val vm: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Must be created before the activity is STARTED.
         val sender = ActivityResultSender(this)
-        setContent { MaterialTheme { Hello(walletAdapter, sender) } }
+        setContent { VowedTheme { Surface(Modifier.fillMaxSize()) { Root(vm, sender) } } }
     }
 }
 
 @Composable
-private fun Hello(adapter: MobileWalletAdapter, sender: ActivityResultSender) {
-    var status by remember { mutableStateOf("Not connected") }
-    val scope = rememberCoroutineScope()
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp, androidx.compose.ui.Alignment.CenterVertically),
-    ) {
-        Text("Vowed (hello world)", style = MaterialTheme.typography.headlineMedium)
-        Text(status)
-        Button(onClick = {
-            scope.launch {
-                status = when (val r = adapter.connect(sender)) {
-                    is TransactionResult.Success -> "Connected: " + r.authResult.accounts.first().publicKey.joinToString("") { "%02x".format(it) }.take(16) + "..."
-                    is TransactionResult.NoWalletFound -> "No MWA wallet found"
-                    is TransactionResult.Failure -> "Failed: " + r.message
-                }
+private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
+    val state by vm.state.collectAsState()
+    val nav: NavHostController = rememberNavController()
+    val start = if (vm.prefs.onboarded && state.account != null) "home" else "onboarding"
+
+    LaunchedEffect(Unit) { vm.loadMeta() }
+    // After a successful connect from onboarding, go home.
+    LaunchedEffect(state.signedIn) {
+        if (state.signedIn && nav.currentDestination?.route == "onboarding") nav.navigate("home") { popUpTo("onboarding") { inclusive = true } }
+    }
+    // A transaction that passed the on-phone check opens the review screen; a finished one returns to the pool.
+    LaunchedEffect(state.flow) {
+        when (val f = state.flow) {
+            is TxFlow.Review -> if (nav.currentDestination?.route != "review") nav.navigate("review")
+            is TxFlow.Done -> {
+                vm.resetFlow()
+                nav.popBackStack("home", false)
+                nav.navigate("detail/${f.pool}")
             }
-        }) { Text("Connect wallet (MWA)") }
+            else -> if (nav.currentDestination?.route == "review" && f !is TxFlow.Working) nav.popBackStack()
+        }
+    }
+
+    NavHost(nav, startDestination = start) {
+        composable("onboarding") { OnboardingScreen(state, onConnect = { vm.connect(sender) }, onDismissError = vm::dismissConnectError) }
+        composable("home") {
+            LaunchedEffect(state.signedIn) { if (state.signedIn) vm.refreshList() }
+            HomeScreen(
+                state, onNew = { nav.navigate("new") }, onOpen = { nav.navigate("detail/$it") }, onRefresh = vm::refreshList,
+                onSettings = { nav.navigate("settings") }, onSignIn = { vm.connect(sender) },
+            )
+        }
+        composable("new") { NewGoalScreen(state, onBack = { vm.resetFlow(); nav.popBackStack() }, onStart = vm::startChallenge) }
+        composable("review") {
+            val f = state.flow
+            if (f is TxFlow.Review) ReviewScreen(f.tx, onSign = { vm.confirm(sender) }, onCancel = { vm.cancelReview() })
+        }
+        composable("detail/{pool}") { entry ->
+            val pool = entry.arguments?.getString("pool") ?: return@composable
+            DetailScreen(
+                state, pool, onBack = { vm.clearDetail(); nav.popBackStack() }, onLoad = { vm.loadDetail(pool) },
+                onJoin = { stake -> state.detail?.challenge?.let { vm.prepareJoin(pool, it.mint, stake) } },
+                onClaim = { state.detail?.challenge?.let { vm.prepareClaim(pool, it.mint) } },
+            )
+        }
+        composable("settings") {
+            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onDisconnect = {
+                vm.disconnect(sender)
+                nav.navigate("onboarding") { popUpTo(0) }
+            })
+        }
     }
 }

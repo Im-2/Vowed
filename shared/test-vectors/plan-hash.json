@@ -1,0 +1,177 @@
+{
+ "note": "canonical JSON (sorted keys, no whitespace) and sha256 of GoalPlans; amounts are integers",
+ "cases": [
+  {
+   "plan": {
+    "title": "20 squats a day",
+    "category": "fitness",
+    "cadence": {
+     "periodDays": 1,
+     "totalDays": 2,
+     "requiredDays": 2
+    },
+    "target": {
+     "metric": "squats",
+     "value": 20,
+     "unit": "reps",
+     "direction": "atLeast"
+    },
+    "proofMethods": [
+     {
+      "type": "CAMERA_POSE",
+      "params": {},
+      "trustTier": "high"
+     }
+    ],
+    "window": null,
+    "difficulty": 2,
+    "verifiable": true,
+    "unverifiableReason": null,
+    "suggestedAlternative": null,
+    "clarifyingQuestions": []
+   },
+   "canonical": "{\"cadence\":{\"periodDays\":1,\"requiredDays\":2,\"totalDays\":2},\"category\":\"fitness\",\"clarifyingQuestions\":[],\"difficulty\":2,\"proofMethods\":[{\"params\":{},\"trustTier\":\"high\",\"type\":\"CAMERA_POSE\"}],\"suggestedAlternative\":null,\"target\":{\"direction\":\"atLeast\",\"metric\":\"squats\",\"unit\":\"reps\",\"value\":20},\"title\":\"20 squats a day\",\"unverifiableReason\":null,\"verifiable\":true,\"window\":null}",
+   "sha256": "c576b6502e289cc9918f1d6f799a5eea67b37dfd4c0ebefcb0e8345a4585e474"
+  },
+  {
+   "plan": {
+    "title": "Walk 8000 steps",
+    "category": "steps",
+    "cadence": {
+     "periodDays": 1,
+     "totalDays": 2,
+     "requiredDays": 2
+    },
+    "target": {
+     "metric": "steps",
+     "value": 8000,
+     "unit": "steps",
+     "direction": "atLeast"
+    },
+    "proofMethods": [
+     {
+      "type": "STEPS",
+      "params": {},
+      "trustTier": "medium"
+     }
+    ],
+    "window": null,
+    "difficulty": 3,
+    "verifiable": true,
+    "unverifiableReason": null,
+    "suggestedAlternative": null,
+    "clarifyingQuestions": []
+   },
+   "canonical": "{\"cadence\":{\"periodDays\":1,\"requiredDays\":2,\"totalDays\":2},\"category\":\"steps\",\"clarifyingQuestions\":[],\"difficulty\":3,\"proofMethods\":[{\"params\":{},\"trustTier\":\"medium\",\"type\":\"STEPS\"}],\"suggestedAlternative\":null,\"target\":{\"direction\":\"atLeast\",\"metric\":\"steps\",\"unit\":\"steps\",\"value\":8000},\"title\":\"Walk 8000 steps\",\"unverifiableReason\":null,\"verifiable\":true,\"window\":null}",
+   "sha256": "360b1587c52df492d4c9a3073a3580823416656b95c26dc09b4ed9f382ac9836"
+  },
+  {
+   "plan": {
+    "title": "Study for 2 hours",
+    "category": "study",
+    "cadence": {
+     "periodDays": 1,
+     "totalDays": 7,
+     "requiredDays": 5
+    },
+    "target": {
+     "metric": "focus",
+     "value": 2,
+     "unit": "hours",
+     "direction": "atLeast"
+    },
+    "proofMethods": [
+     {
+      "type": "FOCUS_TIMER",
+      "params": {
+       "app": "Vowed"
+      },
+      "trustTier": "medium"
+     }
+    ],
+    "window": {
+     "startLocalTime": "09:00",
+     "endLocalTime": "21:00"
+    },
+    "difficulty": 2,
+    "verifiable": true,
+    "unverifiableReason": null,
+    "suggestedAlternative": null,
+    "clarifyingQuestions": []
+   },
+   "canonical": "{\"cadence\":{\"periodDays\":1,\"requiredDays\":5,\"totalDays\":7},\"category\":\"study\",\"clarifyingQuestions\":[],\"difficulty\":2,\"proofMethods\":[{\"params\":{\"app\":\"Vowed\"},\"trustTier\":\"medium\",\"type\":\"FOCUS_TIMER\"}],\"suggestedAlternative\":null,\"target\":{\"direction\":\"atLeast\",\"metric\":\"focus\",\"unit\":\"hours\",\"value\":2},\"title\":\"Study for 2 hours\",\"unverifiableReason\":null,\"verifiable\":true,\"window\":{\"endLocalTime\":\"21:00\",\"startLocalTime\":\"09:00\"}}",
+   "sha256": "873825d348ecef2cde4d521b4da4c0045a764764893fa7b1f5c4b14256da9cfe"
+  },
+  {
+   "plan": {
+    "title": "No TikTok after 10pm",
+    "category": "detox",
+    "cadence": {
+     "periodDays": 1,
+     "totalDays": 2,
+     "requiredDays": 2
+    },
+    "target": {
+     "metric": "tiktok",
+     "value": 0,
+     "unit": "minutes",
+     "direction": "atMost"
+    },
+    "proofMethods": [
+     {
+      "type": "NO_USE_WINDOW",
+      "params": {
+       "packages": [
+        "com.zhiliaoapp.musically"
+       ]
+      },
+      "trustTier": "high"
+     }
+    ],
+    "window": {
+     "startLocalTime": "22:00",
+     "endLocalTime": "23:59"
+    },
+    "difficulty": 2,
+    "verifiable": true,
+    "unverifiableReason": null,
+    "suggestedAlternative": null,
+    "clarifyingQuestions": []
+   },
+   "canonical": "{\"cadence\":{\"periodDays\":1,\"requiredDays\":2,\"totalDays\":2},\"category\":\"detox\",\"clarifyingQuestions\":[],\"difficulty\":2,\"proofMethods\":[{\"params\":{\"packages\":[\"com.zhiliaoapp.musically\"]},\"trustTier\":\"high\",\"type\":\"NO_USE_WINDOW\"}],\"suggestedAlternative\":null,\"target\":{\"direction\":\"atMost\",\"metric\":\"tiktok\",\"unit\":\"minutes\",\"value\":0},\"title\":\"No TikTok after 10pm\",\"unverifiableReason\":null,\"verifiable\":true,\"window\":{\"endLocalTime\":\"23:59\",\"startLocalTime\":\"22:00\"}}",
+   "sha256": "3d77dbdb13bd8ce167cd1c16db911d6b77936186674747eac8c4334c92774c53"
+  },
+  {
+   "plan": {
+    "clarifyingQuestions": [],
+    "suggestedAlternative": null,
+    "unverifiableReason": null,
+    "verifiable": true,
+    "difficulty": 2,
+    "window": null,
+    "proofMethods": [
+     {
+      "trustTier": "high",
+      "params": {},
+      "type": "CAMERA_POSE"
+     }
+    ],
+    "target": {
+     "direction": "atLeast",
+     "unit": "reps",
+     "value": 20,
+     "metric": "squats"
+    },
+    "cadence": {
+     "requiredDays": 2,
+     "totalDays": 2,
+     "periodDays": 1
+    },
+    "category": "fitness",
+    "title": "20 squats a day"
+   },
+   "canonical": "{\"cadence\":{\"periodDays\":1,\"requiredDays\":2,\"totalDays\":2},\"category\":\"fitness\",\"clarifyingQuestions\":[],\"difficulty\":2,\"proofMethods\":[{\"params\":{},\"trustTier\":\"high\",\"type\":\"CAMERA_POSE\"}],\"suggestedAlternative\":null,\"target\":{\"direction\":\"atLeast\",\"metric\":\"squats\",\"unit\":\"reps\",\"value\":20},\"title\":\"20 squats a day\",\"unverifiableReason\":null,\"verifiable\":true,\"window\":null}",
+   "sha256": "c576b6502e289cc9918f1d6f799a5eea67b37dfd4c0ebefcb0e8345a4585e474"
+  }
+ ]
+}

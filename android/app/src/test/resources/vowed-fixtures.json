@@ -1,0 +1,73 @@
+{
+ "generatedBy": "backend/scripts/gen-android-fixtures.ts (deterministic; do not edit by hand)",
+ "programId": "BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL",
+ "wallet": "AKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9",
+ "otherWallet": "GyGKxMyg1p9SsHfm15MkNUu1u9TN2JtTspcdmrtGUdse",
+ "mint": "9hSR6S7WPtxmTojgo6GG3k4yDPecgJY292j7xrsUGWBu",
+ "config": "4EqtLJQYCFdWotbaBqr2xfauYK6mve2SwxABE8Stvmjk",
+ "pool": "8pGNBbmo1LSi6Ck1BMppFMMz2fBdC9dnpVoKukSmNxB4",
+ "vault": "4QuG2x46br4oVXf1nvJt629CAZLVneoFaPKzhMP5ZS9F",
+ "participation": "DsQbXfeaQPjGA4GoU7WpMSpkeHvvxfNeXYYe6NvmMuqJ",
+ "userToken": "A2XhaCzf7YeQdxcYQvhHufAHnS6Ae8e9UWXMfawxrZHW",
+ "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+ "systemProgram": "11111111111111111111111111111111",
+ "ataProgram": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+ "poolId": "123456789",
+ "goalHash": "c576b6502e289cc9918f1d6f799a5eea67b37dfd4c0ebefcb0e8345a4585e474",
+ "deviceKeyHash": "80b2f897e93e81f769edd02733c0f3e41ecf29e43d76d10a263c67b726b1fe67",
+ "plan": {
+  "title": "20 squats a day",
+  "category": "fitness",
+  "cadence": {
+   "periodDays": 1,
+   "totalDays": 2,
+   "requiredDays": 2
+  },
+  "target": {
+   "metric": "squats",
+   "value": 20,
+   "unit": "reps",
+   "direction": "atLeast"
+  },
+  "proofMethods": [
+   {
+    "type": "CAMERA_POSE",
+    "params": {},
+    "trustTier": "high"
+   }
+  ],
+  "window": null,
+  "difficulty": 2,
+  "verifiable": true,
+  "unverifiableReason": null,
+  "suggestedAlternative": null,
+  "clarifyingQuestions": []
+ },
+ "create": {
+  "tx": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAUIiojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1wysoJRWIFSJUdbs7CNUbWiK7q2htSGYP++D7BvbkGNYnQdeuKevJ1FA3NPh74tKJijs5OlvNTbwVKrd3mpx7prAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwHuLDkEYEFg5rWbLD/jp8ybeYGo4d5/adJefI7vuxN4E5dw6ofRdfVqNUZsNMfszLjYqRtO43ol32D1uPybOUmdJ5dQOn6BJ7nf28ycwHDRBBnAbEN5v+Rejt4ZpvoqUG3fbh12Whk9nL4UbO63msHLSF7V9bN5E6jPWFfv8AqQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQYHAAQCBQEHA07pktGOz2hAvBXNWwcAAAAAAAEQJwDSSWsAAAAAAgLFdrZQLiicyZGPHW95ml7qZ7N9/UwOvvyw6DRaRYXkdDwAAAAAAAAACgAAADwAAAA=",
+  "expected": {
+   "mode": "Hard",
+   "penaltyBps": 10000,
+   "startTs": 1800000000,
+   "durationDays": 2,
+   "requiredDays": 2,
+   "joinWindowSecs": 60,
+   "maxParticipants": 10,
+   "demoDaySecs": 60
+  }
+ },
+ "join": {
+  "tx": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAUKiojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1wysoJRWIFSJUdbs7CNUbWiK7q2htSGYP++D7BvbkGNYnQdeuKevJ1FA3NPh74tKJijs5OlvNTbwVKrd3mpx7prhh15p3RmXUorzTaavXdcffLc1SCpkhTIg1+EULF/0VW/NfZ/vbjxJ6i0v7q94yB7g2rGET5AitbFXKb531+ZAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMB7iw5BGBBYOa1myw/46fMm3mBqOHef2nSXnyO77sTeBOXcOqH0XX1ajVGbDTH7My42KkbTuN6Jd9g9bj8mzlJnSeXUDp+gSe539vMnMBw0QQZwGxDeb/kXo7eGab6KlBt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEICQAGAgQHAQMJBTIOQT4QdBHDawAJPQAAAAAAPACAsviX6T6B92nt0CczwPPkHs8p5D120QomPGe3JrH+Zw==",
+  "expected": {
+   "stake": "4000000",
+   "tzOffsetMinutes": 60
+  }
+ },
+ "claim": {
+  "tx": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAUKiojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1wysoJRWIFSJUdbs7CNUbWiK7q2htSGYP++D7BvbkGNYnQdeuKevJ1FA3NPh74tKJijs5OlvNTbwVKrd3mpx7prhh15p3RmXUorzTaavXdcffLc1SCpkhTIg1+EULF/0VW/NfZ/vbjxJ6i0v7q94yB7g2rGET5AitbFXKb531+ZAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5SMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WZnSeXUDp+gSe539vMnMBw0QQZwGxDeb/kXo7eGab6KlBt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIHBgADAAYFCQEBCAcAAgQGAQMJCD7G1sHVn2zS"
+ },
+ "decoys": {
+  "vault": "HoRiktD8XjbAVnwvmX4RwC3LAT5YTuanif1JenyDHtPL",
+  "token": "GGwJHGGgHZNKC936z8h6DvoboGeTjenPvR4N38HBFSYD"
+ }
+}

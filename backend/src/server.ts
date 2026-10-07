@@ -68,5 +68,5 @@ export async function main(): Promise<void> {
   const services = createServices(config);
   const app = await buildApp(services, { logger: true });
   if (config.RUN_JOBS) startJobs(services);
-  await app.listen({ port: config.PORT, host: "0.0.0.0" });
+  await app.listen({ port: config.PORT, host: process.env.HOST ?? "0.0.0.0" });
 }
