@@ -1,3 +1,4 @@
+import { runWeeklyRewards } from "./rewards/service.js";
 import { seedPublicChallenges } from "./jobs/seed.js";
 import { GeminiClient } from "./goals/gemini.js";
 import { readFileSync } from "node:fs";
@@ -62,6 +63,11 @@ export function startJobs(s: Services, log: (msg: string) => void = console.erro
     every(300_000, "missed-days", () => recordMissedDays(s)),
     every(3_600_000, "reminders", () => sendReminders(s)),
     every(3_600_000, "prune", () => pruneRateLimits(s)),
+    // weekly SKR rewards for the last finished week (a no-op without a rewards key; never pays a wallet twice)
+    every(3_600_000, "weekly-rewards", async () => {
+      const r = await runWeeklyRewards(s);
+      for (const e of r.errors) log(`weekly-rewards: ${e}`);
+    }),
     // sample public challenges for Explore (only when a sample-wallet key is configured)
     ...(s.config.SEED_SECRET_KEY
       ? [

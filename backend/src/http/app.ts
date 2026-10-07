@@ -15,6 +15,8 @@ import { registerChallengeRoutes } from "./challenges.js";
 import { registerDeviceRoutes } from "./devices.js";
 import { registerExploreRoutes } from "./explore.js";
 import { registerFaucetRoutes } from "./faucet.js";
+import { registerPerkRoutes } from "./perks.js";
+import { registerAttestationRoutes } from "./attestations.js";
 import { registerNotificationRoutes } from "./notifications.js";
 import { registerGoalRoutes } from "./goals.js";
 import { registerProofRoutes } from "./proofs.js";
@@ -44,7 +46,7 @@ export async function buildApp(s: Services, opts: { logger?: boolean } = {}): Pr
       security: [{ bearerAuth: [] }],
       tags: [
         { name: "auth" }, { name: "meta" }, { name: "challenges" }, { name: "devices" },
-        { name: "proofs" }, { name: "squads" }, { name: "push" }, { name: "coach" },
+        { name: "proofs" }, { name: "squads" }, { name: "push" }, { name: "coach" }, { name: "rewards" }, { name: "letters" }, { name: "plugins" },
       ],
     },
     transform: jsonSchemaTransform,
@@ -97,6 +99,8 @@ export async function buildApp(s: Services, opts: { logger?: boolean } = {}): Pr
   registerProofRoutes(app, s);
   registerSquadRoutes(app, s);
   registerFaucetRoutes(app, s);
+  registerPerkRoutes(app, s);
+  registerAttestationRoutes(app, s);
   registerExploreRoutes(app, s);
   registerNotificationRoutes(app, s);
   registerGoalRoutes(app, s);

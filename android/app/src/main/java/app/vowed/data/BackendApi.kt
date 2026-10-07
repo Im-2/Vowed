@@ -58,6 +58,9 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     suspend fun proofSession(req: ProofSessionRequest): ProofSession = post("/v1/proofs/session", req)
     suspend fun submitProof(pkg: JsonObject): ProofResult = post("/v1/proofs/submit", pkg)
     suspend fun coach(): CoachResponse = get("/v1/coach/suggestions")
+    suspend fun rewards(): RewardsStatus = get("/v1/rewards")
+    suspend fun freezeTx(req: FreezeTxRequest): FreezeQuote = post("/v1/perks/freeze/tx", req)
+    suspend fun freeze(req: FreezeRedeemRequest): FreezeRedeemed = post("/v1/perks/freeze", req)
     suspend fun goalTemplates(): TemplateList = get("/v1/goals/templates")
     suspend fun parseGoal(text: String, useAi: Boolean): ParseResult = post("/v1/goals/parse", ParseRequest(text, useAi))
     suspend fun validateGoal(plan: JsonObject, demo: Boolean): ValidateResult = post("/v1/goals/validate", ValidateRequest(plan, demo))
@@ -85,6 +88,10 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     suspend fun notifications(since: Long): Notes = get("/v1/notifications?since=$since&limit=30")
     suspend fun faucet(): FaucetStatus = get("/v1/faucet")
     suspend fun faucetClaim(): FaucetClaim = post("/v1/faucet/claim", JsonObject(emptyMap()))
+    suspend fun registerSampleProvider(keyId: String, publicKeyBase64: String): Unit =
+        call("POST", "/v1/providers/sample/register", """{"keyId":"$keyId","publicKey":"$publicKeyBase64","algorithm":"ES256"}""") { }
+    /** Hands a signed provider statement (JSON) to the backend; returns the server's one-line note. */
+    suspend fun submitAttestation(json: String): String = call("POST", "/v1/attestations", json) { text -> AppJson.parseToJsonElement(text).let { (it as? JsonObject)?.get("note")?.toString()?.trim('"') ?: "accepted" } }
     suspend fun sync(signature: String): Unit = call("POST", "/v1/challenges/sync", AppJson.encodeToString(SyncRequest(signature))) { }
 
     companion object {

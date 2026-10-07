@@ -10,6 +10,7 @@ import { ApiError, conflict, forbidden, notFound, tooMany } from "../errors.js";
 import { pushToWallet } from "../push/service.js";
 import type { Services } from "../services.js";
 import { addFeed } from "../squads/feed.js";
+import { frozenBitmap } from "../perks/streaks.js";
 import { makePrivate } from "../explore/service.js";
 import { authenticate, pubkeySchema } from "./auth.js";
 import { enforce } from "./ratelimit.js";
@@ -219,7 +220,7 @@ export function registerSquadRoutes(app: FastifyInstance, s: Services) {
         for (const p of parts) {
           const today = dayIndexFor(c, p.tz_offset_minutes, now);
           const bitmap = BigInt(p.checkin_bitmap);
-          const streak = currentStreak(bitmap, today, c.duration_days);
+          const streak = currentStreak(bitmap | frozenBitmap(s, p.wallet, p.pool), today, c.duration_days); // a streak freeze keeps the streak, not the days completed
           const done = today >= 0 && today < c.duration_days && ((bitmap >> BigInt(today)) & 1n) === 1n;
           const cur = agg.get(p.wallet) ?? { daysCompleted: 0, bestStreak: 0, checkedInToday: false };
           cur.daysCompleted += p.days_completed;

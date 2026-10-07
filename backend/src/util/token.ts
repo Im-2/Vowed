@@ -74,3 +74,21 @@ export function tokenAmount(data: Uint8Array): bigint {
 export function tokenOwner(data: Uint8Array): string {
   return new PublicKey(data.subarray(32, 64)).toBase58();
 }
+
+/** TransferChecked (instruction 12): moves tokens and checks the mint and decimals. */
+export function ixTransferChecked(source: PublicKey, mint: PublicKey, dest: PublicKey, owner: PublicKey, amount: bigint, decimals: number): TransactionInstruction {
+  const data = Buffer.alloc(10);
+  data[0] = 12;
+  data.writeBigUInt64LE(amount, 1);
+  data[9] = decimals;
+  return new TransactionInstruction({
+    programId: TOKEN_PROGRAM_ID,
+    keys: [
+      { pubkey: source, isSigner: false, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: dest, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: true, isWritable: false },
+    ],
+    data,
+  });
+}

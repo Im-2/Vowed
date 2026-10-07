@@ -567,6 +567,8 @@ fun DetailScreen(
             Text("Status: ${c.status} · ${c.mode} mode")
             Text("${c.durationDays} days, ${c.requiredDays} needed · day length ${if (c.daySecs >= 3600) "${c.daySecs / 3600} h" else "${c.daySecs} s"}")
             Text("Pot ${fmt(c.totalDeposits)} · forfeited ${fmt(c.totalForfeit)} test USDC")
+            val sim = SimulatedYield.estimateTokens(c.totalDeposits, c.durationDays)
+            Text("Yield: SIMULATED, about ${"%.4f".format(sim)} tokens at an assumed ${SimulatedYield.ASSUMED_APY_PERCENT.toInt()}% a year. Not earned, not paid.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             c.trustTier?.let { Text("Proof trust: $it", style = MaterialTheme.typography.bodySmall) }
             if (me != null) {
                 Text("Your days", style = MaterialTheme.typography.titleMedium)
@@ -603,11 +605,12 @@ fun DetailScreen(
 // ---------------------------------------------------------------- settings
 
 @Composable
-fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit) {
+fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit) {
     val ctx = LocalContext.current
     Page("You", onBack = onBack) {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onCoach, modifier = Modifier.fillMaxWidth()) { Text("Coach: what to try next") }
+            Button(onClick = onRewards, modifier = Modifier.fillMaxWidth()) { Text("SKR rewards and streak freezes") }
             Button(onClick = onLetters, modifier = Modifier.fillMaxWidth()) { Text("Letters to future me") }
             OutlinedButton(onClick = { app.vowed.widget.requestPinWidget(ctx) }, modifier = Modifier.fillMaxWidth()) { Text("Add the Vowed widget to my home screen") }
             Text("Wallet: ${state.account?.wallet?.let(::short) ?: "not connected"}")

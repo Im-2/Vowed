@@ -42,6 +42,7 @@ export class TokenChain extends StubChain {
     const signers = new Set(tx.signatures.filter((s) => s.signature).map((s) => s.publicKey.toBase58()));
     // work on a copy so a failing instruction leaves nothing behind (transactions are atomic)
     const snapshot = new Map(this.accounts);
+    const pendingTransfers: import("../../src/chain/types.js").TokenTransfer[] = [];
     try {
       for (const ix of tx.instructions) {
         if (ix.programId.equals(ATA_PROGRAM_ID)) {
@@ -66,6 +67,21 @@ export class TokenChain extends StubChain {
           const data = Uint8Array.from(acc.data);
           Buffer.from(data.buffer).writeBigUInt64LE(next, 64);
           this.accounts.set(dest, { ...acc, data });
+        } else if (ix.programId.equals(TOKEN_PROGRAM_ID) && ix.data[0] === 12) {
+          const src = ix.keys[0]!.pubkey.toBase58();
+          const mint = ix.keys[1]!.pubkey.toBase58();
+          const dest = ix.keys[2]!.pubkey.toBase58();
+          const owner = ix.keys[3]!.pubkey.toBase58();
+          const from = this.accounts.get(src);
+          const to = this.accounts.get(dest);
+          if (!from || !to) throw new Error("token account does not exist");
+          if (!signers.has(owner) || new PublicKey(from.data.subarray(32, 64)).toBase58() !== owner) throw new Error("not the owner of the source account");
+          const amount = Buffer.from(ix.data.subarray(1, 9)).readBigUInt64LE();
+          const fromAmt = Buffer.from(from.data.subarray(64, 72)).readBigUInt64LE();
+          if (fromAmt < amount) throw new Error("insufficient funds");
+          const fd = Uint8Array.from(from.data); Buffer.from(fd.buffer).writeBigUInt64LE(fromAmt - amount, 64); this.accounts.set(src, { ...from, data: fd });
+          const td = Uint8Array.from(to.data); Buffer.from(td.buffer).writeBigUInt64LE(Buffer.from(to.data.subarray(64, 72)).readBigUInt64LE() + amount, 64); this.accounts.set(dest, { ...to, data: td });
+          pendingTransfers.push({ mint, source: src, destination: dest, authority: owner, amount });
         } else {
           throw new Error(`unexpected instruction for program ${ix.programId.toBase58()}`);
         }
@@ -74,7 +90,9 @@ export class TokenChain extends StubChain {
       this.accounts = snapshot;
       throw e;
     }
-    return { signature: `FakeSig${++this.count}`, logs: [] };
+    const signature = `FakeSig${++this.count}`.padEnd(88, "x");
+    if (pendingTransfers.length) this.transfers.set(signature, pendingTransfers);
+    return { signature, logs: [] };
   }
 }
 

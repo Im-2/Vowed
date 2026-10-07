@@ -32,6 +32,10 @@ services:
         sync: false
       - key: SEED_SECRET_KEY
         sync: false
+      - key: REWARDS_SECRET_KEY
+        sync: false
+      - key: SAMPLE_PROVIDER_ENABLED
+        value: "true"
       - key: FAUCET_AUTHORITY_SECRET_KEY
         sync: false
       - key: FAUCET_USDC_MINT

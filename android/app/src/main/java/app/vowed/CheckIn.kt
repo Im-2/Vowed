@@ -66,6 +66,7 @@ object CheckInLogic {
         val bits = me?.checkinBitmap?.let { runCatching { BigInteger(it) }.getOrNull() } ?: BigInteger.ZERO
         val (opens, closes) = Schedule.windowFor(c.isDemo, c.startTs, c.daySecs.toLong(), tz, day)
         val open = c.status == "Open" && raw in 0 until c.durationDays && now >= opens && now < closes
-        return DayView(day, bits, Schedule.currentStreak(bits, raw.coerceAtMost(c.durationDays - 1), c.durationDays), open, bits.testBit(day), me?.daysCompleted ?: 0)
+        val frozen = me?.frozenBitmap?.let { runCatching { BigInteger(it) }.getOrNull() } ?: BigInteger.ZERO // days bought back with a streak freeze count for the streak only
+        return DayView(day, bits, Schedule.currentStreak(bits.or(frozen), raw.coerceAtMost(c.durationDays - 1), c.durationDays), open, bits.testBit(day), me?.daysCompleted ?: 0)
     }
 }

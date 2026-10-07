@@ -12,7 +12,7 @@ Stake on any goal, prove it each day with your phone, play with friends. A nativ
 - Demo pools with minutes-long days, always labelled **DEMO POOL**, for trying the whole loop quickly.
 - **Test tokens**: an in-app button that sends test USDC and test SKR (see below).
 
-Not built yet: camera rep counting, plain-language goal parsing (AI), squads UI and push, letters, widget, yield, SKR rewards. See `SPEC.md` and `docs/progress.md`.
+Built: staking and settlement, plain-language goals with camera, steps, timer, place, usage and self-report proofs, squads and Explore, coach, letters to future me, a home-screen widget, weekly SKR rewards and an SKR streak freeze (test SKR on devnet), and an open proof-provider format with a sample provider. Not built: real yield (shown as SIMULATED), push when the app is closed, voice letters, the signed release APK. See `SPEC.md` and `docs/progress.md`.
 
 ## Repository layout
 
@@ -83,3 +83,10 @@ Funds are held by the program; users sign their own deposits and claims. Daily c
 ## License
 
 To be added before submission.
+
+
+## What SKR does in the app (devnet test SKR only)
+
+1. **Weekly rewards for the top streaks.** After each week a job pays 10, 5 and 3 SKR to the three longest streaks (at least 3 days, in challenges with two or more players; demo pools do not count). Paid by plain token transfers from a rewards wallet; paid at most once per wallet per week.
+2. **A streak freeze costs 1 SKR.** It keeps your streak alive across one missed day. It does not change check-ins, days completed or payouts. The app checks the payment transaction on the phone before your wallet signs it; the server confirms it on chain.
+SKR staking is not used. On devnet SKR is our own test token with no value; mainnet SKR is not touched. Details: `docs/progress.md` (Phase 8), `docs/verified-facts.md`, and the plug-in format in `docs/proof-provider-spec.md`.

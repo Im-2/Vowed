@@ -3,6 +3,7 @@ package app.vowed
 import app.vowed.core.Base58
 import app.vowed.core.ClaimExpectation
 import app.vowed.core.CreateExpectation
+import app.vowed.core.FreezePaymentExpectation
 import app.vowed.core.JoinExpectation
 import app.vowed.core.PlanHash
 import app.vowed.core.Programs
@@ -111,6 +112,25 @@ class CoreTest {
 
     @Test fun privateChoiceRefusesAnOpenPool() {
         reject { TxChecker.checkCreate(openCreateTx(), createExp()) } // the person chose private, the transaction says public
+    }
+
+    private fun freezeExp(over: (FreezePaymentExpectation) -> FreezePaymentExpectation = { it }) = over(
+        FreezePaymentExpectation(key("wallet"), key("mint"), Base58.decode(fx["freeze"]!!.jsonObject["payee"]!!.jsonPrimitive.content), fx["freeze"]!!.jsonObject["price"]!!.jsonPrimitive.content),
+    )
+
+    @Test fun freezePaymentIsAcceptedAndDescribedAsTestSkr() {
+        val review = TxChecker.checkFreezePayment(tx("freeze"), freezeExp())
+        assertEquals("Buy a streak freeze", review.title)
+        assertTrue(review.lines.any { it.second.contains("TEST token") && it.second.startsWith("1 SKR") })
+    }
+
+    @Test fun freezePaymentRefusesAnyDifferentPaymentThanShown() {
+        reject { TxChecker.checkFreezePayment(tx("freeze"), freezeExp { FreezePaymentExpectation(it.wallet, it.mint, it.payee, "2000000") }) } // a higher price than the one shown
+        reject { TxChecker.checkFreezePayment(tx("freeze"), freezeExp { FreezePaymentExpectation(it.wallet, it.mint, key("otherWallet"), it.priceBaseUnits) }) } // paid to somebody else
+        reject { TxChecker.checkFreezePayment(tx("freeze"), freezeExp { FreezePaymentExpectation(key("otherWallet"), it.mint, it.payee, it.priceBaseUnits) }) } // not your wallet
+        reject { TxChecker.checkFreezePayment(tx("freeze"), freezeExp { FreezePaymentExpectation(it.wallet, key("otherWallet"), it.payee, it.priceBaseUnits) }) } // another token
+        reject { TxChecker.checkFreezePayment(tx("claim"), freezeExp()) } // a different kind of transaction
+        reject { TxChecker.checkFreezePayment(tx("join"), freezeExp()) }
     }
 
     @Test fun createRefusesWrongIntent() {

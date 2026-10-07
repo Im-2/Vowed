@@ -644,6 +644,9 @@
                           "checkinBitmap": {
                             "type": "string"
                           },
+                          "frozenBitmap": {
+                            "type": "string"
+                          },
                           "status": {
                             "type": "string"
                           }
@@ -654,6 +657,7 @@
                           "tzOffsetMinutes",
                           "daysCompleted",
                           "checkinBitmap",
+                          "frozenBitmap",
                           "status"
                         ],
                         "additionalProperties": false
@@ -2780,6 +2784,484 @@
         }
       }
     },
+    "/v1/rewards": {
+      "get": {
+        "summary": "Weekly SKR rewards for the top streaks: the running week's standings and the rewards this wallet has received",
+        "tags": [
+          "rewards"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "includesDemoPools": {
+                      "type": "boolean"
+                    },
+                    "minStreak": {
+                      "type": "number"
+                    },
+                    "ladder": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "currentWeek": {
+                      "type": "number"
+                    },
+                    "weekEndsAt": {
+                      "type": "number"
+                    },
+                    "standings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rank": {
+                            "type": "number"
+                          },
+                          "wallet": {
+                            "type": "string"
+                          },
+                          "streak": {
+                            "type": "number"
+                          },
+                          "you": {
+                            "type": "boolean"
+                          },
+                          "qualifies": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "rank",
+                          "wallet",
+                          "streak",
+                          "you",
+                          "qualifies"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "mine": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "week": {
+                            "type": "number"
+                          },
+                          "rank": {
+                            "type": "number"
+                          },
+                          "streak": {
+                            "type": "number"
+                          },
+                          "amount": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "signature": {
+                            "nullable": true,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "week",
+                          "rank",
+                          "streak",
+                          "amount",
+                          "status",
+                          "signature"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "label",
+                    "includesDemoPools",
+                    "minStreak",
+                    "ladder",
+                    "currentWeek",
+                    "weekEndsAt",
+                    "standings",
+                    "mine"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/perks/freeze/tx": {
+      "post": {
+        "summary": "Build the unsigned SKR payment for a streak freeze on a missed day (within 3 days). The app must check the transaction before signing",
+        "tags": [
+          "rewards"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pool": {
+                    "type": "string"
+                  },
+                  "dayIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 59
+                  }
+                },
+                "required": [
+                  "pool",
+                  "dayIndex"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "price": {
+                      "type": "string"
+                    },
+                    "mint": {
+                      "type": "string"
+                    },
+                    "payee": {
+                      "type": "string"
+                    },
+                    "payeeToken": {
+                      "type": "string"
+                    },
+                    "decimals": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "transaction": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "price",
+                    "mint",
+                    "payee",
+                    "payeeToken",
+                    "decimals",
+                    "label",
+                    "transaction"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/perks/freeze": {
+      "post": {
+        "summary": "Record a streak freeze once its SKR payment is confirmed on chain. The freeze only affects streak displays and rewards, never check-ins or payouts",
+        "tags": [
+          "rewards"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pool": {
+                    "type": "string"
+                  },
+                  "dayIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 59
+                  },
+                  "signature": {
+                    "type": "string",
+                    "minLength": 60,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "pool",
+                  "dayIndex",
+                  "signature"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pool": {
+                      "type": "string"
+                    },
+                    "dayIndex": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "pool",
+                    "dayIndex"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/providers/sample/register": {
+      "post": {
+        "summary": "Devnet demos only: the sample provider inside the app registers the public key it made on the phone, for this wallet",
+        "tags": [
+          "plugins"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "keyId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "publicKey": {
+                    "type": "string",
+                    "minLength": 40,
+                    "maxLength": 200
+                  },
+                  "algorithm": {
+                    "type": "string",
+                    "enum": [
+                      "ES256"
+                    ]
+                  }
+                },
+                "required": [
+                  "keyId",
+                  "publicKey",
+                  "algorithm"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string"
+                    },
+                    "keyId": {
+                      "type": "string"
+                    },
+                    "fingerprint": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "keyId",
+                    "fingerprint"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/attestations": {
+      "post": {
+        "summary": "Hand in a statement signed by a proof provider (see docs/proof-provider-spec.md). Verified, then recorded with a LOW trust tier",
+        "tags": [
+          "plugins"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "v": {
+                    "type": "number",
+                    "enum": [
+                      1
+                    ]
+                  },
+                  "provider": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"
+                  },
+                  "keyId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,64}$"
+                  },
+                  "wallet": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 44
+                  },
+                  "metric": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{1,47}$"
+                  },
+                  "value": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16
+                  },
+                  "windowStart": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "windowEnd": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "nonce": {
+                    "type": "string",
+                    "minLength": 16,
+                    "maxLength": 64
+                  },
+                  "issuedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "alg": {
+                    "type": "string",
+                    "enum": [
+                      "ES256",
+                      "EdDSA"
+                    ]
+                  },
+                  "signature": {
+                    "type": "string",
+                    "minLength": 40,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "v",
+                  "provider",
+                  "keyId",
+                  "wallet",
+                  "metric",
+                  "value",
+                  "unit",
+                  "windowStart",
+                  "windowEnd",
+                  "nonce",
+                  "issuedAt",
+                  "alg",
+                  "signature"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "provider": {
+                      "type": "string"
+                    },
+                    "metric": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    },
+                    "trustTier": {
+                      "type": "string"
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "accepted",
+                    "provider",
+                    "metric",
+                    "value",
+                    "trustTier",
+                    "note"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/explore": {
       "get": {
         "summary": "Public challenges you can join, with filters and pages. Only the goal text and public pool data are returned",
@@ -4657,6 +5139,15 @@
     },
     {
       "name": "coach"
+    },
+    {
+      "name": "rewards"
+    },
+    {
+      "name": "letters"
+    },
+    {
+      "name": "plugins"
     }
   ]
 }

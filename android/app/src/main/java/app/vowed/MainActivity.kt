@@ -192,6 +192,9 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
                 onNewChallenge = { vm.setNewGoalSquad(id); nav.navigate("new") },
             )
         }
+        composable("rewards") {
+            app.vowed.ui.RewardsScreen(state, state.account?.wallet, onBack = { nav.popBackStack() }, onLoad = vm::loadRewards, onFreeze = { pool, day -> vm.prepareFreeze(pool, day) }, onDismissMessage = vm::clearRewardsMessage, onSampleProvider = vm::runSampleProvider)
+        }
         composable("coach") {
             app.vowed.ui.CoachScreen(
                 state, onBack = { nav.popBackStack() }, onLoad = vm::loadCoach,
@@ -206,7 +209,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         }
         composable("practice") { app.vowed.ui.PracticeScreen(onBack = { nav.popBackStack() }) }
         composable("settings") {
-            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onLetters = { nav.navigate("letters") }, onDisconnect = {
+            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onDisconnect = {
                 vm.disconnect(sender)
                 nav.navigate("onboarding") { popUpTo(0) }
             })

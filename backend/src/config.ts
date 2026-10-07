@@ -76,6 +76,22 @@ const schema = z.object({
   FAUCET_GLOBAL_DAILY_CLAIMS: z.coerce.number().int().min(1).default(200),
   /** A wallet may claim once per this many seconds (default: once per 24 hours). */
   FAUCET_COOLDOWN_SECS: z.coerce.number().int().min(60).default(86_400),
+  /**
+   * Weekly SKR rewards and SKR-paid perks. The rewards wallet holds the (test) SKR that is paid out and receives perk payments. Off unless
+   * its key, the SKR mint and the faucet mint settings are present.
+   */
+  REWARDS_SECRET_KEY: secretKey.optional(),
+  /** base units paid to rank 1, 2, 3 ... (6 decimals: 10,000,000 = 10 tokens) */
+  REWARDS_AMOUNTS: z.string().default("10000000,5000000,3000000"),
+  REWARDS_MIN_STREAK: z.coerce.number().int().min(1).default(3),
+  /** demo pools have minutes-long days, so they are not habit history; only a demo of the rewards turns this on, and the app says so */
+  REWARDS_INCLUDE_DEMO: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  /** price of one streak freeze in SKR base units */
+  PERK_FREEZE_PRICE: z.coerce.bigint().min(1n).default(1_000_000n),
+  /** at most this many freezes per challenge */
+  PERK_FREEZE_MAX_PER_POOL: z.coerce.number().int().min(1).default(2),
+  /** lets the sample proof provider register its own key (devnet demos only) */
+  SAMPLE_PROVIDER_ENABLED: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
   /** Reject proofs whose attestation is missing (otherwise they are accepted with a lower trust cap). */
   REQUIRE_ATTESTATION: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
 });
@@ -85,6 +101,10 @@ export type Config = z.infer<typeof schema>;
 /** The faucet is usable only when its key and both mints are configured and the network is a test network. */
 export function faucetEnabled(c: Config): boolean {
   return Boolean(c.FAUCET_AUTHORITY_SECRET_KEY && c.FAUCET_USDC_MINT && c.FAUCET_SKR_MINT);
+}
+
+export function rewardsEnabled(c: Config): boolean {
+  return Boolean(c.REWARDS_SECRET_KEY && c.FAUCET_SKR_MINT);
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {

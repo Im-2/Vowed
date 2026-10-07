@@ -238,6 +238,50 @@ CREATE TABLE reports (
   UNIQUE (pool, reporter)
 );
 `,
+  // 6: Phase 8: weekly SKR rewards, streak freezes paid in SKR, and signed attestations from proof providers
+  `
+CREATE TABLE rewards (
+  week INTEGER NOT NULL,                 -- unix week number (days since 1970 divided by 7) that the reward is FOR
+  wallet TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  streak INTEGER NOT NULL,
+  amount TEXT NOT NULL,                  -- token base units
+  status TEXT NOT NULL,                  -- pending | sent | failed (a failed row is retried on the next run)
+  signature TEXT,
+  error TEXT,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (week, wallet)
+);
+CREATE TABLE freezes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  wallet TEXT NOT NULL,
+  pool TEXT NOT NULL,
+  day_index INTEGER NOT NULL,
+  signature TEXT NOT NULL UNIQUE,        -- the SKR payment that bought it; one payment buys one freeze, once
+  amount TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE (wallet, pool, day_index)
+);
+CREATE TABLE provider_keys (
+  provider_id TEXT NOT NULL,
+  key_id TEXT NOT NULL,
+  public_key TEXT NOT NULL,              -- base64 SPKI (P-256) or raw 32 bytes (Ed25519)
+  algorithm TEXT NOT NULL,               -- ES256 | EdDSA
+  wallet TEXT,                           -- set for a key a person registered for themselves; null for a registry key
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (provider_id, key_id)
+);
+CREATE TABLE attestations (
+  nonce TEXT PRIMARY KEY,
+  provider_id TEXT NOT NULL,
+  wallet TEXT NOT NULL,
+  metric TEXT NOT NULL,
+  value REAL NOT NULL,
+  window_start INTEGER NOT NULL,
+  window_end INTEGER NOT NULL,
+  accepted_at INTEGER NOT NULL
+);
+`,
 ];
 
 export function openDb(path: string): Db {

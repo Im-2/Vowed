@@ -1,3 +1,4 @@
+import { frozenBitmap } from "../perks/streaks.js";
 import { planProblemForStake } from "../goals/validate.js";
 import { assertPublicAllowed, recordMeta } from "../explore/service.js";
 import { randomBytes } from "node:crypto";
@@ -122,6 +123,8 @@ const participantView = (p: ParticipantRow) => ({
   tzOffsetMinutes: p.tz_offset_minutes,
   daysCompleted: p.days_completed,
   checkinBitmap: p.checkin_bitmap,
+  /** days bought back with a streak freeze: they keep the streak alive but are NOT check-ins and change no payout */
+  frozenBitmap: "0",
   status: p.status,
 });
 
@@ -228,7 +231,7 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         response: {
           200: z.object({
             challenge: challengeSchema,
-            participants: z.array(z.object({ wallet: z.string(), stake: z.string(), tzOffsetMinutes: z.number(), daysCompleted: z.number(), checkinBitmap: z.string(), status: z.string() })),
+            participants: z.array(z.object({ wallet: z.string(), stake: z.string(), tzOffsetMinutes: z.number(), daysCompleted: z.number(), checkinBitmap: z.string(), frozenBitmap: z.string(), status: z.string() })),
             me: z.object({ joined: z.boolean(), claimable: z.string() }),
           }),
         },
@@ -249,7 +252,7 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
             totalSuccessStake: BigInt(c.total_success_stake),
           })
         : 0n;
-      return { challenge: challengeView(c), participants: parts.map(participantView), me: { joined: !!mine, claimable: amount.toString() } };
+      return { challenge: challengeView(c), participants: parts.map((p) => ({ ...participantView(p), frozenBitmap: frozenBitmap(s, p.wallet, p.pool).toString() })), me: { joined: !!mine, claimable: amount.toString() } };
     },
   );
 

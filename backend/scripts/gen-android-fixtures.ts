@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { Keypair, Transaction, type TransactionInstruction } from "@solana/web3.js";
 import { canonicalJson, planHash, type GoalPlan } from "../src/domain/plan.js";
 import { VowedProgram } from "../src/program/client.js";
-import { ataAddress, ixCreateAtaIdempotent } from "../src/util/token.js";
+import { ataAddress, ixCreateAtaIdempotent, ixTransferChecked } from "../src/util/token.js";
 
 const seedKey = (b: number) => Keypair.fromSeed(new Uint8Array(32).fill(b));
 const wallet = seedKey(1);
@@ -62,6 +62,12 @@ const userToken = ataAddress(wallet.publicKey, mint.publicKey);
 const joinIx = program.ixJoinPool(wallet.publicKey, ref, userToken, 4_000_000n, 60, Buffer.from(deviceKeyHash, "hex"));
 const claimIxs = [ixCreateAtaIdempotent(wallet.publicKey, wallet.publicKey, mint.publicKey), program.ixClaim(wallet.publicKey, ref, userToken)];
 
+const payee = seedKey(4);
+const freezeIxs = [
+  ixCreateAtaIdempotent(wallet.publicKey, payee.publicKey, mint.publicKey),
+  ixTransferChecked(ataAddress(wallet.publicKey, mint.publicKey), mint.publicKey, ataAddress(payee.publicKey, mint.publicKey), wallet.publicKey, 1_000_000n, 6),
+];
+
 const fixtures = {
   generatedBy: "backend/scripts/gen-android-fixtures.ts (deterministic; do not edit by hand)",
   programId: program.programId.toBase58(),
@@ -83,6 +89,7 @@ const fixtures = {
   create: { tx: buildTx([createIx]), expected: { mode: "Hard", penaltyBps: 10_000, startTs: 1_800_000_000, durationDays: 2, requiredDays: 2, joinWindowSecs: 60, maxParticipants: 10, demoDaySecs: 60 } },
   join: { tx: buildTx([joinIx]), expected: { stake: "4000000", tzOffsetMinutes: 60 } },
   claim: { tx: buildTx(claimIxs) },
+  freeze: { tx: buildTx(freezeIxs), payee: payee.publicKey.toBase58(), price: "1000000" },
   // addresses of unrelated accounts, used to tamper with transactions in tests
   decoys: { vault: program.vaultPda(program.poolPda(other.publicKey, 1n)).toBase58(), token: ataAddress(other.publicKey, mint.publicKey).toBase58() },
 };

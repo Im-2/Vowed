@@ -42,6 +42,11 @@ export class StubChain implements Chain {
   async getTransactionLogs() {
     return null;
   }
+  /** confirmed token transfers by signature, filled by TokenChain (and by tests that fake a payment) */
+  transfers = new Map<string, import("../../src/chain/types.js").TokenTransfer[]>();
+  async getTokenTransfers(signature: string) {
+    return this.transfers.get(signature) ?? null;
+  }
 }
 
 export const fakeAttestation = (result?: Partial<AttestationResult>): AttestationVerifier => ({

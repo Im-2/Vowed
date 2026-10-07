@@ -1,0 +1,20 @@
+{
+  "comment": "ES256 attestation signed with a throwaway key; the private key was discarded",
+  "publicKeySpkiBase64": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEoCvtJIIxigj/H+2mu4vL3f+HjF+WUz5B/cWsHpMDQKlfTfJ8i4N/pG0y+yCBIEu8C37wP1LfLN+wSUIRK7bBmQ==",
+  "canonicalUtf8": "VOWED-ATTESTATION-v1\n{\"alg\":\"ES256\",\"issuedAt\":1800001605,\"keyId\":\"k1\",\"metric\":\"focus_seconds\",\"nonce\":\"AAECAwQFBgcICQoLDA0ODw==\",\"provider\":\"sample.focus\",\"unit\":\"seconds\",\"v\":1,\"value\":1500,\"wallet\":\"2YePEWRp8aTfqQnJHK2EBt4YkXRXWetzdmL8dDG7UFZf\",\"windowEnd\":1800001600,\"windowStart\":1800000000}",
+  "attestation": {
+    "v": 1,
+    "provider": "sample.focus",
+    "keyId": "k1",
+    "wallet": "2YePEWRp8aTfqQnJHK2EBt4YkXRXWetzdmL8dDG7UFZf",
+    "metric": "focus_seconds",
+    "value": 1500,
+    "unit": "seconds",
+    "windowStart": 1800000000,
+    "windowEnd": 1800001600,
+    "nonce": "AAECAwQFBgcICQoLDA0ODw==",
+    "issuedAt": 1800001605,
+    "alg": "ES256",
+    "signature": "MEYCIQCDzUJNHWeu8rqhYB3S8bIpcag65S1aWSjeJnS56OFwNAIhAPxx15QJydaXeYhqIP8+fqKioFbzkS75iGUWEyShZARO"
+  }
+}

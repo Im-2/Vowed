@@ -97,4 +97,18 @@ export class Web3Chain implements Chain {
     }
     return null;
   }
+
+  async getTokenTransfers(signature: string): Promise<import("./types.js").TokenTransfer[] | null> {
+    const tx = await rpc("getParsedTransaction", () => this.connection.getParsedTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 }));
+    if (!tx || tx.meta?.err) return null;
+    const out: import("./types.js").TokenTransfer[] = [];
+    for (const ix of tx.transaction.message.instructions) {
+      const p = ix as { program?: string; parsed?: { type?: string; info?: Record<string, any> } };
+      if (p.program !== "spl-token" || p.parsed?.type !== "transferChecked") continue;
+      const i = p.parsed.info ?? {};
+      if (!i.mint || !i.source || !i.destination || !i.authority || !i.tokenAmount?.amount) continue;
+      out.push({ mint: String(i.mint), source: String(i.source), destination: String(i.destination), authority: String(i.authority), amount: BigInt(i.tokenAmount.amount) });
+    }
+    return out;
+  }
 }

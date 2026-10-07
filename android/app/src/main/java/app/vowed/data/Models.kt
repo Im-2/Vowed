@@ -75,7 +75,7 @@ data class Challenge(
     val plan: JsonObject? = null,
 )
 @Serializable data class ChallengeList(val challenges: List<Challenge>)
-@Serializable data class Participant(val wallet: String, val stake: String, val tzOffsetMinutes: Int, val daysCompleted: Int, val checkinBitmap: String, val status: String)
+@Serializable data class Participant(val wallet: String, val stake: String, val tzOffsetMinutes: Int, val daysCompleted: Int, val checkinBitmap: String, val frozenBitmap: String = "0", val status: String)
 @Serializable data class MeInfo(val joined: Boolean, val claimable: String)
 @Serializable data class ChallengeDetail(val challenge: Challenge, val participants: List<Participant>, val me: MeInfo)
 
@@ -226,3 +226,22 @@ data class CoachSuggestion(
     val message: String,
 )
 @Serializable data class CoachResponse(val suggestions: List<CoachSuggestion>)
+
+@Serializable data class FreezeTxRequest(val pool: String, val dayIndex: Int)
+@Serializable data class FreezeRedeemRequest(val pool: String, val dayIndex: Int, val signature: String)
+@Serializable data class FreezeRedeemed(val pool: String, val dayIndex: Int)
+@Serializable data class FreezeQuote(val price: String, val mint: String, val payee: String, val payeeToken: String, val decimals: Int, val label: String, val transaction: String)
+@Serializable data class RewardStanding(val rank: Int, val wallet: String, val streak: Int, val you: Boolean, val qualifies: Boolean)
+@Serializable data class MyReward(val week: Int, val rank: Int, val streak: Int, val amount: String, val status: String, val signature: String? = null)
+@Serializable
+data class RewardsStatus(
+    val enabled: Boolean,
+    val label: String,
+    val includesDemoPools: Boolean,
+    val minStreak: Int,
+    val ladder: List<String>,
+    val currentWeek: Int,
+    val weekEndsAt: Long,
+    val standings: List<RewardStanding>,
+    val mine: List<MyReward>,
+)

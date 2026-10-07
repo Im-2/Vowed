@@ -12,7 +12,7 @@ import { Keypair } from "@solana/web3.js";
 const DIR = new URL("../.devnet/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const one = (f: string) => JSON.stringify(JSON.parse(readFileSync(`${DIR}${f}`, "utf8")));
 const pub = (f: string) => Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(`${DIR}${f}`, "utf8")) as number[])).publicKey.toBase58();
-for (const f of ["oracle.json", "crank.json", "faucet.json", "seeder.json", "mint-usdc-test.json", "mint-skr-test.json"]) {
+for (const f of ["oracle.json", "crank.json", "faucet.json", "seeder.json", "rewards.json", "mint-usdc-test.json", "mint-skr-test.json"]) {
   if (!existsSync(`${DIR}${f}`)) throw new Error(`missing backend/.devnet/${f}`);
 }
 const lines = [
@@ -21,6 +21,7 @@ const lines = [
   `CRANK_SECRET_KEY=${one("crank.json")}`,
   `SEED_SECRET_KEY=${one("seeder.json")}`,
   `FAUCET_AUTHORITY_SECRET_KEY=${one("faucet.json")}`,
+  `REWARDS_SECRET_KEY=${one("rewards.json")}`,
   `FAUCET_USDC_MINT=${pub("mint-usdc-test.json")}`,
   `FAUCET_SKR_MINT=${pub("mint-skr-test.json")}`,
   existsSync(`${DIR}gemini-key.txt`) ? `GEMINI_API_KEY=${readFileSync(`${DIR}gemini-key.txt`, "utf8").trim()}` : "# GEMINI_API_KEY=  (optional; no key file found)",

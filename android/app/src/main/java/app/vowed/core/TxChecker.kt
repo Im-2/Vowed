@@ -25,6 +25,16 @@ class CreateExpectation(
     val kind: Int = 0,
 )
 
+/** A streak-freeze payment: SKR (a test token on devnet) from the person's own token account to the rewards wallet, nothing else. */
+class FreezePaymentExpectation(
+    val wallet: ByteArray,
+    val mint: ByteArray,
+    /** the rewards wallet that receives the payment (its token account is derived here, not trusted from the server) */
+    val payee: ByteArray,
+    val priceBaseUnits: String,
+    val decimals: Int = 6,
+)
+
 class JoinExpectation(
     val wallet: ByteArray,
     val pool: ByteArray,
@@ -137,6 +147,40 @@ object TxChecker {
                 "Token" to Base58.encode(exp.mint).short(),
                 "Bound to" to "this phone's proof key",
                 "What you pay" to "the stake, plus network fee and account rent in SOL",
+            ),
+        )
+    }
+
+    fun checkFreezePayment(txBytes: ByteArray, exp: FreezePaymentExpectation): TxReview {
+        val tx = TxDecoder.decode(txBytes)
+        requireFeePayer(tx, exp.wallet)
+        val src = addr.ata(exp.wallet, exp.mint)
+        val dest = addr.ata(exp.payee, exp.mint)
+        val ixs = tx.instructions
+        if (ixs.size !in 1..2) throw TxRejected("expected a payment, optionally preceded by creating the receiver's token account")
+        if (ixs.size == 2) {
+            val ata = ixs[0]
+            requireProgram(ata, ataProgram, "the associated token account program")
+            if (!ata.data.contentEquals(byteArrayOf(1))) throw TxRejected("unexpected token-account instruction")
+            requireAccounts(ata, listOf("payer", "ata", "owner", "mint", "system", "token"), listOf(exp.wallet, dest, exp.payee, exp.mint, systemProgram, tokenProgram), listOf(SW, W, R, R, R, R))
+        }
+        val ix = ixs.last()
+        requireProgram(ix, tokenProgram, "the token program")
+        if (ix.data.size != 10 || ix.data[0].toInt() != 12) throw TxRejected("the instruction is not a checked token transfer")
+        requireAccounts(ix, listOf("from", "mint", "to", "owner"), listOf(src, exp.mint, dest, exp.wallet), listOf(W, R, W, SW)) // the wallet is also the fee payer, so it is writable
+        val d = ByteBuffer.wrap(ix.data).order(ByteOrder.LITTLE_ENDIAN)
+        d.position(1)
+        val amount = BigInteger(java.lang.Long.toUnsignedString(d.long))
+        val decimals = ix.data[9].toInt() and 0xFF
+        if (amount != BigInteger(exp.priceBaseUnits)) throw TxRejected("the amount in the transaction ($amount) is not the price shown (${exp.priceBaseUnits})")
+        if (decimals != exp.decimals) throw TxRejected("unexpected token decimals")
+        return TxReview(
+            "Buy a streak freeze",
+            listOf(
+                "You pay" to "${formatUnits(amount)} SKR (TEST token on devnet, no value)",
+                "To" to Base58.encode(exp.payee).short() + " (the Vowed rewards wallet)",
+                "What you get" to "one missed day no longer breaks your streak. Your check-ins and payout do not change.",
+                "What you pay besides" to "network fee in SOL; a one-time account rent if the receiver has no SKR account yet",
             ),
         )
     }

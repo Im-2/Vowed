@@ -139,6 +139,10 @@ export class LiteSvmChain implements Chain {
   async getTransactionLogs(signature: string): Promise<string[] | null> {
     return this.sent.find((t) => t.signature === signature)?.logs ?? null;
   }
+
+  async getTokenTransfers(): Promise<null> {
+    return null;
+  }
 }
 
 export { Keypair, BPF_LOADER_UPGRADEABLE };

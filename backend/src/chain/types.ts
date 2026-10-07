@@ -37,6 +37,16 @@ export function parseAnchorError(logs: readonly string[]): { code: string; numbe
   return undefined;
 }
 
+/** One token transfer found in a confirmed transaction. */
+export interface TokenTransfer {
+  mint: string;
+  source: string;
+  destination: string;
+  /** the wallet that signed the transfer */
+  authority: string;
+  amount: bigint;
+}
+
 /** Everything the backend needs from Solana. Implemented over RPC for devnet and over LiteSVM in tests. */
 export interface Chain {
   getAccount(address: string): Promise<AccountData | null>;
@@ -49,4 +59,6 @@ export interface Chain {
   /** Newest first. `until` stops at an already processed signature. */
   getSignaturesForAddress(address: string, opts?: { until?: string; before?: string; limit?: number }): Promise<SignatureInfo[]>;
   getTransactionLogs(signature: string): Promise<string[] | null>;
+  /** The token transfers of a CONFIRMED, SUCCESSFUL transaction, or null when it is unknown or failed. */
+  getTokenTransfers(signature: string): Promise<TokenTransfer[] | null>;
 }

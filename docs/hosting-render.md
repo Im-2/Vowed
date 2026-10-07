@@ -31,6 +31,7 @@ Goal: a public HTTPS address that a judge's APK can reach. Everything here uses 
    | `CRANK_SECRET_KEY` | `backend/.devnet/crank.json`: pays fees to settle pools, holds no authority and almost no SOL |
    | `SEED_SECRET_KEY` | `backend/.devnet/seeder.json`: throwaway key that creates the sample challenges; holds the SOL for their rent |
    | `FAUCET_AUTHORITY_SECRET_KEY` | the **dedicated faucet key** (`backend/.devnet/faucet.json`). It is the mint authority of the two test tokens and holds 0.05 devnet SOL for new token accounts, nothing else. The deployer key (program upgrade authority and admin) is **never** put on Render |
+   | `REWARDS_SECRET_KEY` | `backend/.devnet/rewards.json`: the throwaway wallet that holds the test SKR for the weekly rewards and receives streak-freeze payments (holds 0.02 devnet SOL and test SKR only). Without it the rewards and perks screens say they are off |
    | `FAUCET_USDC_MINT`, `FAUCET_SKR_MINT` | public mint addresses of the two test tokens (not secret) |
    | `GEMINI_API_KEY` | optional; from `backend/.devnet/gemini-key.txt`. Render's network may reach Google when your PC cannot. Leave it out and the template matcher still works |
 

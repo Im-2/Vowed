@@ -62,7 +62,7 @@ class PendingTx(
     val txBytes: ByteArray,
     val pool: String,
     /** Run after the wallet has sent it (e.g. to build the next transaction). */
-    val after: (suspend () -> Unit)? = null,
+    val after: (suspend (String) -> Unit)? = null,
 )
 
 sealed interface TxFlow {
@@ -115,6 +115,14 @@ data class CoachUi(
     val error: String? = null,
 )
 
+/** SKR rewards and the streak-freeze perk (test SKR on devnet). */
+data class RewardsUi(
+    val status: app.vowed.data.RewardsStatus? = null,
+    val loading: Boolean = false,
+    val error: String? = null,
+    val message: String? = null,
+)
+
 /** Squads: my list, and one open squad with its feed and leaderboard. */
 data class SquadsUi(
     val list: List<app.vowed.data.Squad> = emptyList(),
@@ -158,6 +166,7 @@ data class UiState(
     val squads: SquadsUi = SquadsUi(),
     val lettersUi: LettersUi = LettersUi(),
     val coachUi: CoachUi = CoachUi(),
+    val rewardsUi: RewardsUi = RewardsUi(),
     /** goal text to try as soon as the new-challenge screen opens (a tapped quick challenge or example) */
     val pendingGoalText: String? = null,
     val pendingDemo: Boolean = false,
@@ -365,7 +374,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 setFlow(TxFlow.Working("Confirming on Solana…"))
                 val signature = Base58.encode(sig)
                 // the transaction is already submitted; tell the backend so it mirrors the result right away
-                var synced = false
+                var synced = tx.kind == "freeze" // a token payment is not a Vowed program transaction: nothing to mirror
                 repeat(6) { attempt ->
                     if (!synced) {
                         try { c.api.sync(signature); synced = true } catch (e: ApiException) { if (e.code != "not_found") throw e; delay(2_000L + attempt * 500L) }
@@ -373,7 +382,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val next = tx.after
                 if (next != null) {
-                    next()
+                    next(signature)
                 } else {
                     val msg = when (tx.kind) {
                         "join" -> "You're in. Your stake is held by the program."
@@ -759,4 +768,81 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // ------------------------------------------------------------------ SKR rewards and the streak-freeze perk
+
+    fun loadRewards() {
+        if (!c.account.signedIn) return
+        _state.update { it.copy(rewardsUi = it.rewardsUi.copy(loading = true, error = null)) }
+        viewModelScope.launch {
+            try {
+                val st = c.api.rewards()
+                _state.update { it.copy(rewardsUi = it.rewardsUi.copy(status = st, loading = false)) }
+            } catch (e: Throwable) {
+                _state.update { it.copy(rewardsUi = it.rewardsUi.copy(loading = false, error = friendly(e))) }
+            }
+        }
+    }
+
+    /** Builds the SKR payment for a streak freeze, checks it on the phone, and opens the usual review screen. */
+    fun prepareFreeze(pool: String, dayIndex: Int) {
+        viewModelScope.launch {
+            try {
+                val account = requireAccount()
+                setFlow(TxFlow.Working("Preparing the payment…"))
+                val q = c.api.freezeTx(app.vowed.data.FreezeTxRequest(pool, dayIndex))
+                val txBytes = Base64.decode(q.transaction, Base64.DEFAULT)
+                val review = TxChecker.checkFreezePayment(
+                    txBytes,
+                    app.vowed.core.FreezePaymentExpectation(Base58.decode(account.wallet), Base58.decode(q.mint), Base58.decode(q.payee), q.price, q.decimals),
+                )
+                setFlow(
+                    TxFlow.Review(
+                        PendingTx("freeze", review, txBytes, pool) { signature ->
+                            // the server confirms the payment on chain itself; give the network a few seconds to settle first
+                            var lastError: Throwable? = null
+                            for (attempt in 0 until 8) {
+                                try {
+                                    c.api.freeze(app.vowed.data.FreezeRedeemRequest(pool, dayIndex, signature))
+                                    lastError = null
+                                    break
+                                } catch (e: ApiException) {
+                                    lastError = e
+                                    if (e.code != "not_found") break
+                                    delay(2_500)
+                                }
+                            }
+                            lastError?.let { throw it }
+                            loadRewards()
+                            refreshList()
+                            _state.update { st -> st.copy(rewardsUi = st.rewardsUi.copy(message = "Streak freeze added for day ${dayIndex + 1}.")) }
+                            setFlow(TxFlow.Idle)
+                        },
+                    ),
+                )
+            } catch (e: Throwable) {
+                setFlow(TxFlow.Failed(friendly(e)))
+            }
+        }
+    }
+
+    /** Plug-in demo: the sample provider (key made on this phone) registers, signs a statement about 25 minutes of focus, and the server verifies it. */
+    fun runSampleProvider() {
+        viewModelScope.launch {
+            try {
+                val account = requireAccount()
+                val provider = app.vowed.proof.provider.SampleFocusProvider(app.vowed.proof.provider.SampleFocusProvider.keystoreSigner())
+                c.api.registerSampleProvider(provider.keyId, app.vowed.proof.provider.SampleFocusProvider.keystorePublicKeyBase64())
+                val now = System.currentTimeMillis() / 1000
+                val nonce = Base64.encodeToString(java.security.SecureRandom().let { r -> ByteArray(16).also(r::nextBytes) }, Base64.NO_WRAP)
+                val signed = provider.attest(account.wallet, "focus_seconds", 1500, "seconds", now - 1600, now - 5, nonce, now)
+                val note = c.api.submitAttestation(signed.toJson())
+                _state.update { it.copy(rewardsUi = it.rewardsUi.copy(message = "The server accepted the sample provider's signed statement (25 minutes of focus). $note")) }
+            } catch (e: Throwable) {
+                _state.update { it.copy(rewardsUi = it.rewardsUi.copy(message = "Sample provider: ${friendly(e)}")) }
+            }
+        }
+    }
+
+    fun clearRewardsMessage() = _state.update { it.copy(rewardsUi = it.rewardsUi.copy(message = null)) }
 }
