@@ -9,7 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import app.vowed.ui.components.AppCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -56,21 +56,21 @@ fun CoachScreen(state: UiState, onBack: () -> Unit, onLoad: () -> Unit, onTry: (
             co.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (co.loading) CircularProgressIndicator()
             if (co.loaded && co.items.isEmpty()) {
-                Card(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Nothing to say yet", style = MaterialTheme.typography.titleMedium)
                         Text("Finish a few days of a real (non-demo) challenge and the coach will have something to go on.")
                     }
                 }
             }
-            co.items.forEach { s -> CoachCard(s, onTry) }
+            co.items.forEach { s -> CoachAppCard(s, onTry) }
         }
     }
 }
 
 @Composable
-private fun CoachCard(s: CoachSuggestion, onTry: (String) -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+private fun CoachAppCard(s: CoachSuggestion, onTry: (String) -> Unit) {
+    AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(categoryLabel(s.category), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(actionTitle(s.action), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -130,7 +130,7 @@ fun LettersScreen(
             Text("Your letters", style = MaterialTheme.typography.titleMedium)
             if (lu.list.isEmpty()) Text("None yet.", style = MaterialTheme.typography.bodySmall)
             lu.list.forEach { l ->
-                Card(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (l.deliveredAt == null) {
                             Text("Sealed: opens ${LetterRules.describe(l.trigger)}", fontWeight = FontWeight.Medium)
@@ -145,7 +145,7 @@ fun LettersScreen(
             }
 
             if (DebugProofs.ENABLED) {
-                Card(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Debug build: simulate progress", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.error)
                         Text(

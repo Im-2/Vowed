@@ -33,7 +33,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.defaultMinSize
+import app.vowed.ui.components.AppCard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -55,37 +57,28 @@ import app.vowed.data.ConnectStep
 import java.math.BigDecimal
 import java.math.BigInteger
 
-private val Green = androidx.compose.ui.graphics.Color(0xFF1B7F5C)
-private val LightColors: ColorScheme = lightColorScheme(primary = Green)
-private val DarkColors: ColorScheme = darkColorScheme(primary = androidx.compose.ui.graphics.Color(0xFF5FD3A5))
-
-@Composable
-fun VowedTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) DarkColors else LightColors, content = content)
-}
-
 fun short(addr: String) = if (addr.length > 10) addr.take(4) + "…" + addr.takeLast(4) else addr
 
 fun fmt(baseUnits: String): String = runCatching { TxChecker.formatUnits(BigInteger(baseUnits)) }.getOrDefault(baseUnits)
 
 @Composable
 fun DemoBadge(label: String?) {
-    Card {
-        Text(
-            label ?: "DEMO POOL: minutes-long days, test money only",
-            Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error,
-        )
-    }
+    // the honesty label stays word for word; only its look changed
+    app.vowed.ui.components.StatusBadge(label ?: "DEMO POOL: minutes-long days, test money only", app.vowed.ui.components.Tone.Danger)
 }
 
 @Composable
 fun Page(title: String, onBack: (() -> Unit)? = null, actions: @Composable () -> Unit = {}, content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (onBack != null) TextButton(onClick = onBack) { Text("Back") }
-                Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onBack != null) {
+                    Box(
+                        Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.surface).clickable(onClick = onBack),
+                        contentAlignment = Alignment.Center,
+                    ) { Text("‹", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary) }
+                }
+                Text(title, style = MaterialTheme.typography.headlineSmall, maxLines = 1)
             }
             actions()
         }
@@ -225,10 +218,10 @@ fun HomeScreen(
             OutlinedButton(onClick = onRefresh) { Text("Refresh") }
         }
         state.listError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        FaucetCard(state.faucet, myWallet, onLoadFaucet, onClaimFaucet)
+        FaucetAppCard(state.faucet, myWallet, onLoadFaucet, onClaimFaucet)
         if (state.loadingList) CircularProgressIndicator()
         if (state.challenges.isEmpty() && !state.loadingList) {
-            Card(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Nothing here yet", style = MaterialTheme.typography.titleMedium)
                     Text("Start a challenge: type any goal (reading time, steps, waking up early, less screen time, the gym, a focus session, sleep, or something you simply confirm), put a small stake behind it, and check in each day. Or browse Explore to join someone else's.")
@@ -240,7 +233,7 @@ fun HomeScreen(
                 val detail = state.details[c.pool]
                 val me = detail?.participants?.firstOrNull { it.wallet == myWallet }
                 val dv = if (me != null) CheckInLogic.dayView(c, me, now) else null
-                Card(onClick = { onOpen(c.pool) }, Modifier.fillMaxWidth()) {
+                AppCard(onClick = { onOpen(c.pool) }, Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (c.isDemo) DemoBadge(c.demoLabel)
                         Text(planTitle(c), fontWeight = FontWeight.SemiBold)
@@ -329,7 +322,7 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Uni
                 goal.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
                 if (result != null && result.status == "unverifiable") {
-                    Card(Modifier.fillMaxWidth()) {
+                    AppCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("A phone cannot check this goal", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
                             result.reason?.let { Text(it) }
@@ -339,7 +332,7 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Uni
                     }
                 }
                 if (result != null && result.status == "unclear") {
-                    Card(Modifier.fillMaxWidth()) {
+                    AppCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("I need a little more", style = MaterialTheme.typography.titleMedium)
                             result.clarifyingQuestions.forEach { Text(it) }
@@ -421,7 +414,7 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
         wantLocation = false
     }
 
-    Card(Modifier.fillMaxWidth()) {
+    AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Your plan", style = MaterialTheme.typography.titleMedium)
             Text(sourceLabel(result), style = MaterialTheme.typography.labelMedium, color = if (result.source == "ai" || result.source == "cache") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)

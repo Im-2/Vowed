@@ -11,7 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import app.vowed.ui.components.AppCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -72,7 +72,7 @@ fun ExploreScreen(
     Page("Explore", actions = { TextButton(onClick = onLoad) { Text("Refresh") } }) {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
-                Card(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Quick challenges", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text("DEMO MODE: days last a few minutes and the money is test money, so you can see a whole challenge in minutes.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
@@ -84,7 +84,7 @@ fun ExploreScreen(
                         }
                         if (ex.demoPools.isNotEmpty()) {
                             Text("Open demo challenges by others", style = MaterialTheme.typography.titleSmall)
-                            ex.demoPools.forEach { p -> ExploreCard(p, now, onOpen, { reporting = p }) }
+                            ex.demoPools.forEach { p -> ExploreAppCard(p, now, onOpen, { reporting = p }) }
                         }
                     }
                 }
@@ -108,7 +108,7 @@ fun ExploreScreen(
             if (ex.loading && ex.items.isEmpty()) item { CircularProgressIndicator() }
             if (!ex.loading && ex.loaded && ex.items.isEmpty() && ex.error == null) {
                 item {
-                    Card(Modifier.fillMaxWidth()) {
+                    AppCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Nothing matches right now", style = MaterialTheme.typography.titleMedium)
                             Text("No public challenge fits these filters. Clear a filter, or start your own: you can make it public when you create it.")
@@ -116,7 +116,7 @@ fun ExploreScreen(
                     }
                 }
             }
-            items(ex.items, key = { it.pool }) { p -> ExploreCard(p, now, onOpen) { reporting = p } }
+            items(ex.items, key = { it.pool }) { p -> ExploreAppCard(p, now, onOpen) { reporting = p } }
             if (ex.nextCursor != null) item { OutlinedButton(onClick = onMore, enabled = !ex.loadingMore, modifier = Modifier.fillMaxWidth()) { Text(if (ex.loadingMore) "Loading…" else "Show more") } }
         }
     }
@@ -141,8 +141,8 @@ fun ExploreScreen(
 }
 
 @Composable
-private fun ExploreCard(p: ExploreItem, now: Long, onOpen: (String) -> Unit, onReport: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+private fun ExploreAppCard(p: ExploreItem, now: Long, onOpen: (String) -> Unit, onReport: () -> Unit) {
+    AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (p.isDemo) DemoBadge(p.demoLabel)
             if (p.sample) Text("SAMPLE: created by the Vowed team so there is always something to try", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)

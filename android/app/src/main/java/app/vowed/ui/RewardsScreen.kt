@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import app.vowed.ui.components.AppCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -58,7 +58,7 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
             if (st != null && !st.enabled) Text("Rewards and perks are not switched on on this server.")
 
             if (st != null && st.enabled) {
-                Card(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Weekly rewards for the longest streaks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(
@@ -100,7 +100,7 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
                     OutlinedButton(onClick = { onFreeze(o.pool, o.dayIndex) }, modifier = Modifier.fillMaxWidth()) { Text("Freeze day ${o.dayIndex + 1} of ${o.title}") }
                 }
             }
-            Card(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Yield on stakes: SIMULATED", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
                     Text(
@@ -109,7 +109,7 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
                     )
                 }
             }
-            Card(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Open proof plug-ins (sample)", style = MaterialTheme.typography.titleMedium)
                     Text(

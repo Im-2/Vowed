@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import app.vowed.ui.components.AppCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -93,7 +93,7 @@ fun CheckInScreen(
             Text(trustLine(ci.kind), style = MaterialTheme.typography.bodySmall)
             val sub = ci.submission
             when {
-                sub is Submission.Accepted -> AcceptedCard(sub)
+                sub is Submission.Accepted -> AcceptedAppCard(sub)
                 ci.doneAlready -> Text("Today is already recorded. Come back tomorrow.", color = MaterialTheme.colorScheme.primary)
                 !ci.dayOpen -> Text("Check-ins are not open right now for this challenge.", color = MaterialTheme.colorScheme.error)
                 else -> ProofPanel(ci, sub is Submission.Working, onSubmit, stepBaseline, saveStepBaseline, watchedApp)
@@ -106,8 +106,8 @@ fun CheckInScreen(
 }
 
 @Composable
-private fun AcceptedCard(sub: Submission.Accepted) {
-    Card(Modifier.fillMaxWidth()) {
+private fun AcceptedAppCard(sub: Submission.Accepted) {
+    AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Recorded", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             Text("Streak ${sub.result.streak} · ${sub.result.daysCompleted} day(s) done · trust ${sub.result.trustTier}")
@@ -126,7 +126,7 @@ private fun AcceptedCard(sub: Submission.Accepted) {
 
 @Composable
 private fun DebugPanel(ci: CheckInState, sub: Submission, onInject: (Boolean) -> Unit, onReplay: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+    AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("DEBUG BUILD: test data (not in release builds)", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
             Text("Fills in readings for ${ci.kind.name} so the flow can run on an emulator. The server treats it like a real proof; it is for testing only.", style = MaterialTheme.typography.bodySmall)

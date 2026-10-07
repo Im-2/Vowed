@@ -25,7 +25,7 @@ import app.vowed.ui.NewGoalScreen
 import app.vowed.ui.OnboardingScreen
 import app.vowed.ui.ReviewScreen
 import app.vowed.ui.SettingsScreen
-import app.vowed.ui.VowedTheme
+import app.vowed.ui.theme.VowedTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.NavigationBar

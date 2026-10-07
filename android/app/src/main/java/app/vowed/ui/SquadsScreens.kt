@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import app.vowed.ui.components.AppCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -50,7 +50,7 @@ fun SquadsScreen(state: UiState, onLoad: () -> Unit, onCreate: (String) -> Unit,
             if (!notificationsOn) OutlinedButton(onClick = onTurnOnNotifications, modifier = Modifier.fillMaxWidth()) { Text("Turn on notifications for nudges and check-ins") }
             if (sq.loading && !sq.loaded) CircularProgressIndicator()
             if (sq.loaded && sq.list.isEmpty()) {
-                Card(Modifier.fillMaxWidth()) {
+                AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("No squads yet", style = MaterialTheme.typography.titleMedium)
                         Text("Create one and share its code, or join a friend's squad with their code.")
@@ -58,7 +58,7 @@ fun SquadsScreen(state: UiState, onLoad: () -> Unit, onCreate: (String) -> Unit,
                 }
             }
             sq.list.forEach { s ->
-                Card(onClick = { onOpen(s.id) }, Modifier.fillMaxWidth()) {
+                AppCard(onClick = { onOpen(s.id) }, Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp)) {
                         Text(s.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
                         Text("${s.memberCount} member${if (s.memberCount == 1) "" else "s"} · code ${s.inviteCode}", style = MaterialTheme.typography.bodySmall)
@@ -116,7 +116,7 @@ fun SquadDetailScreen(
             return@Page
         }
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Card(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Invite code: ${d.squad.inviteCode}", fontWeight = FontWeight.SemiBold)
                     Text("${d.members.size} member${if (d.members.size == 1) "" else "s"}", style = MaterialTheme.typography.bodySmall)

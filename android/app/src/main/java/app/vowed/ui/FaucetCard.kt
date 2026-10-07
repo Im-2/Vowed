@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import app.vowed.ui.components.AppCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -38,14 +38,14 @@ private fun waitText(seconds: Long): String {
  * once per wallet per day. The card always says that these are test tokens, and that network fees still need devnet SOL.
  */
 @Composable
-fun FaucetCard(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim: () -> Unit) {
+fun FaucetAppCard(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim: () -> Unit) {
     LaunchedEffect(Unit) { onLoad() }
     val ctx = LocalContext.current
     val st = faucet.status
     val now = rememberNowSeconds()
     // when the server has no faucet (for example a production backend), show nothing at all
     if (st != null && !st.enabled) return
-    Card(Modifier.fillMaxWidth()) {
+    AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Test tokens", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
