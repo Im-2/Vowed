@@ -1,6 +1,9 @@
 package app.vowed.debug
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 import app.vowed.CoachUi
 import app.vowed.GoalUi
 import app.vowed.LettersUi
@@ -115,6 +118,21 @@ fun PreviewMore(screen: String) {
             ),
             none, none, { _, _, _ -> }, {}, {}, none, {},
         )
+        "token-sheet" -> androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().padding(top = 360.dp)) {
+            androidx.compose.material3.Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), color = androidx.compose.material3.MaterialTheme.colorScheme.surface, shadowElevation = 12.dp, modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(24.dp)) { app.vowed.ui.FaucetPanel(st.faucet, Samples.ME, none, none) }
+            }
+        }
+        "info-sheet" -> androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().padding(top = 520.dp)) {
+            androidx.compose.material3.Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), color = androidx.compose.material3.MaterialTheme.colorScheme.surface, shadowElevation = 12.dp, modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(24.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                    androidx.compose.material3.Text("Demo mode", style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
+                    androidx.compose.material3.Text("DEMO MODE: days last a few minutes and the money is test money, so you can see a whole challenge in minutes.", style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                    app.vowed.ui.components.SoftButton("Got it", none)
+                }
+            }
+        }
+        "splash" -> app.vowed.ui.SplashScreen { }
         "connect-error" -> ConnectScreen(st.copy(signedIn = false, connectError = "Your wallet app closed before it connected. Open the wallet, make sure it is unlocked, then tap the button again. Nothing was signed."), none, none, none, none)
         "connect-success" -> ConnectScreen(st.copy(signedIn = true), none, none, none, none)
         else -> androidx.compose.material3.Text("No preview for $screen")
