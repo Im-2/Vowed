@@ -46,7 +46,7 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
     val options: List<FreezeOption> = state.details.values.flatMap { d -> FreezeOptions.forDetail(d, myWallet, planTitle(d.challenge), now) }
     Page("SKR rewards and perks", onBack = onBack, actions = { TextButton(onClick = onLoad) { Text("Refresh") } }) {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            app.vowed.ui.components.StatusBadge(st?.label ?: "TEST SKR: this build runs on Solana devnet and SKR here is a test token with no value.", app.vowed.ui.components.Tone.Danger)
+            app.vowed.ui.components.LabelChip("TEST SKR", app.vowed.ui.components.ChipKind.Test, moreTitle = "Test SKR", more = st?.label ?: "TEST SKR: this build runs on Solana devnet and SKR here is a test token with no value.")
             ru.message?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(it, Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
@@ -67,7 +67,7 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
                             style = MaterialTheme.typography.bodySmall,
                         )
                         if (st.includesDemoPools) {
-                            Text("DEMO: on this server, demo pools count too, so a whole week of rewards can be shown.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            app.vowed.ui.components.LabelChip("DEMO", app.vowed.ui.components.ChipKind.Demo, moreTitle = "Demo rewards", more = "DEMO: on this server, demo pools count too, so a whole week of rewards can be shown.")
                         }
                         Text("This week so far (paid after the week ends):", style = MaterialTheme.typography.labelLarge)
                         if (st.standings.isEmpty()) Text("Nobody has a streak yet.", style = MaterialTheme.typography.bodySmall)
@@ -106,7 +106,10 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
             }
             AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Yield on stakes: SIMULATED", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Yield on stakes", style = MaterialTheme.typography.titleMedium)
+                        app.vowed.ui.components.LabelChip("SIMULATED", app.vowed.ui.components.ChipKind.Simulated)
+                    }
                     Text(
                         "Stakes are not lent out in this version, so they earn no yield. Challenge pages show an illustrative number labelled SIMULATED, using an assumed ${SimulatedYield.ASSUMED_APY_PERCENT.toInt()}% a year. Nobody is credited with it and nothing is paid.",
                         style = MaterialTheme.typography.bodySmall,

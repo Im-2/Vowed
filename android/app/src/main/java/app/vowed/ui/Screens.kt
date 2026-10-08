@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import app.vowed.ui.components.AppCard
@@ -66,7 +67,7 @@ fun fmt(baseUnits: String): String = runCatching { TxChecker.formatUnits(BigInte
 @Composable
 fun DemoBadge(label: String?) {
     // the honesty label stays word for word; only its look changed
-    app.vowed.ui.components.StatusBadge(label ?: "DEMO POOL: minutes-long days, test money only", app.vowed.ui.components.Tone.Danger)
+    app.vowed.ui.components.LabelChip("DEMO", app.vowed.ui.components.ChipKind.Demo, moreTitle = "Demo pool", more = label ?: "DEMO POOL: minutes-long days, test money only")
 }
 
 @Composable
@@ -303,13 +304,11 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
     AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Your plan", style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                app.vowed.ui.components.StatusBadge(sourceLabel(result), if (result.source == "ai" || result.source == "cache") app.vowed.ui.components.Tone.Danger else app.vowed.ui.components.Tone.Primary)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                app.vowed.ui.components.LabelChip(app.vowed.ui.components.trustLabel(result.trustTier), app.vowed.ui.components.ChipKind.Neutral)
+                app.vowed.ui.components.LabelChip("TEST USDC", app.vowed.ui.components.ChipKind.Test, moreTitle = "Test tokens", more = "TEST TOKENS: tUSDC and tSKR exist only on Solana devnet and have no real value.")
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                app.vowed.ui.components.StatusBadge(app.vowed.ui.components.trustLabel(result.trustTier), app.vowed.ui.components.trustTone(result.trustTier))
-                app.vowed.ui.components.StatusBadge("Token: test USDC", app.vowed.ui.components.Tone.Warning)
-            }
+            Text(sourceLabel(result), style = MaterialTheme.typography.labelMedium, color = if (result.source == "ai" || result.source == "cache") VowedTheme.extra.warning else MaterialTheme.colorScheme.primary)
             Text("How it is proved: ${proofLabel(type)}", fontWeight = FontWeight.Bold)
             Text(trustExplanation(result.trustTier), style = MaterialTheme.typography.bodySmall)
             plan["window"]?.let { w -> (w as? kotlinx.serialization.json.JsonObject)?.let { Text("Window: ${(it["startLocalTime"] as? kotlinx.serialization.json.JsonPrimitive)?.content} to ${(it["endLocalTime"] as? kotlinx.serialization.json.JsonPrimitive)?.content}") } }
@@ -466,8 +465,13 @@ fun DetailScreen(
                     Text("${c.durationDays} days, ${c.requiredDays} needed · day length ${if (c.daySecs >= 3600) "${c.daySecs / 3600} h" else "${c.daySecs} s"}", style = MaterialTheme.typography.bodyMedium)
                     Text("Pot ${fmt(c.totalDeposits)} · forfeited ${fmt(c.totalForfeit)} test USDC", style = MaterialTheme.typography.titleSmall)
                     val sim = SimulatedYield.estimateTokens(c.totalDeposits, c.durationDays)
-                    app.vowed.ui.components.StatusBadge("Yield: SIMULATED, about ${"%.4f".format(sim)} tokens at an assumed ${SimulatedYield.ASSUMED_APY_PERCENT.toInt()}% a year. Not earned, not paid.", app.vowed.ui.components.Tone.Danger)
-                    c.trustTier?.let { app.vowed.ui.components.StatusBadge("Proof trust: $it", app.vowed.ui.components.trustTone(it)) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        app.vowed.ui.components.LabelChip(
+                            "SIMULATED yield", app.vowed.ui.components.ChipKind.Simulated, moreTitle = "Simulated yield",
+                            more = "Yield: SIMULATED, about ${"%.4f".format(sim)} tokens at an assumed ${SimulatedYield.ASSUMED_APY_PERCENT.toInt()}% a year. Not earned, not paid.",
+                        )
+                        c.trustTier?.let { app.vowed.ui.components.LabelChip(app.vowed.ui.components.trustLabel(it), app.vowed.ui.components.ChipKind.Neutral) }
+                    }
                 }
             }
             if (me != null) {
@@ -536,6 +540,35 @@ private fun HubRow(title: String, subtitle: String, glyph: app.vowed.ui.art.Glyp
 }
 
 @Composable
+private fun AvatarPicker(wallet: String?) {
+    val ctx = LocalContext.current
+    val prefs = remember { app.vowed.data.Prefs(ctx) }
+    AppCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Your avatar", style = MaterialTheme.typography.titleSmall)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                // automatic: the one chosen from your address
+                Box(
+                    Modifier.size(52.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(if (app.vowed.ui.components.Avatars.mineIndex < 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer)
+                        .clickable { prefs.avatarIndex = -1; app.vowed.ui.components.Avatars.mineIndex = -1 },
+                    contentAlignment = Alignment.Center,
+                ) { Text("Auto", style = MaterialTheme.typography.labelMedium, color = if (app.vowed.ui.components.Avatars.mineIndex < 0) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.primary) }
+                app.vowed.ui.components.Avatars.all.forEachIndexed { i, res ->
+                    val selected = app.vowed.ui.components.Avatars.mineIndex == i
+                    Box(
+                        Modifier.size(56.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(if (selected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent).padding(3.dp)
+                            .clickable { prefs.avatarIndex = i; app.vowed.ui.components.Avatars.mineIndex = i },
+                    ) { androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(res), contentDescription = "Avatar ${i + 1}", modifier = Modifier.fillMaxSize().clip(androidx.compose.foundation.shape.CircleShape)) }
+                }
+            }
+            if (wallet == null) Text("Connect a wallet to keep your choice with your account on this phone.", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
 fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit) {
     val ctx = LocalContext.current
     Page("You") {
@@ -552,6 +585,7 @@ fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPra
                     }
                 }
             }
+            AvatarPicker(state.account?.wallet)
             HubRow("Coach", "What to try next, from your own history", app.vowed.ui.art.Glyph.Focus, app.vowed.ui.components.CategoryStyle.colors("study"), onCoach)
             HubRow("SKR rewards and streak freezes", "Weekly top streaks, test SKR", app.vowed.ui.art.Glyph.Trophy, app.vowed.ui.components.CategoryStyle.colors("focus"), onRewards)
             HubRow("Letters to future me", "Written now, delivered later, kept on this phone", app.vowed.ui.art.Glyph.Bell, app.vowed.ui.components.CategoryStyle.colors("fitness"), onLetters)
