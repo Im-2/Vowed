@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -17,7 +19,28 @@ android {
         // The hosted devnet backend (a public URL, not a secret). Pass -PbackendUrl=http://10.0.2.2:8787 for a local backend; debug builds can also switch in You (settings).
         buildConfigField("String", "BACKEND_URL", "\"${providers.gradleProperty("backendUrl").getOrElse("https://vowed-backend.onrender.com")}\"")
     }
-    buildTypes { release { isMinifyEnabled = false } }
+    // Release signing: the keystore and its passwords live OUTSIDE the repository (default ~/.vowed-signing/signing.properties, or the file named by
+    // the VOWED_SIGNING_PROPERTIES environment variable). Without that file the release APK is built unsigned.
+    val signingProps = Properties().also { props ->
+        val f = file(System.getenv("VOWED_SIGNING_PROPERTIES") ?: (System.getProperty("user.home") + "/.vowed-signing/signing.properties"))
+        if (f.exists()) f.inputStream().use { props.load(it) }
+    }
+    signingConfigs {
+        if (signingProps.getProperty("storeFile") != null) {
+            create("release") {
+                storeFile = file(signingProps.getProperty("storeFile"))
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
