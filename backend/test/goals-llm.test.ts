@@ -238,6 +238,24 @@ describe("language model goal parsing", () => {
     expect(["plan", "unclear"]).toContain(b.status);
   });
 
+  it("tries once more after a quick server error (HTTP 5xx), but not after a timeout, a rate limit or a client error", async () => {
+    const flaky = await world([{ status: 503, body: "{}" }, wrap(guitar())]);
+    const ok = (await parse(flaky.w, flaky.who, FREE_TEXT)).json();
+    expect(ok.source).toBe("ai");
+    expect(flaky.calls.length).toBe(2);
+    const down = await world([{ status: 503, body: "{}" }]);
+    const b = (await parse(down.w, down.who, FREE_TEXT)).json();
+    expect(b.ai.note).toBe("the language model answered HTTP 503");
+    expect(down.calls.length).toBe(2); // one retry, then give up
+    const limited = await world([{ status: 429, body: "{}" }]);
+    await parse(limited.w, limited.who, FREE_TEXT);
+    expect(limited.calls.length).toBe(1);
+    const bad = await world([{ status: 400, body: "{}" }]);
+    const c = (await parse(bad.w, bad.who, FREE_TEXT)).json();
+    expect(c.ai.note).toBe("the language model answered HTTP 400");
+    expect(bad.calls.length).toBe(1);
+  });
+
   it("limits model calls per wallet per hour and for everyone per day", async () => {
     const perWallet = await world((n) => wrap(guitar({ title: `Guitar ${n}` })), { GOALS_LLM_PER_WALLET_HOUR: "2" });
     const codes: number[] = [];

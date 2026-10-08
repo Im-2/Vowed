@@ -136,7 +136,16 @@ export async function parseGoal(s: Services, wallet: string, rawText: string, us
     if (limit) aiNote = limit;
     else {
       try {
-        const raw = await s.llm!.parseGoal(text);
+        let raw: unknown;
+        try {
+          raw = await s.llm!.parseGoal(text);
+        } catch (e) {
+          // a quick server-side failure (HTTP 5xx, "high demand") is worth one more try; timeouts and rate limits are not retried
+          if (e instanceof GeminiError && e.kind === "http" && (e.status ?? 0) >= 500) {
+            await new Promise((r) => setTimeout(r, 800));
+            raw = await s.llm!.parseGoal(text);
+          } else throw e;
+        }
         const out = interpretModelReply(base, text, raw);
         if (out) {
           if (out.status !== "unclear") s.db.prepare("INSERT OR REPLACE INTO goal_cache (text_hash, result_json, created_at) VALUES (?,?,?)").run(key, JSON.stringify(out), s.wallNow());
@@ -149,6 +158,7 @@ export async function parseGoal(s: Services, wallet: string, rawText: string, us
             e.kind === "rate_limited" ? "the language model is busy right now"
             : e.kind === "blocked" ? "the language model is not reachable from this server"
             : e.kind === "network" || e.kind === "timeout" ? "the language model could not be reached right now"
+            : e.kind === "http" ? `the language model answered HTTP ${e.status ?? "error"}`
             : "the language model gave no usable answer";
           if (e.kind === "rate_limited") s.db.prepare("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)").run(BACKOFF_KEY, String(s.wallNow() + 60));
         } else aiNote = "the language model failed";
