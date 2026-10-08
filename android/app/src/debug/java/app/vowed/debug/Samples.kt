@@ -62,7 +62,12 @@ object Samples {
         val a = challenge("p1", "Read for 30 minutes a day", "study", "FOCUS_TIMER", "medium", startedDaysAgo = 2, deposits = "6000000")
         val b = challenge("p2", "Walk 6000 steps a day", "steps", "STEPS", "medium", startedDaysAgo = 3, days = 10, deposits = "9000000", count = 6)
         val c = challenge("p3", "Focus for 25 minutes a day", "study", "FOCUS_TIMER", "medium", demo = true, startedDaysAgo = 1, days = 3, deposits = "2000000", count = 2)
-        val list = if (empty) emptyList() else listOf(a, b, c)
+        // leftovers that Home must NOT show: pools with no title and nothing in them (test runs), and two finished challenges that go to "Past challenges"
+        val junk1 = challenge("6yXBkQfJrZ1p9wD2uE4hVnS7cTgAaLmN3xKoPYWb", "x", "custom", "SELF_ATTEST", "low", deposits = "0", count = 0).copy(plan = null, creator = ME)
+        val junk2 = challenge("3fJ2kQfJrZ1p9wD2uE4hVnS7cTgAaLmN3xKoAQby", "x", "custom", "SELF_ATTEST", "low", deposits = "0", count = 0).copy(plan = null, creator = ME, status = "Settled")
+        val past1 = challenge("p8", "Meditate 10 minutes a day", "focus", "FOCUS_TIMER", "medium", startedDaysAgo = 10, deposits = "4000000", count = 3).copy(status = "Settled")
+        val past2 = challenge("p9", "Sleep 7 hours a night", "sleep", "STEPS", "medium", startedDaysAgo = 12, deposits = "5000000", count = 4).copy(status = "Settled")
+        val list = if (empty) emptyList() else listOf(junk1, a, b, junk2, c, past1, past2)
         return UiState(
             account = app.vowed.data.Account(ME, "dev", "low"), signedIn = true,
             challenges = list,
