@@ -46,7 +46,10 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
     val options: List<FreezeOption> = state.details.values.flatMap { d -> FreezeOptions.forDetail(d, myWallet, planTitle(d.challenge), now) }
     Page("SKR rewards and perks", onBack = onBack, actions = { TextButton(onClick = onLoad) { Text("Refresh") } }) {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            app.vowed.ui.components.LabelChip("TEST SKR", app.vowed.ui.components.ChipKind.Test, moreTitle = "Test SKR", more = st?.label ?: "TEST SKR: this build runs on Solana devnet and SKR here is a test token with no value.")
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                app.vowed.ui.components.SkrIcon(36.dp)
+                app.vowed.ui.components.LabelChip("TEST SKR", app.vowed.ui.components.ChipKind.Test, moreTitle = "Test SKR", more = st?.label ?: "TEST SKR: this build runs on Solana devnet and SKR here is a test token with no value.")
+            }
             ru.message?.let {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(it, Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
@@ -86,10 +89,16 @@ fun RewardsScreen(state: UiState, myWallet: String?, onBack: () -> Unit, onLoad:
                 Text("Rewards you received", style = MaterialTheme.typography.titleMedium)
                 if (st.mine.isEmpty()) Text("None yet.", style = MaterialTheme.typography.bodySmall)
                 st.mine.forEach { m ->
-                    Text("Week ${m.week}: rank ${m.rank}, streak ${m.streak}, ${TxChecker.formatUnits(BigInteger(m.amount))} test SKR (${m.status})", style = MaterialTheme.typography.bodyMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        app.vowed.ui.components.SkrIcon(18.dp)
+                        Text("Week ${m.week}: rank ${m.rank}, streak ${m.streak}, ${TxChecker.formatUnits(BigInteger(m.amount))} test SKR (${m.status})", style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
 
-                Text("Streak freeze (1 test SKR)", style = MaterialTheme.typography.titleMedium)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    app.vowed.ui.components.SkrIcon(22.dp)
+                    Text("Streak freeze (1 test SKR)", style = MaterialTheme.typography.titleMedium)
+                }
                 Text(
                     "A missed day breaks your streak. A freeze, paid in SKR from your wallet, keeps the streak for that one day. It never changes your check-ins, your days completed or your payout: it is only for the streak shown here, in the squad leaderboard, and for the weekly rewards.",
                     style = MaterialTheme.typography.bodySmall,

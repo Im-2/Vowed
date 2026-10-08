@@ -10,6 +10,7 @@ Screens were captured from the debug build on the Android emulator (API 36). **S
 | 07-home-before.png, 14-explore-before.png | Home and Explore BEFORE the polish pass |
 | 07-home.png, 08-home-empty.png | Home AFTER (token pill, short hero, one card per check-in) and the new-user empty state |
 | 09-token-sheet.png, 09b-info-sheet.png | the bottom sheets: test tokens (from the pill) and an honesty-label explanation (info icon) |
+| 15-categories.png, 14-explore.png, 17-challenge-detail.png | updated: photo tiles with a scrim, photo thumbnails, photo header |
 | avatars.png | the 14 original avatars and the neutral fallback |
 | 11-create-start.png, 12-create-plan.png, 13-review.png | Create challenge (plain words, plan card with proof type, trust, token, mode, stake) and the review-before-sign screen |
 | 14-explore.png, 15-categories.png | Explore (filters, DEMO MODE quick challenges, SAMPLE and DEMO labels) and the categories grid |

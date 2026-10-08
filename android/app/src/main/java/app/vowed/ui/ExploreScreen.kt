@@ -202,7 +202,7 @@ private fun ExploreCard(p: ExploreItem, now: Long, onOpen: (String) -> Unit, onR
     AppCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
-                GradientTile(CategoryStyle.colors(p.category), Modifier.size(48.dp)) { GlyphIcon(categoryGlyph(p.category), Color.White, 26.dp) }
+                app.vowed.ui.components.CategoryThumb(p.category, 48.dp)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(p.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
                     Text("${categoryLabel(p.category)} · ${p.mode} · ${p.durationDays} days", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
@@ -256,11 +256,12 @@ fun CategoriesScreen(onBack: () -> Unit, onPick: (String) -> Unit) {
                     pair.forEach { (cat, label, sub) ->
                         val tint = if (label == "Focus") "focus" else cat
                         AppCard(onClick = { onPick(cat) }, Modifier.weight(1f)) {
-                            Column(Modifier.fillMaxWidth().background(Brush.linearGradient(CategoryStyle.colors(tint))).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                GlyphIcon(categoryGlyph(tint), Color.White, 32.dp)
-                                Spacer(Modifier.height(16.dp))
-                                Text(label, style = MaterialTheme.typography.titleMedium, color = Color.White)
-                                Text(sub, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.9f))
+                            // a real photo with a dark-to-clear scrim at the bottom and white text over it (gradient tile and icon when there is no photo)
+                            app.vowed.ui.components.CategoryBackdrop(tint, Modifier.fillMaxWidth().height(156.dp)) {
+                                Column(Modifier.align(Alignment.BottomStart).padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(label, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                                    Text(sub, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.92f))
+                                }
                             }
                         }
                     }

@@ -96,41 +96,49 @@ fun HomeTopBar(state: UiState, onPill: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             LabelChip("TEST", ChipKind.Test)
-            Text(if (b != null) "${compactAmount(b.tUSDC)} tUSDC · ${compactAmount(b.tSKR)} tSKR" else "test tokens", style = MaterialTheme.typography.labelMedium)
+            if (b != null) {
+                Text("${compactAmount(b.tUSDC)} tUSDC", style = MaterialTheme.typography.labelMedium)
+                app.vowed.ui.components.SkrIcon(16.dp)
+                Text("${compactAmount(b.tSKR)} tSKR", style = MaterialTheme.typography.labelMedium)
+            } else {
+                Text("test tokens", style = MaterialTheme.typography.labelMedium)
+            }
             Text("i", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
 
-/** A shorter banner: friends as illustrated avatars, and the Solana logomark floating around as decoration (different sizes, overlapping, soft shadow). */
+/**
+ * A shorter banner. The right side is a loose, scattered cluster of round circles of different sizes that overlap a little and cast soft shadows:
+ * mostly illustrated avatars, plus exactly one Solana logo circle (the official mark, unaltered, on white) and exactly one SKR logo circle.
+ */
 @Composable
 private fun HeroBanner(onSquads: () -> Unit) {
     Box(
-        Modifier.fillMaxWidth().height(136.dp).clip(MaterialTheme.shapes.large).background(Brush.linearGradient(listOf(VowedColors.Violet, VowedColors.IndigoDeep))),
+        Modifier.fillMaxWidth().height(148.dp).clip(MaterialTheme.shapes.large).background(Brush.linearGradient(listOf(VowedColors.Violet, VowedColors.IndigoDeep))),
     ) {
-        Column(Modifier.align(Alignment.CenterStart).padding(start = 20.dp).fillMaxWidth(0.58f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.align(Alignment.CenterStart).padding(start = 20.dp).fillMaxWidth(0.46f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Play with your friends", style = MaterialTheme.typography.titleMedium, color = Color.White)
             Box(Modifier.clip(CircleShape).background(Color.White).clickable(onClick = onSquads).padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text("Start a squad", style = MaterialTheme.typography.labelLarge, color = VowedColors.Indigo)
             }
         }
-        // decoration, drawn back to front
-        FloatingToken(Modifier.align(Alignment.TopEnd).offset(x = (-86).dp, y = 10.dp), 34.dp)
-        FloatingToken(Modifier.align(Alignment.BottomEnd).offset(x = (-8).dp, y = (-6).dp), 46.dp)
-        FloatingToken(Modifier.align(Alignment.TopEnd).offset(x = (-14).dp, y = 14.dp), 26.dp)
-        Row(Modifier.align(Alignment.CenterEnd).padding(end = 34.dp).offset(y = 4.dp), horizontalArrangement = Arrangement.spacedBy((-14).dp)) {
-            Avatar("hero-a-0123456789", 46.dp, Modifier.shadow(4.dp, CircleShape))
-            Avatar("hero-b-9876543210", 52.dp, Modifier.shadow(4.dp, CircleShape))
-            Avatar("hero-c-5566778899", 46.dp, Modifier.shadow(4.dp, CircleShape))
+        // the cluster: offsets are from the top-left of the right half; sizes and positions are deliberately uneven
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.align(Alignment.CenterEnd).fillMaxWidth(0.54f).height(148.dp)) {
+            val w = maxWidth
+            @Composable
+            fun bubble(x: Float, y: Float, size: Int, content: @Composable () -> Unit) {
+                Box(Modifier.offset(x = w * x, y = y.dp).size(size.dp).shadow(8.dp, CircleShape).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) { content() }
+            }
+            bubble(0.02f, 40f, 54) { Avatar("hero-a-0123456789", 54.dp) }
+            bubble(0.30f, 8f, 44) { Avatar("hero-b-9876543210", 44.dp) }
+            bubble(0.34f, 56f, 64) { Avatar("hero-c-5566778899", 64.dp) }
+            bubble(0.64f, 16f, 40) { Image(painterResource(R.drawable.solana_logomark), contentDescription = "Solana", modifier = Modifier.size(22.dp)) }
+            bubble(0.70f, 62f, 46) { Avatar("hero-d-1122334455", 46.dp) }
+            bubble(0.56f, 100f, 34) { app.vowed.ui.components.SkrIcon(34.dp) }
+            bubble(0.04f, 100f, 30) { Avatar("hero-e-6677889900", 30.dp) }
+            bubble(0.84f, 8f, 28) { Avatar("hero-f-4433221100", 28.dp) }
         }
-    }
-}
-
-/** The official Solana logomark (unchanged artwork) on a plain white disc with a soft shadow. */
-@Composable
-private fun FloatingToken(modifier: Modifier, size: androidx.compose.ui.unit.Dp) {
-    Box(modifier.size(size).shadow(6.dp, CircleShape).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-        Image(painterResource(R.drawable.solana_logomark), contentDescription = null, modifier = Modifier.size(size * 0.56f))
     }
 }
 
@@ -249,7 +257,7 @@ private fun TodayCard(c: Challenge, dv: app.vowed.DayView, daysDone: Int, onOpen
     AppCard(onClick = { onOpen(c.pool) }, Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                GradientTile(CategoryStyle.colors(cat), Modifier.size(48.dp)) { GlyphIcon(categoryGlyph(cat), Color.White, 26.dp) }
+                app.vowed.ui.components.CategoryThumb(cat, 48.dp)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(planTitle(c), style = MaterialTheme.typography.titleSmall, maxLines = 2)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -283,7 +291,7 @@ private fun ChallengeRow(c: Challenge, onOpen: (String) -> Unit) {
     val cat = planCategory(c)
     AppCard(onClick = { onOpen(c.pool) }, Modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            GradientTile(CategoryStyle.colors(cat), Modifier.size(44.dp)) { GlyphIcon(categoryGlyph(cat), Color.White, 24.dp) }
+            app.vowed.ui.components.CategoryThumb(cat, 44.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(planTitle(c), style = MaterialTheme.typography.titleSmall, maxLines = 1)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -299,9 +307,7 @@ private fun ChallengeRow(c: Challenge, onOpen: (String) -> Unit) {
 @Composable
 private fun DiscoverCard(p: ExploreItem, now: Long, onOpen: (String) -> Unit) {
     AppCard(onClick = { onOpen(p.pool) }, Modifier.width(200.dp)) {
-        Box(Modifier.fillMaxWidth().height(72.dp).background(Brush.linearGradient(CategoryStyle.colors(p.category))), contentAlignment = Alignment.Center) {
-            GlyphIcon(categoryGlyph(p.category), Color.White, 36.dp)
-        }
+        app.vowed.ui.components.CategoryBackdrop(p.category, Modifier.fillMaxWidth().height(80.dp), scrim = Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.04f), 1f to Color.Black.copy(alpha = 0.30f)))
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(p.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, minLines = 2)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

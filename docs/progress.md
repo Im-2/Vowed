@@ -255,3 +255,9 @@ Done in four commits (logo and theme; splash, onboarding and connect; home, crea
 - **Explore:** one slim single-line DEMO MODE banner with an info sheet; one card layout (icon, title, one meta line, at most two chips, stats row for pot, joined and join-within, primary Join, Report in a menu); one row of category chips plus a Filter button that opens a sheet with token and ending soon.
 - **Same audit** applied to create, detail, squads, rewards and You.
 - **Not done:** the **SKR token logo** (no official file could be obtained, see `docs/verified-facts.md`: waiting for the file); dark-theme screenshots; a real-phone check.
+
+## UI round 2 (2026-10-08): SKR icon, banner cluster, category photos
+- **SKR icon** (the owner's file) used in the token pill, banner, token panel balances, SKR rewards and freeze screens, and the You hub row.
+- **Home banner:** the right side is a loose cluster of round shapes of different sizes that overlap slightly with soft shadows: mostly illustrated avatars, exactly one Solana logo circle and exactly one SKR logo circle.
+- **Photos:** Categories tiles are photos with a dark-to-clear scrim and white text (gradient tile when there is no photo: **Study has no photo yet**); the same photo is the thumbnail on Explore and Home cards for that category and the header of the challenge detail. WebP, 800 px wide, 209 KB in total; the debug APK grew by about 0.65 MB (107.05 MB to 107.70 MB). Sources and licenses: `docs/photo-credits.md` (the owner fills them in).
+- Behavior, honesty labels and tests unchanged; tests and the debug build pass.

@@ -452,11 +452,10 @@ fun DetailScreen(
         val cat = planCategory(c)
         Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // hero header
-            Box(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(androidx.compose.ui.graphics.Brush.linearGradient(app.vowed.ui.components.CategoryStyle.colors(cat))).padding(18.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    app.vowed.ui.art.GlyphIcon(app.vowed.ui.art.categoryGlyph(cat), androidx.compose.ui.graphics.Color.White, 34.dp)
+            app.vowed.ui.components.CategoryBackdrop(cat, Modifier.fillMaxWidth().height(168.dp).clip(MaterialTheme.shapes.large)) {
+                Column(Modifier.align(Alignment.BottomStart).padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(planTitle(c), style = MaterialTheme.typography.headlineSmall, color = androidx.compose.ui.graphics.Color.White)
-                    Text("Status: ${c.status} · ${c.mode} mode", style = MaterialTheme.typography.bodyMedium, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f))
+                    Text("Status: ${c.status} · ${c.mode} mode", style = MaterialTheme.typography.bodyMedium, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.92f))
                 }
             }
             if (c.isDemo) DemoBadge(c.demoLabel)
@@ -587,7 +586,16 @@ fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPra
             }
             AvatarPicker(state.account?.wallet)
             HubRow("Coach", "What to try next, from your own history", app.vowed.ui.art.Glyph.Focus, app.vowed.ui.components.CategoryStyle.colors("study"), onCoach)
-            HubRow("SKR rewards and streak freezes", "Weekly top streaks, test SKR", app.vowed.ui.art.Glyph.Trophy, app.vowed.ui.components.CategoryStyle.colors("focus"), onRewards)
+            AppCard(onClick = onRewards, Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    app.vowed.ui.components.SkrIcon(46.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text("SKR rewards and streak freezes", style = MaterialTheme.typography.titleSmall)
+                        Text("Weekly top streaks, test SKR", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    app.vowed.ui.art.GlyphIcon(app.vowed.ui.art.Glyph.Chevron, MaterialTheme.colorScheme.onSurfaceVariant, 22.dp)
+                }
+            }
             HubRow("Letters to future me", "Written now, delivered later, kept on this phone", app.vowed.ui.art.Glyph.Bell, app.vowed.ui.components.CategoryStyle.colors("fitness"), onLetters)
             HubRow("Practice check-in", "Camera practice (nothing is sent)", app.vowed.ui.art.Glyph.Fitness, app.vowed.ui.components.CategoryStyle.colors("steps"), onPractice)
             HubRow("Home screen widget", "Add the Vowed widget to my home screen", app.vowed.ui.art.Glyph.Home, app.vowed.ui.components.CategoryStyle.colors("detox")) { app.vowed.widget.requestPinWidget(ctx) }

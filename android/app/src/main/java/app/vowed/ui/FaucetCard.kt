@@ -51,7 +51,11 @@ fun FaucetPanel(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim: 
             style = MaterialTheme.typography.bodyMedium, color = androidx.compose.ui.graphics.Color(0xFFB7791F),
         )
         if (st != null) {
-            Text("You have: ${fmt(st.balances.tUSDC)} tUSDC · ${fmt(st.balances.tSKR)} tSKR", style = MaterialTheme.typography.titleSmall)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("You have: ${fmt(st.balances.tUSDC)} tUSDC ·", style = MaterialTheme.typography.titleSmall)
+                app.vowed.ui.components.SkrIcon(20.dp)
+                Text("${fmt(st.balances.tSKR)} tSKR", style = MaterialTheme.typography.titleSmall)
+            }
             val usdc = st.tokens.firstOrNull { it.symbol == "tUSDC" }
             val skr = st.tokens.firstOrNull { it.symbol == "tSKR" }
             if (usdc != null && skr != null) Text("One claim gives ${fmt(usdc.amount)} tUSDC and ${fmt(skr.amount)} tSKR, once a day per wallet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
