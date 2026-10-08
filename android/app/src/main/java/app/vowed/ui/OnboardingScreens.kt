@@ -85,7 +85,7 @@ fun SplashScreen(onFinished: () -> Unit) {
     Box(Modifier.fillMaxSize().background(SoftBackground), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(
-                Modifier.size(150.dp).scale(scale.value).graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
+                Modifier.size(220.dp).scale(scale.value).graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
                     drawContent()
                     val x = shine.value * size.width * 1.7f - size.width * 0.4f
                     drawRect(
@@ -93,7 +93,7 @@ fun SplashScreen(onFinished: () -> Unit) {
                         blendMode = BlendMode.SrcAtop,
                     )
                 },
-            ) { VowedMark(150.dp) }
+            ) { VowedMark(220.dp) }
             Text("Vowed", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.graphicsLayer { alpha = nameAlpha.value })
             Text("Put something behind your goal", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.graphicsLayer { alpha = nameAlpha.value })
         }

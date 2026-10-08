@@ -58,7 +58,7 @@ import app.vowed.ui.theme.VowedTheme
 /** The Vowed logo mark (vector drawable, same artwork as the launcher icon). */
 @Composable
 fun VowedMark(size: Dp, modifier: Modifier = Modifier) {
-    androidx.compose.foundation.Image(painterResource(R.drawable.ic_logo_mark), contentDescription = "Vowed", modifier = modifier.size(size))
+    androidx.compose.foundation.Image(painterResource(R.drawable.logo_mark), contentDescription = "Vowed", modifier = modifier.size(size))
 }
 
 /** A white rounded card with a soft shadow. Pass [onClick] to make it pressable (it dips slightly while pressed). */
@@ -126,42 +126,29 @@ fun SmallButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
     ) { Text(text, style = MaterialTheme.typography.labelMedium) }
 }
 
-enum class Tone { Neutral, Primary, Success, Warning, Danger }
+enum class Tone { Neutral, Primary, Success, Warning, Danger, Error }
 
 /**
- * Honesty labels (DEMO, SAMPLE, TEST, SIMULATED, trust tiers) are drawn with this one component, so they look the same everywhere and
- * can be restyled but never go missing.
+ * Honesty labels (DEMO, SAMPLE, TEST, SIMULATED, trust tiers) use this, so they look the same everywhere and can be restyled but never go
+ * missing. [Tone.Danger] (the old name for the DEMO style) is now the calm amber outline; red is only for [Tone.Error].
  */
 @Composable
 fun StatusBadge(text: String, tone: Tone = Tone.Neutral, modifier: Modifier = Modifier) {
     val x = VowedTheme.extra
-    val (bg, fg) = when (tone) {
-        Tone.Neutral -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-        Tone.Primary -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.primary
-        Tone.Success -> x.successTint to x.success
-        Tone.Warning -> x.warningTint to x.warning
-        Tone.Danger -> x.demoTint to x.demo
-    }
-    Box(modifier.clip(RoundedCornerShape(50)).background(bg).padding(horizontal = 10.dp, vertical = 4.dp)) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = fg)
+    when (tone) {
+        Tone.Danger -> LabelChip(text, ChipKind.Demo, modifier)
+        Tone.Warning -> LabelChip(text, ChipKind.Test, modifier)
+        Tone.Primary -> LabelChip(text, ChipKind.Primary, modifier)
+        Tone.Success -> LabelChip(text, ChipKind.Success, modifier)
+        Tone.Neutral -> LabelChip(text, ChipKind.Neutral, modifier)
+        Tone.Error -> Box(modifier.clip(RoundedCornerShape(50)).background(x.demoTint).padding(horizontal = 10.dp, vertical = 4.dp)) {
+            Text(text, style = MaterialTheme.typography.labelSmall, color = x.demo)
+        }
     }
 }
 
 fun trustTone(tier: String?): Tone = when (tier) { "high" -> Tone.Success; "medium" -> Tone.Primary; else -> Tone.Warning }
 fun trustLabel(tier: String?): String = when (tier) { "high" -> "High trust"; "medium" -> "Medium trust"; "low" -> "Low trust"; else -> "Trust: ?" }
-
-/** A round avatar built from an address: a gradient chosen by the address and its first letters. */
-@Composable
-fun Avatar(seed: String, size: Dp = 44.dp, modifier: Modifier = Modifier) {
-    val palette = listOf(
-        listOf(Color(0xFF7C6CF0), Color(0xFF4A35D0)), listOf(Color(0xFFFF9F68), Color(0xFFE5566D)), listOf(Color(0xFF38C7A0), Color(0xFF1E8F6F)),
-        listOf(Color(0xFFFFC857), Color(0xFFE8932A)), listOf(Color(0xFF5BB5FF), Color(0xFF3566D6)), listOf(Color(0xFFE48BF0), Color(0xFF9B4FD1)),
-    )
-    val colors = palette[(seed.hashCode() and 0x7fffffff) % palette.size]
-    Box(modifier.size(size).clip(CircleShape).background(Brush.linearGradient(colors)), contentAlignment = Alignment.Center) {
-        Text(seed.take(2).uppercase(), style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.ExtraBold)
-    }
-}
 
 @Composable
 fun SectionHeader(title: String, action: String? = null, onAction: (() -> Unit)? = null, modifier: Modifier = Modifier) {

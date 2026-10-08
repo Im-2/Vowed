@@ -50,6 +50,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("asked_notify", false)
         set(v) = sp.edit().putBoolean("asked_notify", v).apply()
 
+    /** The avatar the person picked in You (index into the avatar set); -1 means "choose one for me from my address". Stays on this phone. */
+    var avatarIndex: Int
+        get() = sp.getInt("avatar_index", -1)
+        set(v) = sp.edit().putInt("avatar_index", v).apply()
+
     /** The time of the last squad-notification check (unix seconds); 0 means never looked. */
     var notesSince: Long
         get() = sp.getLong("notes_since", 0L)

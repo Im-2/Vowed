@@ -71,6 +71,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
     val start = if (vm.prefs.onboarded && state.account != null) "home" else "onboarding"
 
     LaunchedEffect(Unit) { vm.loadMeta() }
+    LaunchedEffect(state.account?.wallet) { app.vowed.ui.components.Avatars.mineWallet = state.account?.wallet; app.vowed.ui.components.Avatars.mineIndex = vm.prefs.avatarIndex }
     // After a successful connect from onboarding, go home.
     LaunchedEffect(state.signedIn) {
         // the connect screen shows its own "Wallet connected" pop-up first and then navigates; only the old onboarding route jumps ahead
