@@ -86,6 +86,8 @@ const schema = z.object({
   REWARDS_MIN_STREAK: z.coerce.number().int().min(1).default(3),
   /** demo pools have minutes-long days, so they are not habit history; only a demo of the rewards turns this on, and the app says so */
   REWARDS_INCLUDE_DEMO: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  /** adds clearly labelled SAMPLE rows to the leaderboards so that a new visitor does not see an empty screen; they are never paid */
+  LEADERBOARD_SAMPLES: z.enum(["true", "false"]).default("true").transform((v) => v === "true"),
   /** price of one streak freeze in SKR base units */
   PERK_FREEZE_PRICE: z.coerce.bigint().min(1n).default(1_000_000n),
   /** at most this many freezes per challenge */

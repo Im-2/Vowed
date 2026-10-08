@@ -282,6 +282,8 @@ CREATE TABLE attestations (
   accepted_at INTEGER NOT NULL
 );
 `,
+  // 2026-10: a person can hide themselves from the public leaderboards (they are still paid)
+  `ALTER TABLE users ADD COLUMN leaderboard_hidden INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 export function openDb(path: string): Db {

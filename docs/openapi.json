@@ -2822,6 +2822,10 @@
                     "weekEndsAt": {
                       "type": "number"
                     },
+                    "rewardsWallet": {
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "standings": {
                       "type": "array",
                       "items": {
@@ -2898,8 +2902,197 @@
                     "ladder",
                     "currentWeek",
                     "weekEndsAt",
+                    "rewardsWallet",
                     "standings",
                     "mine"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/leaderboard": {
+      "get": {
+        "summary": "Leaderboard for the Rewards screen: this week live standings or the all-time longest streaks. Only an avatar seed (wallet), a short name and a streak number are shown for other people; SAMPLE rows are flagged",
+        "tags": [
+          "rewards"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": "week",
+              "type": "string",
+              "enum": [
+                "week",
+                "all"
+              ]
+            },
+            "in": "query",
+            "name": "scope",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "week",
+                        "all"
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "weekEndsAt": {
+                      "type": "number"
+                    },
+                    "minStreak": {
+                      "type": "number"
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rank": {
+                            "type": "number"
+                          },
+                          "wallet": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "streak": {
+                            "type": "number"
+                          },
+                          "reward": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "you": {
+                            "type": "boolean"
+                          },
+                          "sample": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "rank",
+                          "wallet",
+                          "name",
+                          "streak",
+                          "reward",
+                          "you",
+                          "sample"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "me": {
+                      "type": "object",
+                      "properties": {
+                        "rank": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "streak": {
+                          "type": "number"
+                        },
+                        "rewardIfNow": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "hidden": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "rank",
+                        "streak",
+                        "rewardIfNow",
+                        "hidden"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "hasSamples": {
+                      "type": "boolean"
+                    },
+                    "sampleNote": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "scope",
+                    "label",
+                    "enabled",
+                    "weekEndsAt",
+                    "minStreak",
+                    "entries",
+                    "me",
+                    "hasSamples",
+                    "sampleNote"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/profile/leaderboard": {
+      "post": {
+        "summary": "Hide this wallet from the public leaderboards (or show it again). A hidden wallet still earns the weekly reward",
+        "tags": [
+          "rewards"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hidden": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "hidden"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hidden": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "hidden"
                   ],
                   "additionalProperties": false
                 }

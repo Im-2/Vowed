@@ -40,9 +40,11 @@ export function ladder(s: Services): bigint[] {
 }
 
 /** The best streak of every eligible wallet for [week], highest first. */
-export function standingsForWeek(s: Services, week: number): Standing[] {
+export function standingsForWeek(s: Services, week: number, asOf?: number): Standing[] {
   const weekStart = week * WEEK_SECONDS;
   const weekEnd = weekStart + WEEK_SECONDS;
+  // a week still running is counted up to now, not up to its last second (a finished week is counted to its end)
+  const at = Math.min(weekEnd - 1, asOf ?? weekEnd - 1);
   const pools = s.db.prepare("SELECT pool FROM challenges WHERE status != 'Voided' AND start_ts < ? AND end_ts > ? AND participant_count >= 2").all(weekEnd, weekStart) as { pool: string }[];
   const best = new Map<string, Standing>();
   for (const { pool } of pools) {
@@ -50,7 +52,7 @@ export function standingsForWeek(s: Services, week: number): Standing[] {
     if (c.is_demo && !s.config.REWARDS_INCLUDE_DEMO) continue;
     const parts = s.db.prepare("SELECT * FROM participants WHERE pool = ?").all(pool) as unknown as ParticipantRow[];
     for (const p of parts) {
-      const today = dayIndexFor(c, p.tz_offset_minutes, weekEnd - 1);
+      const today = dayIndexFor(c, p.tz_offset_minutes, at);
       if (today < 0) continue;
       const bits = effectiveBitmap(BigInt(p.checkin_bitmap), frozenBitmap(s, p.wallet, pool));
       const streak = currentStreak(bits, today, c.duration_days);
@@ -136,6 +138,8 @@ export interface RewardsStatus {
   /** the week now running, and when it ends (unix seconds) */
   currentWeek: number;
   weekEndsAt: number;
+  /** the PUBLIC address of the rewards wallet (where the reward SKR is held), or null when rewards are off; never a key */
+  rewardsWallet: string | null;
   /** live standings for the running week, best first (not paid until the week ends) */
   standings: { rank: number; wallet: string; streak: number; you: boolean; qualifies: boolean }[];
   mine: { week: number; rank: number; streak: number; amount: string; status: string; signature: string | null }[];
@@ -145,7 +149,7 @@ export function rewardsStatus(s: Services, wallet: string): RewardsStatus {
   const week = weekOf(s.wallNow());
   const enabled = rewardsEnabled(s.config);
   const lad = ladder(s);
-  const standings = enabled ? standingsForWeek(s, week).slice(0, 10) : [];
+  const standings = enabled ? standingsForWeek(s, week, s.wallNow()).slice(0, 10) : [];
   const mine = s.db.prepare("SELECT week, rank, streak, amount, status, signature FROM rewards WHERE wallet = ? ORDER BY week DESC LIMIT 12").all(wallet) as RewardsStatus["mine"];
   return {
     enabled,
@@ -155,6 +159,7 @@ export function rewardsStatus(s: Services, wallet: string): RewardsStatus {
     ladder: lad.map(String),
     currentWeek: week,
     weekEndsAt: (week + 1) * WEEK_SECONDS,
+    rewardsWallet: enabled ? s.config.REWARDS_SECRET_KEY!.publicKey.toBase58() : null,
     standings: standings.map((x, i) => ({ rank: i + 1, wallet: x.wallet, streak: x.streak, you: x.wallet === wallet, qualifies: x.streak >= s.config.REWARDS_MIN_STREAK && i < lad.length })),
     mine,
   };
