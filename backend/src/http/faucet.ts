@@ -6,6 +6,7 @@ import type { Services } from "../services.js";
 import { authenticate } from "./auth.js";
 import { enforce } from "./ratelimit.js";
 
+const solDrip = z.object({ status: z.enum(["sent", "skipped", "failed", "off"]), lamports: z.string(), reason: z.string().optional(), signature: z.string().optional() });
 const token = z.object({ symbol: z.enum(["tUSDC", "tSKR"]), name: z.string(), mint: z.string(), amount: z.string(), decimals: z.number() });
 
 export function registerFaucetRoutes(app: FastifyInstance, s: Services) {
@@ -28,7 +29,8 @@ export function registerFaucetRoutes(app: FastifyInstance, s: Services) {
             canClaim: z.boolean(),
             nextClaimAt: z.number(),
             claimsLeftToday: z.number(),
-            balances: z.object({ tUSDC: z.string(), tSKR: z.string() }),
+            balances: z.object({ tUSDC: z.string(), tSKR: z.string(), sol: z.string() }),
+            sol: z.object({ enabled: z.boolean(), lamports: z.string(), received: z.boolean() }),
           }),
         },
       },
@@ -45,13 +47,14 @@ export function registerFaucetRoutes(app: FastifyInstance, s: Services) {
       preHandler: auth,
       schema: {
         tags: ["faucet"],
-        summary: "Claim a fixed amount of TEST USDC and TEST SKR (once per wallet per 24 hours, with a global daily cap)",
+        summary: "Claim a fixed amount of TEST USDC and TEST SKR (once per wallet per 24 hours, with a global daily cap). The first claim also sends a small one-time gift of devnet SOL for fees when the SOL faucet is on",
         response: {
           200: z.object({
             signature: z.string(),
             minted: z.object({ tUSDC: z.string(), tSKR: z.string() }),
             nextClaimAt: z.number(),
             label: z.string(),
+            sol: solDrip,
           }),
         },
       },

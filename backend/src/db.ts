@@ -284,6 +284,16 @@ CREATE TABLE attestations (
 `,
   // 2026-10: a person can hide themselves from the public leaderboards (they are still paid)
   `ALTER TABLE users ADD COLUMN leaderboard_hidden INTEGER NOT NULL DEFAULT 0;`,
+  // 2026-10: one small devnet SOL gift per wallet, with its own ledger for the caps
+  `CREATE TABLE sol_drips (
+  wallet TEXT PRIMARY KEY,
+  lamports TEXT NOT NULL,
+  status TEXT NOT NULL,                 -- pending | sent | failed
+  day INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  signature TEXT,
+  error TEXT
+);`,
 ];
 
 export function openDb(path: string): Db {

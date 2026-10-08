@@ -1,4 +1,4 @@
-import { PublicKey, type Transaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram, type Transaction } from "@solana/web3.js";
 import { ATA_PROGRAM_ID, TOKEN_PROGRAM_ID } from "../../src/program/client.js";
 import { ataAddress } from "../../src/util/token.js";
 import type { SendResult } from "../../src/chain/types.js";
@@ -82,6 +82,15 @@ export class TokenChain extends StubChain {
           const fd = Uint8Array.from(from.data); Buffer.from(fd.buffer).writeBigUInt64LE(fromAmt - amount, 64); this.accounts.set(src, { ...from, data: fd });
           const td = Uint8Array.from(to.data); Buffer.from(td.buffer).writeBigUInt64LE(Buffer.from(to.data.subarray(64, 72)).readBigUInt64LE() + amount, 64); this.accounts.set(dest, { ...to, data: td });
           pendingTransfers.push({ mint, source: src, destination: dest, authority: owner, amount });
+        } else if (ix.programId.equals(SystemProgram.programId) && ix.data.readUInt32LE(0) === 2) {
+          const from = ix.keys[0]!.pubkey.toBase58();
+          const to = ix.keys[1]!.pubkey.toBase58();
+          const amount = ix.data.readBigUInt64LE(4);
+          const a = this.accounts.get(from);
+          if (!a || a.lamports < amount || !signers.has(from)) throw new Error("insufficient lamports");
+          this.accounts.set(from, { ...a, lamports: a.lamports - amount });
+          const b = this.accounts.get(to);
+          this.accounts.set(to, b ? { ...b, lamports: b.lamports + amount } : { data: new Uint8Array(0), lamports: amount, owner: SystemProgram.programId.toBase58() });
         } else {
           throw new Error(`unexpected instruction for program ${ix.programId.toBase58()}`);
         }

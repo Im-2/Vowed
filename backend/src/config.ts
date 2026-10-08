@@ -77,6 +77,18 @@ const schema = z.object({
   /** A wallet may claim once per this many seconds (default: once per 24 hours). */
   FAUCET_COOLDOWN_SECS: z.coerce.number().int().min(60).default(86_400),
   /**
+   * Devnet SOL for new testers, so they can pay network fees: a dedicated small wallet (never a public faucet) funded from the deployer.
+   * Off unless its key is set. Each wallet gets it once; there is a cap per UTC day and a cap on the total ever given out.
+   */
+  FAUCET_SOL_SECRET_KEY: secretKey.optional(),
+  /** lamports per wallet (default 0.01 SOL) */
+  FAUCET_SOL_LAMPORTS: z.coerce.bigint().min(1n).default(10_000_000n),
+  FAUCET_SOL_DAILY_CAP: z.coerce.number().int().min(1).default(30),
+  /** the most the faucet wallet may ever give out (default 0.5 SOL) */
+  FAUCET_SOL_TOTAL_CAP_LAMPORTS: z.coerce.bigint().min(1n).default(500_000_000n),
+  /** a wallet that already holds at least this much SOL does not need any (default 0.05 SOL) */
+  FAUCET_SOL_SKIP_ABOVE_LAMPORTS: z.coerce.bigint().min(0n).default(50_000_000n),
+  /**
    * Weekly SKR rewards and SKR-paid perks. The rewards wallet holds the (test) SKR that is paid out and receives perk payments. Off unless
    * its key, the SKR mint and the faucet mint settings are present.
    */

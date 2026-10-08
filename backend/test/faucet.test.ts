@@ -78,7 +78,7 @@ describe("test-token faucet", () => {
     expect(chain.balance(p.wallet, usdc)).toBe(USDC_AMOUNT);
     expect(chain.balance(p.wallet, skr)).toBe(SKR_AMOUNT);
     const after = await status(w, p);
-    expect(after.balances).toEqual({ tUSDC: USDC_AMOUNT.toString(), tSKR: SKR_AMOUNT.toString() });
+    expect(after.balances).toEqual({ tUSDC: USDC_AMOUNT.toString(), tSKR: SKR_AMOUNT.toString(), sol: "0" });
     expect(after.canClaim).toBe(false);
   });
 

@@ -162,6 +162,43 @@
         }
       }
     },
+    "/v1/auth/refresh": {
+      "post": {
+        "summary": "Swap a still-valid token for a new one without asking the wallet again. Refused once the session is older than 7 days since the wallet signed in",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "number"
+                    },
+                    "wallet": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "token",
+                    "expiresAt",
+                    "wallet"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/meta": {
       "get": {
         "summary": "Program and deployment facts the app needs (no secrets)",
@@ -2703,11 +2740,35 @@
                         },
                         "tSKR": {
                           "type": "string"
+                        },
+                        "sol": {
+                          "type": "string"
                         }
                       },
                       "required": [
                         "tUSDC",
-                        "tSKR"
+                        "tSKR",
+                        "sol"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "sol": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "lamports": {
+                          "type": "string"
+                        },
+                        "received": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "lamports",
+                        "received"
                       ],
                       "additionalProperties": false
                     }
@@ -2720,7 +2781,8 @@
                     "canClaim",
                     "nextClaimAt",
                     "claimsLeftToday",
-                    "balances"
+                    "balances",
+                    "sol"
                   ],
                   "additionalProperties": false
                 }
@@ -2732,7 +2794,7 @@
     },
     "/v1/faucet/claim": {
       "post": {
-        "summary": "Claim a fixed amount of TEST USDC and TEST SKR (once per wallet per 24 hours, with a global daily cap)",
+        "summary": "Claim a fixed amount of TEST USDC and TEST SKR (once per wallet per 24 hours, with a global daily cap). The first claim also sends a small one-time gift of devnet SOL for fees when the SOL faucet is on",
         "tags": [
           "faucet"
         ],
@@ -2768,13 +2830,42 @@
                     },
                     "label": {
                       "type": "string"
+                    },
+                    "sol": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "sent",
+                            "skipped",
+                            "failed",
+                            "off"
+                          ]
+                        },
+                        "lamports": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "signature": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "lamports"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
                     "signature",
                     "minted",
                     "nextClaimAt",
-                    "label"
+                    "label",
+                    "sol"
                   ],
                   "additionalProperties": false
                 }

@@ -12,11 +12,15 @@ import { enforce } from "./ratelimit.js";
 declare module "fastify" {
   interface FastifyRequest {
     wallet?: string;
+    /** when the wallet last signed in (unix seconds); refreshing keeps this, so a session cannot be extended for ever */
+    sessionStart?: number;
   }
 }
 
 export const NONCE_TTL_SEC = 300;
-export const TOKEN_TTL_SEC = 3600;
+/** one token lasts 6 hours; /v1/auth/refresh swaps a still-valid token for a new one, up to SESSION_MAX_SEC after the wallet signed in */
+export const TOKEN_TTL_SEC = 21_600;
+export const SESSION_MAX_SEC = 7 * 86_400;
 const STATEMENT = "Sign in to Vowed. This does not move any funds.";
 
 export const pubkeySchema = z.string().refine((v) => {
@@ -52,9 +56,9 @@ export function parseSiws(message: string): SiwsFields | null {
   return { domain: first[1]!, address: lines[1].trim(), nonce: field("Nonce"), expirationTime: field("Expiration Time") };
 }
 
-export async function issueToken(s: Services, wallet: string): Promise<{ token: string; expiresAt: number }> {
+export async function issueToken(s: Services, wallet: string, sessionStart?: number): Promise<{ token: string; expiresAt: number }> {
   const expiresAt = s.wallNow() + TOKEN_TTL_SEC;
-  const token = await new SignJWT({})
+  const token = await new SignJWT({ sat: sessionStart ?? s.wallNow() })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(wallet)
     .setIssuer("vowed-backend")
@@ -73,6 +77,7 @@ export function authenticate(s: Services) {
       const { payload } = await jwtVerify(h.slice(7), key, { issuer: "vowed-backend", algorithms: ["HS256"] });
       if (!payload.sub) throw unauthorized();
       req.wallet = payload.sub;
+      req.sessionStart = typeof payload.sat === "number" ? payload.sat : payload.iat;
     } catch {
       throw unauthorized("invalid or expired token");
     }
@@ -158,6 +163,24 @@ export function registerAuthRoutes(app: FastifyInstance, s: Services) {
       s.db.prepare("INSERT OR IGNORE INTO users (wallet, created_at) VALUES (?, ?)").run(wallet, s.wallNow());
       const { token, expiresAt } = await issueToken(s, wallet);
       return { token, expiresAt, wallet };
+    },
+  );
+
+  r.post(
+    "/v1/auth/refresh",
+    {
+      preHandler: authenticate(s),
+      schema: {
+        tags: ["auth"],
+        summary: "Swap a still-valid token for a new one without asking the wallet again. Refused once the session is older than 7 days since the wallet signed in",
+        response: { 200: z.object({ token: z.string(), expiresAt: z.number(), wallet: z.string() }) },
+      },
+    },
+    async (req) => {
+      enforce(s, `wallet:${req.wallet}:refresh`, 30, 3_600);
+      if (s.wallNow() - (req.sessionStart ?? 0) > SESSION_MAX_SEC) throw unauthorized("the session is too old; sign in with the wallet again");
+      const { token, expiresAt } = await issueToken(s, req.wallet!, req.sessionStart);
+      return { token, expiresAt, wallet: req.wallet! };
     },
   );
 }
