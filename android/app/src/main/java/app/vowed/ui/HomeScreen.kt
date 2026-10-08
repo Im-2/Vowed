@@ -123,7 +123,7 @@ private fun HeroBanner(onSquads: () -> Unit) {
                 Text("Start a squad", style = MaterialTheme.typography.labelLarge, color = VowedColors.Indigo)
             }
         }
-        // the cluster: offsets are from the top-left of the right half; sizes and positions are deliberately uneven
+        // the cluster (5 avatars, exactly two SKR logos and exactly one Solana logo): offsets are from the top-left of the right half; sizes and positions are deliberately uneven
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.align(Alignment.CenterEnd).fillMaxWidth(0.54f).height(148.dp)) {
             val w = maxWidth
             @Composable
@@ -137,7 +137,7 @@ private fun HeroBanner(onSquads: () -> Unit) {
             bubble(0.70f, 62f, 46) { Avatar("hero-d-1122334455", 46.dp) }
             bubble(0.56f, 100f, 34) { app.vowed.ui.components.SkrIcon(34.dp) }
             bubble(0.04f, 100f, 30) { Avatar("hero-e-6677889900", 30.dp) }
-            bubble(0.84f, 8f, 28) { Avatar("hero-f-4433221100", 28.dp) }
+            bubble(0.82f, 6f, 30) { app.vowed.ui.components.SkrIcon(30.dp) }
         }
     }
 }
