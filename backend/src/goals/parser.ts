@@ -137,11 +137,13 @@ export async function parseGoal(s: Services, wallet: string, rawText: string, us
     else {
       try {
         let raw: unknown;
+        const t0 = Date.now();
         try {
           raw = await s.llm!.parseGoal(text);
         } catch (e) {
-          // a quick server-side failure (HTTP 5xx, "high demand") is worth one more try; timeouts and rate limits are not retried
-          if (e instanceof GeminiError && e.kind === "http" && (e.status ?? 0) >= 500) {
+          // a QUICK server-side failure (HTTP 5xx, under 4 s) is worth one more try; slow failures, timeouts and rate limits are not retried,
+          // so the whole request stays inside the app's wait of 40 s
+          if (e instanceof GeminiError && e.kind === "http" && (e.status ?? 0) >= 500 && Date.now() - t0 < 4_000) {
             await new Promise((r) => setTimeout(r, 800));
             raw = await s.llm!.parseGoal(text);
           } else throw e;
