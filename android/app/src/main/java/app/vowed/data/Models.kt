@@ -242,6 +242,26 @@ data class RewardsStatus(
     val ladder: List<String>,
     val currentWeek: Int,
     val weekEndsAt: Long,
+    /** the public address of the server rewards wallet (never a key), or null when rewards are off */
+    val rewardsWallet: String? = null,
     val standings: List<RewardStanding>,
     val mine: List<MyReward>,
 )
+
+/** One row of a leaderboard: only an avatar seed (wallet), a short name and a streak number. [sample] rows are made up and never paid. */
+@Serializable data class BoardEntry(val rank: Int, val wallet: String, val name: String, val streak: Int, val reward: String? = null, val you: Boolean = false, val sample: Boolean = false)
+@Serializable data class BoardMe(val rank: Int? = null, val streak: Int = 0, val rewardIfNow: String? = null, val hidden: Boolean = false)
+@Serializable
+data class Board(
+    val scope: String,
+    val label: String,
+    val enabled: Boolean,
+    val weekEndsAt: Long,
+    val minStreak: Int,
+    val entries: List<BoardEntry>,
+    val me: BoardMe,
+    val hasSamples: Boolean = false,
+    val sampleNote: String? = null,
+)
+@Serializable data class HiddenRequest(val hidden: Boolean)
+@Serializable data class HiddenResponse(val hidden: Boolean)

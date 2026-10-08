@@ -568,8 +568,12 @@ private fun AvatarPicker(wallet: String?) {
 }
 
 @Composable
-fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit) {
+fun SettingsScreen(
+    state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit,
+    onHideFromBoard: (Boolean) -> Unit = {}, onLoadBoard: () -> Unit = {}, onSampleProvider: () -> Unit = {},
+) {
     val ctx = LocalContext.current
+    LaunchedEffect(state.signedIn) { if (state.signedIn) onLoadBoard() }
     Page("You") {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             AppCard(Modifier.fillMaxWidth()) {
@@ -599,6 +603,21 @@ fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPra
             HubRow("Letters to future me", "Written now, delivered later, kept on this phone", app.vowed.ui.art.Glyph.Bell, app.vowed.ui.components.CategoryStyle.colors("fitness"), onLetters)
             HubRow("Practice check-in", "Camera practice (nothing is sent)", app.vowed.ui.art.Glyph.Fitness, app.vowed.ui.components.CategoryStyle.colors("steps"), onPractice)
             HubRow("Home screen widget", "Add the Vowed widget to my home screen", app.vowed.ui.art.Glyph.Home, app.vowed.ui.components.CategoryStyle.colors("detox")) { app.vowed.widget.requestPinWidget(ctx) }
+            // privacy: other people see only an avatar, a short name and a streak number; this switch removes even that
+            val hidden = state.rewardsUi.week?.me?.hidden ?: state.rewardsUi.all?.me?.hidden
+            AppCard(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Hide me from the leaderboard", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Others see only an avatar, a short name and a streak number. Turn this on to not appear at all. You are still ranked and still paid.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = hidden == true, onCheckedChange = onHideFromBoard, enabled = hidden != null && !state.rewardsUi.savingHidden)
+                }
+            }
+            LabsSection(onSampleProvider)
             Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (app.vowed.BuildConfig.DEBUG) {
                 // debug builds only: the release app always uses its built-in address
@@ -616,6 +635,29 @@ fun SettingsScreen(state: UiState, backendUrl: String, onBack: () -> Unit, onPra
                 }
             }
             app.vowed.ui.components.SoftButton("Disconnect wallet", onDisconnect)
+        }
+    }
+}
+
+/** Experiments that are not part of the main flow. Collapsed until opened. */
+@Composable
+private fun LabsSection(onSampleProvider: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    AppCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.clickable { open = !open }.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Labs", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                app.vowed.ui.components.LabelChip("SAMPLE", app.vowed.ui.components.ChipKind.Sample)
+                Text(if (open) "Hide" else "Show", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            }
+            if (open) {
+                Text("Open proof plug-ins (sample)", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Other apps can sign a statement about what you did and hand it to Vowed (the format is in docs/proof-provider-spec.md). Only a built-in sample provider exists today; no outside app is connected. A statement is recorded with LOW trust and does not count as a check-in yet. Needs a devnet server with the sample provider switched on.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                app.vowed.ui.components.SoftButton("Send a signed sample statement", onSampleProvider, Modifier.fillMaxWidth())
+            }
         }
     }
 }

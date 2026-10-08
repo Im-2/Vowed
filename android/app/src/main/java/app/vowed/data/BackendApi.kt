@@ -59,6 +59,8 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     suspend fun submitProof(pkg: JsonObject): ProofResult = post("/v1/proofs/submit", pkg)
     suspend fun coach(): CoachResponse = get("/v1/coach/suggestions")
     suspend fun rewards(): RewardsStatus = get("/v1/rewards")
+    suspend fun rewardsBoard(scope: String): Board = get("/v1/leaderboard?scope=$scope")
+    suspend fun setLeaderboardHidden(hidden: Boolean): HiddenResponse = post("/v1/profile/leaderboard", HiddenRequest(hidden))
     suspend fun freezeTx(req: FreezeTxRequest): FreezeQuote = post("/v1/perks/freeze/tx", req)
     suspend fun freeze(req: FreezeRedeemRequest): FreezeRedeemed = post("/v1/perks/freeze", req)
     suspend fun goalTemplates(): TemplateList = get("/v1/goals/templates")

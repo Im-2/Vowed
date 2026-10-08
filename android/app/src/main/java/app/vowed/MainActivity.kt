@@ -204,7 +204,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
             )
         }
         composable("rewards") {
-            app.vowed.ui.RewardsScreen(state, state.account?.wallet, onBack = { nav.popBackStack() }, onLoad = vm::loadRewards, onFreeze = { pool, day -> vm.prepareFreeze(pool, day) }, onDismissMessage = vm::clearRewardsMessage, onSampleProvider = vm::runSampleProvider)
+            app.vowed.ui.RewardsScreen(state, state.account?.wallet, onBack = { nav.popBackStack() }, onLoad = vm::loadRewards, onFreeze = { pool, day -> vm.prepareFreeze(pool, day) }, onDismissMessage = vm::clearRewardsMessage, onSignIn = { vm.connect(sender) }, onLoadFaucet = vm::loadFaucet)
         }
         composable("coach") {
             app.vowed.ui.CoachScreen(
@@ -220,7 +220,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         }
         composable("practice") { app.vowed.ui.PracticeScreen(onBack = { nav.popBackStack() }) }
         composable("settings") {
-            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onDisconnect = {
+            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onHideFromBoard = vm::setLeaderboardHidden, onLoadBoard = vm::loadRewards, onSampleProvider = vm::runSampleProvider, onDisconnect = {
                 vm.disconnect(sender)
                 nav.navigate("onboarding") { popUpTo(0) }
             })

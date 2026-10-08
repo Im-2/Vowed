@@ -118,9 +118,16 @@ data class CoachUi(
 /** SKR rewards and the streak-freeze perk (test SKR on devnet). */
 data class RewardsUi(
     val status: app.vowed.data.RewardsStatus? = null,
+    /** the two leaderboards: this week and all time */
+    val week: app.vowed.data.Board? = null,
+    val all: app.vowed.data.Board? = null,
     val loading: Boolean = false,
     val error: String? = null,
     val message: String? = null,
+    /** the sign-in is missing or has expired (it lasts an hour and is kept in memory only): the screen offers to sign in again */
+    val needsSignIn: Boolean = false,
+    /** true while the hide-me switch is being saved */
+    val savingHidden: Boolean = false,
 )
 
 /** Squads: my list, and one open squad with its feed and leaderboard. */
@@ -772,14 +779,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------ SKR rewards and the streak-freeze perk
 
     fun loadRewards() {
-        if (!c.account.signedIn) return
-        _state.update { it.copy(rewardsUi = it.rewardsUi.copy(loading = true, error = null)) }
+        if (!c.account.signedIn) {
+            _state.update { it.copy(rewardsUi = it.rewardsUi.copy(loading = false, error = null, needsSignIn = true)) }
+            return
+        }
+        _state.update { it.copy(rewardsUi = it.rewardsUi.copy(loading = true, error = null, needsSignIn = false)) }
         viewModelScope.launch {
             try {
                 val st = c.api.rewards()
-                _state.update { it.copy(rewardsUi = it.rewardsUi.copy(status = st, loading = false)) }
+                // the boards are extra: if one fails the rest of the screen still works
+                val week = runCatching { c.api.rewardsBoard("week") }.getOrNull()
+                val all = runCatching { c.api.rewardsBoard("all") }.getOrNull()
+                _state.update { it.copy(rewardsUi = it.rewardsUi.copy(status = st, week = week ?: it.rewardsUi.week, all = all ?: it.rewardsUi.all, loading = false)) }
             } catch (e: Throwable) {
-                _state.update { it.copy(rewardsUi = it.rewardsUi.copy(loading = false, error = friendly(e))) }
+                val expired = e is ApiException && e.status == 401
+                if (expired) c.api.token = null
+                _state.update { it.copy(signedIn = if (expired) false else it.signedIn, rewardsUi = it.rewardsUi.copy(loading = false, needsSignIn = expired, error = if (expired) null else friendly(e))) }
+            }
+        }
+    }
+
+    /** The "hide me from the leaderboards" switch in You. The person is still ranked and still paid; others just do not see them. */
+    fun setLeaderboardHidden(hidden: Boolean) {
+        if (!c.account.signedIn) return
+        _state.update { it.copy(rewardsUi = it.rewardsUi.copy(savingHidden = true)) }
+        viewModelScope.launch {
+            try {
+                val r = c.api.setLeaderboardHidden(hidden)
+                _state.update { st ->
+                    val me = { b: app.vowed.data.Board? -> b?.copy(me = b.me.copy(hidden = r.hidden)) }
+                    st.copy(rewardsUi = st.rewardsUi.copy(savingHidden = false, week = me(st.rewardsUi.week), all = me(st.rewardsUi.all)))
+                }
+                loadRewards()
+            } catch (e: Throwable) {
+                _state.update { it.copy(rewardsUi = it.rewardsUi.copy(savingHidden = false, error = friendly(e))) }
             }
         }
     }

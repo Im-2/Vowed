@@ -94,7 +94,7 @@ fun PreviewMore(screen: String) {
         "squads" -> SquadsScreen(squadState, none, {}, {}, {}, null)
         "squad-detail" -> SquadDetailScreen(squadState, Samples.ME, none, none, {}, {}, none)
         "you" -> SettingsScreen(st, "https://vowed-backend.onrender.com", none, none, none, none, none, none)
-        "rewards" -> RewardsScreen(st, Samples.ME, none, none, { _, _ -> }, none, none)
+        "rewards" -> RewardsScreen(st, Samples.ME, none, none, { _, _ -> }, none)
         "coach" -> CoachScreen(
             st.copy(
                 coachUi = CoachUi(

@@ -73,9 +73,32 @@ object Samples {
             explore = app.vowed.ExploreUi(items = explore().filter { !it.isDemo }, demoPools = explore().filter { it.isDemo }, loaded = true),
             rewardsUi = app.vowed.RewardsUi(
                 status = RewardsStatus(
-                    true, "TEST SKR: weekly rewards are paid in a test token on devnet. It has no value.", false, 3, listOf("10000000", "5000000", "3000000"), 2960, System.currentTimeMillis() / 1000 + 200_000,
+                    true, "TEST SKR: weekly rewards are paid in a test token on devnet. It has no value.", false, 3, listOf("10000000", "5000000", "3000000"), 2960, System.currentTimeMillis() / 1000 + 200_000, null,
                     listOf(RewardStanding(1, ADA, 9, false, true), RewardStanding(2, ME, 6, true, true), RewardStanding(3, KAI, 5, false, true), RewardStanding(4, MIA, 3, false, false), RewardStanding(5, BOB, 2, false, false)),
                     listOf(MyReward(2959, 2, 5, "5000000", "sent", null)),
+                ),
+                week = app.vowed.data.Board(
+                    "week", "TEST SKR", true, System.currentTimeMillis() / 1000 + 200_000, 3,
+                    listOf(
+                        app.vowed.data.BoardEntry(1, "SAMPLEMira111111111111111111111111111111", "Mira", 6, null, false, true),
+                        app.vowed.data.BoardEntry(2, "SAMPLEJonas11111111111111111111111111111", "Jonas", 5, null, false, true),
+                        app.vowed.data.BoardEntry(3, "SAMPLEAiko111111111111111111111111111111", "Aiko", 4, null, false, true),
+                        app.vowed.data.BoardEntry(4, "SAMPLETomas11111111111111111111111111111", "Tomas", 3, null, false, true),
+                        app.vowed.data.BoardEntry(5, "SAMPLELena111111111111111111111111111111", "Lena", 3, null, false, true),
+                        app.vowed.data.BoardEntry(6, "SAMPLERui1111111111111111111111111111111", "Rui", 2, null, false, true),
+                        app.vowed.data.BoardEntry(7, ME, "You", 2, null, true, false),
+                        app.vowed.data.BoardEntry(8, "SAMPLEOmar111111111111111111111111111111", "Omar", 1, null, false, true),
+                    ),
+                    app.vowed.data.BoardMe(7, 2, null, false), true, "SAMPLE: made-up players, never paid.",
+                ),
+                all = app.vowed.data.Board(
+                    "all", "TEST SKR", true, System.currentTimeMillis() / 1000 + 200_000, 3,
+                    listOf(
+                        app.vowed.data.BoardEntry(1, "SAMPLEMira111111111111111111111111111111", "Mira", 21, null, false, true),
+                        app.vowed.data.BoardEntry(2, "SAMPLEAiko111111111111111111111111111111", "Aiko", 18, null, false, true),
+                        app.vowed.data.BoardEntry(3, "SAMPLEJonas11111111111111111111111111111", "Jonas", 14, null, false, true),
+                    ),
+                    app.vowed.data.BoardMe(null, 0, null, false), true, "SAMPLE: made-up players, never paid.",
                 ),
             ),
         )
