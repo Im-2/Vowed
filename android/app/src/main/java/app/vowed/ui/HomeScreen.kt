@@ -183,15 +183,16 @@ fun HomeScreen(
             HeroBanner(onSquads)
             state.listError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-            val open = state.challenges.filter { it.status == "Open" }
-            val dueCards = open.mapNotNull { c ->
+            // only my own, readable, running challenges here; finished ones wait in "Past challenges" (rules and tests: HomeFilter)
+            val lists = HomeFilter.split(state.challenges, myWallet, now, state.hiddenPools) { pool -> state.details[pool]?.participants?.map { it.wallet }?.toSet() }
+            val dueCards = lists.active.mapNotNull { c ->
                 val me = state.details[c.pool]?.participants?.firstOrNull { it.wallet == myWallet } ?: return@mapNotNull null
                 Triple(c, CheckInLogic.dayView(c, me, now), me)
             }
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionHeader("Today's check-ins", "Refresh", onRefresh)
                 if (state.loadingList && state.challenges.isEmpty()) Spinner()
-                if (state.challenges.isEmpty() && !state.loadingList) {
+                if (lists.active.isEmpty() && !state.loadingList) {
                     EmptyState(
                         "Nothing here yet",
                         "Type any goal in your own words, put a small stake behind it, and check in each day. Or join someone else's challenge in Explore.",
@@ -209,7 +210,7 @@ fun HomeScreen(
                     )
                 }
                 dueCards.forEach { (c, dv, me) -> TodayCard(c, dv, me.daysCompleted, onOpen, onCheckIn) }
-                val others = state.challenges.filter { ch -> dueCards.none { it.first.pool == ch.pool } }
+                val others = lists.active.filter { ch -> dueCards.none { it.first.pool == ch.pool } }
                 others.forEach { c -> ChallengeRow(c, onOpen) }
             }
 
@@ -240,6 +241,8 @@ fun HomeScreen(
                     }
                 }
             }
+
+            PastChallenges(lists.past, onOpen)
         }
     }
     if (sheet) {
@@ -286,6 +289,22 @@ private fun TodayCard(c: Challenge, dv: app.vowed.DayView, daysDone: Int, onOpen
     }
 }
 
+/** Finished and settled challenges, collapsed until opened. The count is always in the header. */
+@Composable
+private fun PastChallenges(past: List<Challenge>, onOpen: (String) -> Unit) {
+    if (past.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AppCard(onClick = { open = !open }, Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Past challenges (${past.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                Text(if (open) "Hide" else "Show", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+        if (open) past.forEach { c -> ChallengeRow(c, onOpen) }
+    }
+}
+
 @Composable
 private fun ChallengeRow(c: Challenge, onOpen: (String) -> Unit) {
     val cat = planCategory(c)
@@ -309,7 +328,7 @@ private fun DiscoverCard(p: ExploreItem, now: Long, onOpen: (String) -> Unit) {
     AppCard(onClick = { onOpen(p.pool) }, Modifier.width(200.dp)) {
         app.vowed.ui.components.CategoryBackdrop(p.category, Modifier.fillMaxWidth().height(80.dp), scrim = Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.04f), 1f to Color.Black.copy(alpha = 0.30f)))
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(p.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, minLines = 2)
+            Text(HomeFilter.exploreTitle(p), style = MaterialTheme.typography.titleSmall, maxLines = 2, minLines = 2)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (p.sample) LabelChip("SAMPLE", ChipKind.Sample, moreTitle = "Sample challenge", more = "SAMPLE: created by the Vowed team so there is always something to try")
                 if (p.isDemo) LabelChip("DEMO", ChipKind.Demo, moreTitle = "Demo pool", more = p.demoLabel ?: "DEMO POOL: minutes-long days, test money only")

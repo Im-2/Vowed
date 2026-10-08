@@ -52,7 +52,7 @@ const schema = z.object({
   GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta"),
   /** template_first: use a confident template match and ask the model only otherwise (saves free-tier quota); llm_first: always ask first (tests); template_only: never. */
   GOALS_PARSER_MODE: z.enum(["template_first", "llm_first", "template_only"]).default("template_first"),
-  GOALS_LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(15_000),
+  GOALS_LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(28_000),
   /** Free-tier protection: model calls per wallet per hour, and across everyone per UTC day. */
   GOALS_LLM_PER_WALLET_HOUR: z.coerce.number().int().min(1).default(12),
   GOALS_LLM_DAILY_CAP: z.coerce.number().int().min(1).default(300),

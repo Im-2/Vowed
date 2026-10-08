@@ -174,7 +174,7 @@ fun ExploreScreen(
             title = { Text("Report this challenge") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("\"${p.title}\"", fontWeight = FontWeight.Medium)
+                    Text("\"${HomeFilter.exploreTitle(p)}\"", fontWeight = FontWeight.Medium)
                     Text("Why are you reporting it?")
                     listOf("spam" to "Spam", "offensive" to "Offensive language", "scam" to "Looks like a scam", "other" to "Something else").forEach { (k, label) ->
                         OutlinedButton(onClick = { onReport(p.pool, k); reporting = null }, modifier = Modifier.fillMaxWidth()) { Text(label) }
@@ -204,7 +204,7 @@ private fun ExploreCard(p: ExploreItem, now: Long, onOpen: (String) -> Unit, onR
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
                 app.vowed.ui.components.CategoryThumb(p.category, 48.dp)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(p.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+                    Text(HomeFilter.exploreTitle(p), style = MaterialTheme.typography.titleSmall, maxLines = 2)
                     Text("${categoryLabel(p.category)} · ${p.mode} · ${p.durationDays} days", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 }
                 if (!p.createdByYou && !p.sample) {

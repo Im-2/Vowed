@@ -17,6 +17,11 @@ class Prefs(context: Context) {
         override fun put(key: String, value: String?) = ssp.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()
     }
 
+    /** Debug builds: pools hidden from Home on this phone (for test runs). Nothing on chain or on the server changes. */
+    var hiddenPools: Set<String>
+        get() = sp.getStringSet("hidden_pools", emptySet()) ?: emptySet()
+        set(v) = sp.edit().putStringSet("hidden_pools", v).apply()
+
     var onboarded: Boolean
         get() = sp.getBoolean("onboarded", false)
         set(v) = sp.edit().putBoolean("onboarded", v).apply()

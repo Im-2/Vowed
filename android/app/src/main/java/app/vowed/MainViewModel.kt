@@ -14,6 +14,7 @@ import app.vowed.core.TxRejected
 import app.vowed.core.TxReview
 import app.vowed.data.Account
 import app.vowed.data.ApiException
+import app.vowed.ui.HomeFilter
 import app.vowed.data.FaucetText
 import app.vowed.data.SessionKeeper
 import app.vowed.data.Challenge
@@ -187,13 +188,15 @@ data class UiState(
     val notice: String? = null,
     /** the server forgot this phone: the app registers it again (the wallet is asked to approve) */
     val deviceRecovery: DeviceRecovery = DeviceRecovery.None,
+    /** debug builds only: pools hidden from Home on this phone */
+    val hiddenPools: Set<String> = emptySet(),
 )
 
 enum class DeviceRecovery { None, Needed, Working }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val c = (application as VowedApp).container
-    private val _state = MutableStateFlow(UiState(account = c.account.current))
+    private val _state = MutableStateFlow(UiState(account = c.account.current, hiddenPools = if (BuildConfig.DEBUG) c.prefs.hiddenPools else emptySet()))
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     init {
@@ -266,6 +269,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissConnectError() = _state.update { it.copy(connectError = null) }
+
+    /** Debug builds only: hide every pool that Home now lists as past (gate and test runs) on this phone. */
+    fun hidePastPools(now: Long) {
+        if (!BuildConfig.DEBUG) return
+        val st = _state.value
+        val past = HomeFilter.split(st.challenges.map { it }, st.account?.wallet, now, st.hiddenPools).past.map { it.pool }
+        val next = st.hiddenPools + past
+        c.prefs.hiddenPools = next
+        _state.update { it.copy(hiddenPools = next) }
+    }
+
+    fun showHiddenPools() {
+        c.prefs.hiddenPools = emptySet()
+        _state.update { it.copy(hiddenPools = emptySet()) }
+    }
 
     fun dismissNotice() = _state.update { it.copy(notice = null) }
 

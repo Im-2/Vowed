@@ -110,8 +110,8 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .callTimeout(45, TimeUnit.SECONDS)
+            .readTimeout(40, TimeUnit.SECONDS)
+            .callTimeout(55, TimeUnit.SECONDS)
             .build()
     }
 }

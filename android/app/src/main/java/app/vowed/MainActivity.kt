@@ -223,7 +223,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         composable("wallet-help") { app.vowed.ui.WalletHelpScreen(onBack = { nav.popBackStack() }) }
         composable("practice") { app.vowed.ui.PracticeScreen(onBack = { nav.popBackStack() }) }
         composable("settings") {
-            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onResetConnection = vm::resetConnection, onWalletHelp = { nav.navigate("wallet-help") }, onHideFromBoard = vm::setLeaderboardHidden, onLoadBoard = vm::loadRewards, onSampleProvider = vm::runSampleProvider, onDisconnect = {
+            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onResetConnection = vm::resetConnection, onHidePastPools = { vm.hidePastPools(System.currentTimeMillis() / 1000) }, onShowHiddenPools = vm::showHiddenPools, onWalletHelp = { nav.navigate("wallet-help") }, onHideFromBoard = vm::setLeaderboardHidden, onLoadBoard = vm::loadRewards, onSampleProvider = vm::runSampleProvider, onDisconnect = {
                 vm.disconnect(sender)
                 nav.navigate("onboarding") { popUpTo(0) }
             })

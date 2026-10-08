@@ -142,7 +142,7 @@ fun rememberNowSeconds(): Long {
     return t
 }
 
-fun planTitle(c: Challenge): String = c.plan?.get("title")?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content } ?: "Challenge ${short(c.pool)}"
+fun planTitle(c: Challenge): String = HomeFilter.displayTitle(c)
 
 // ---------------------------------------------------------------- new goal
 
@@ -571,7 +571,7 @@ private fun AvatarPicker(wallet: String?) {
 fun SettingsScreen(
     state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit,
     onHideFromBoard: (Boolean) -> Unit = {}, onLoadBoard: () -> Unit = {}, onSampleProvider: () -> Unit = {},
-    onResetConnection: () -> Unit = {}, onWalletHelp: () -> Unit = {},
+    onResetConnection: () -> Unit = {}, onWalletHelp: () -> Unit = {}, onHidePastPools: () -> Unit = {}, onShowHiddenPools: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     LaunchedEffect(state.signedIn) { if (state.signedIn) onLoadBoard() }
@@ -633,6 +633,11 @@ fun SettingsScreen(
                             app.vowed.ui.components.SoftButton("Local (emulator)", { prefs.backendUrl = "http://10.0.2.2:8787"; shown = prefs.backendUrl }, Modifier.weight(1f))
                         }
                         Text("Now: $shown", style = MaterialTheme.typography.bodySmall)
+                        Text("Hidden test pools on this phone: ${state.hiddenPools.size} (nothing on chain or the server changes)", style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            app.vowed.ui.components.SoftButton("Hide past pools", onHidePastPools, Modifier.weight(1f))
+                            app.vowed.ui.components.SoftButton("Show hidden", onShowHiddenPools, Modifier.weight(1f))
+                        }
                     }
                 }
             }
