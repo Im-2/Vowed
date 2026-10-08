@@ -121,3 +121,19 @@ Use a **throwaway wallet** made only for this test, on a phone with Phantom or S
 | S4 | Server update that wipes the database (Render redeploy on the free plan), then try to join or check in | "The server forgot this phone (it was updated), so Vowed is registering it again. Approve the request in your wallet." then "This phone is registered again. Please repeat what you were doing." | |
 | S5 | You > Reset connection, then Sign in | Back to the sign-in screen with one sentence; sign-in works; challenges and stakes are still there | |
 | S6 | Mock wallet: after a cold start, a first Connect that times out | Message about the wallet taking long and what to do; the second try works once the wallet is warm | |
+
+## Release APK and submission checks (Phase 9)
+
+Run on a **clean real phone** (not the development emulator), with the signed release APK from `scripts/android-release.ps1`. Record the APK file name, size and SHA-256 next to the results.
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| A1 | Download the APK from the stable link you will submit (GitHub Release or cloud storage) on the phone, install | Installs without a "blocked" warning beyond Android's normal unknown-source prompt; app name Vowed and the V icon | |
+| A2 | `apksigner verify --print-certs app-release.apk` on the PC | Verifies; certificate CN "Vowed hackathon demo" | |
+| A3 | Launch, onboarding, Try camera practice | Practice works with no wallet; nothing is sent | |
+| A4 | Connect a wallet (see R1 to R9 above), Get test tokens | Test tokens and 0.01 SOL arrive; labels say TEST | |
+| A5 | Run the demo script (`docs/demo-script.md`) end to end | Every step works; note anything that waits more than 3 seconds | |
+| A6 | Airplane mode, open the app | Clear "could not reach the server" messages, no crash, no endless spinner | |
+| A7 | Rotate the phone, switch to dark mode, large font | Nothing is cut off or unreadable (dark theme has not been checked yet) | |
+| A8 | Check Android settings, Apps, Vowed, Permissions | Camera, location, activity recognition, usage access, notifications are each asked for only when a feature needs them | |
+| A9 | Seeker only: connect with the Seed Vault Wallet | Works on devnet or shows the "wrong network" message (see verified-facts) | |

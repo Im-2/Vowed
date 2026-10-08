@@ -204,3 +204,25 @@ Built and verified: weekly test-SKR rewards for the top streaks (real devnet tra
 
 ## UI redesign and logo (2026-10-08)
 New visual identity (original logo, theme, bundled open-license font Nunito, original illustrations drawn in code), bottom navigation with a raised Create button, redesigned screens, and `docs/ui/` screenshots. Screens with data were captured through a debug-only preview with **made-up data**, so label them as such if used in the deck. **Do not claim:** that the screenshots show live data; dark mode as tested; real-device visuals.
+
+
+---
+
+## Status update, 2026-10-08 (Phases 3 to 9 start): this section replaces the older status table above
+
+The status table in section 1 and the "Last updated" line date from the Phase 2 gate; the product has moved on. What is built and verified now (proof: unit tests, the hosted backend, emulator runs; see `docs/progress.md` for the history and commits):
+
+| Area | State | Verified how |
+|---|---|---|
+| Android app with Mobile Wallet Adapter sign-in, create, join, check in, claim | Built | emulator with the Mock MWA Wallet against devnet (Phases 3 and 4) |
+| Phone proofs: self-attest, focus timer, steps, place, app usage, camera pose | Built; collectors unit-tested, camera counting only on a synthetic skeleton | emulator and tests; **no real phone or Seeker yet** |
+| Plain-language goals: 13 templates, Gemini free tier through the server | Built | hosted server answered with `source: ai` for 3 of 4 goals on 2026-10-08, the 4th timed out at the old 15 s limit; limit raised to 28 s (re-check after deploy) |
+| Squads, Explore, coach, letters, widget | Built | tests and emulator |
+| SKR weekly rewards, streak freeze, leaderboards (week and all time), hide-me switch | Built | backend tests (289), emulator; payouts need the weekly job to run on the hosted server |
+| Test-token faucet and one-time devnet SOL gift | Built | backend tests; SOL faucet needs its key added on Render |
+| Session kept encrypted across restarts, quiet refresh, device re-registration, Reset connection | Built | unit tests; emulator sign-in, force-stop, reopen |
+| Home shows only my own readable, non-empty challenges; Past challenges collapsed | Built | `HomeFilterTest`, screenshots in `docs/ui` |
+| Signed release APK | Built | `scripts/android-release.ps1`; installed and launched on the emulator; size 95.9 MB |
+| Real wallets (Phantom, Solflare, Seed Vault Wallet) over MWA on devnet | **Not verified** | checklist in `docs/device-tests.md` |
+
+Do not claim: real-phone camera counting, Seeker support, push when the app is closed, real yield, mainnet, an audit, a privacy policy or in-app data deletion (not built), dark-theme polish.

@@ -1,92 +1,119 @@
 # Vowed
 
-Stake on any goal, prove it each day with your phone, play with friends. A native Android app (Kotlin and Jetpack Compose) with a Solana program, built for the Solana Mobile "CLOCK IN" hackathon.
+**Stake on any goal, prove it each day with your phone, play with friends.** A native Android app (Kotlin and Jetpack Compose) with a Solana program, built for the Solana Mobile "CLOCK IN" hackathon.
 
-> **Status: work in progress, devnet only.** Everything below that says "works" was run on the Android emulator against Solana devnet with test tokens (see `docs/submission-notes.md` for exactly what is proven and what is not). No mainnet, no real funds. The program is unaudited.
+> **Status: hackathon build, Solana devnet only.** All money in the app is test tokens with no value. No mainnet, no real funds. The program is unaudited. Everything below that says "works" was run on the Android emulator against Solana devnet; what has *not* been run on a real phone is listed in [What is and is not verified](#what-is-and-is-not-verified).
 
-## What works today
+## The idea
 
-- Connect a wallet with Mobile Wallet Adapter, sign in, register the phone's hardware-backed proof key.
-- Create a challenge from a goal template, stake into a program-owned vault, check in each day, settle, and claim, including a success payout that includes a friend's forfeited stake.
-- Daily proofs: self-attest, focus timer, steps, place, app usage (collectors on the phone; verified end to end on devnet with the backend).
-- Demo pools with minutes-long days, always labelled **DEMO POOL**, for trying the whole loop quickly.
-- **Test tokens**: an in-app button that sends test USDC and test SKR (see below).
+Everyone fails their goals. In Vowed you type a goal in plain words ("No TikTok after 10pm for a week"), put a small stake behind it, and prove it each day with something the phone can check: the camera counting reps, the step counter, app-usage data, a focus timer, a place. Finish and you get your stake back (plus a share of friends' forfeits); miss days and part of it is forfeited. Squads, streaks, a coach and letters to your future self make it social.
 
-Built: staking and settlement, plain-language goals with camera, steps, timer, place, usage and self-report proofs, squads and Explore, coach, letters to future me, a home-screen widget, weekly SKR rewards and an SKR streak freeze (test SKR on devnet), and an open proof-provider format with a sample provider. Not built: real yield (shown as SIMULATED), push when the app is closed, voice letters, the signed release APK. See `SPEC.md` and `docs/progress.md`.
+## Architecture
 
-## Repository layout
+```
+Android app (Kotlin, Compose, MVVM)                 Wallet app (Mobile Wallet Adapter)
+  - wallet connect, sign-in, signing  <-------------> Seed Vault Wallet / Phantom / Solflare / Mock wallet
+  - proof engine on the phone (camera pose, steps, usage, timer, place)
+  - proof key in the Android Keystore (hardware-backed when the phone has it)
+  - decodes every transaction before the wallet signs it
+        |  HTTPS, JWT from wallet sign-in (kept encrypted with a Keystore key)
+        v
+Backend (TypeScript, Fastify, SQLite)
+  - API, goal parser (templates + Gemini), proof verifier, oracle signer,
+    chain indexer, settlement crank, test-token and SOL faucet, SKR rewards
+        |  Solana RPC
+        v
+Solana program (Anchor, Rust), devnet: BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL
+  - config, pools, participations, token vaults owned by the pool PDA
+```
 
 | Path | What |
 |---|---|
-| `programs/vowed` | Anchor program (Rust) and tests |
-| `backend` | TypeScript API, oracle, indexer, settlement crank, test-token faucet |
+| `programs/vowed` | Anchor program and tests (LiteSVM) |
+| `backend` | TypeScript API, oracle, indexer, crank, faucets, rewards |
 | `android` | Kotlin and Compose app |
 | `shared` | JSON schemas and test vectors used by all three |
-| `docs` | progress, verified facts, device tests, threat model, runbook |
+| `docs` | progress, verified facts, threat model, runbook, device tests, demo script, screenshots |
 
-Commands are listed in `CLAUDE.md` and `docs/runbook.md`.
+The backend builds each unsigned transaction; **the app decodes it and checks the program id, accounts and amounts against what it expects before asking the wallet to sign** (`TxChecker`). The wallet is the only signer of user funds.
+
+## Trust model (honest version)
+
+- **Funds are controlled only by the program.** Users sign their own deposits and claims. The oracle, admin and backend cannot move stakes.
+- **Daily completion is recorded by a backend oracle key** after it verifies a proof signed by the phone's hardware-backed key (nonce per proof, key attestation checked against Google's roots, plausibility limits). The oracle can be wrong or malicious, and a determined user can try to fake a proof. That is why every goal has a **trust tier** (high, medium, low) that caps the stake, and why pools have stake and size caps.
+- **Not built (roadmap):** multiple attestors, squad dispute voting, timelocked oracle rotation.
+- The full review (what the program guarantees, who can do what, threats and gaps) is in [`docs/threat-model.md`](docs/threat-model.md). Open gaps are listed there too: privacy policy, in-app data deletion, age gate.
 
 ## Solana Mobile Stack components used
 
-- **Mobile Wallet Adapter** (`clientlib-ktx` 2.2.0): connect, Sign-In-With-Solana, sign messages, sign and send transactions.
-- **Android Keystore** proof key with key attestation (the backend verifies the certificate chain against Google's roots).
-- Developed against the **Mock MWA Wallet**; a real MWA wallet and a Seeker are on the device checklist (`docs/device-tests.md`).
-
-## Test tokens (no outside faucet needed for the app's tokens)
-
-The app needs two kinds of devnet funds:
-
-1. **Test USDC (tUSDC) and test SKR (tSKR)**: our own tokens, created for this project. They have no value and exist only on devnet. In the app, **Today -> Test tokens -> Get test tokens**. The backend sends a small fixed amount (20 of each by default) to the signed-in wallet.
-   - Limits (enforced on the server): **one claim per wallet per 24 hours**, and a **global cap per UTC day** (200 claims by default). The caller cannot choose amounts or recipients. A failed send does not use up a claim. If the faucet's fee wallet runs low it stops and says so.
-   - The tokens are labelled "TEST TOKENS" wherever they appear.
-   - It is switched off unless the backend has `FAUCET_AUTHORITY_SECRET_KEY` and both mint addresses in its environment. The key is the mint authority of the two test mints; it lives only in the backend's environment (for local runs it is read from the git-ignored `backend/.devnet/` folder by `scripts/dev-backend.ps1`). It is never in the repository or the APK. See `backend/.env.example`.
-   - Tests for the limits: `backend/test/faucet.test.ts` (13 tests; deliberately broken versions of each limit are caught).
-2. **Devnet SOL** for network fees and account rent. The test tokens do **not** include SOL. A tester needs a little devnet SOL (a pool costs about 0.005 SOL of rent; joining about 0.002). Use Solana's public faucet at <https://faucet.solana.com/> or ask the project team. The "Copy my wallet address" button in the Test tokens card helps with this.
-
-### Circle's devnet USDC
-
-Circle's official devnet USDC (mint `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`) is on the allowed list for **normal (non-demo) pools**. Demo pools accept only our own test tokens, by design. Status of Circle USDC in the app, checked on 2026-10-07:
-
-- Creating a normal pool in the app with Circle's mint **works** (pool created on devnet, Open, 24-hour days).
-- Joining, check-ins and claiming with it are **not verified**, because no test wallet holds any and we did not call Circle's faucet (<https://faucet.circle.com/>, 20 USDC per address per chain every 2 hours, no account needed). The program treats every standard SPL mint the same way, so this is expected to work, but it is untested. A tester who gets Circle devnet USDC can use it for normal pools.
-
-## Using the app on devnet: which wallets can be set to devnet
-
-The app asks the wallet for the `solana:devnet` chain. A wallet that cannot serve that chain answers with the MWA error `ERROR_CHAIN_NOT_SUPPORTED`. What we verified against official documentation (sources in `docs/verified-facts.md`):
-
-| Wallet | Devnet | How |
+| Component | Used? | Where |
 |---|---|---|
-| Mock MWA Wallet (Solana Mobile's test wallet) | **Yes, verified by running it** | Submits to devnet RPC. Development only. |
-| Phantom | **Yes, per Phantom's docs** (not run by us) | Settings -> Developer Settings -> Testnet Mode, then enable Solana Devnet |
-| Solflare | **Yes, per Solflare's help center** (not run by us) | Settings -> Network -> Devnet (the article gives no more detail) |
-| Seed Vault Wallet (Seeker) | **Not documented**; unverified | Solana Mobile's docs do not say. To be tested on a Seeker. |
-| Backpack | **Unverified**; no official statement found | |
+| **Mobile Wallet Adapter** (`clientlib-ktx` 2.2.0) | Yes | connect, Sign-In-With-Solana, message signing, sign-and-send; the only signing path for user funds |
+| **SKR token** | Yes (devnet test SKR) | weekly rewards and a streak freeze, see below |
+| Seed Vault Wallet (Seeker) | Reachable through MWA, **not tested**; Seed Vault SDK signing is **not used** | see `docs/device-tests.md` |
+| Solana dApp Store | Not published; the app is meant to be publishable | `docs/verified-facts.md` |
+| Android Keystore key attestation | Yes (Android platform feature, not Solana Mobile) | proof key and trust tiers |
 
-## Goals in plain words (AI usage and costs)
+## How SKR is used (devnet test SKR only)
 
-Type a goal in your own words ("do 20 squats every day for a week"); the app shows a plan with how it will be proved, its **trust tier**, its limits, and lets you edit it before you stake.
+1. **Weekly rewards for the top streaks.** After each week a job pays 10, 5 and 3 SKR to the three longest streaks (at least 3 days, in challenges with two or more players; demo pools do not count), by plain token transfers from a rewards wallet, once per wallet per week. The **Rewards** screen shows the balance, a countdown, the podium, your rank and the leaderboards ("This week" and "All time").
+2. **A streak freeze costs 1 SKR.** It keeps your streak across one missed day. It never changes check-ins, days completed or payouts. The app checks the payment transaction on the phone before your wallet signs it; the server confirms it on chain.
 
-- **13 built-in templates work with no AI**: squats, push-ups, steps, walk outside, gym visit, focus/study time, reading, meditation, app-usage limit, no-use window for an app, early wake, phone-free sleep window, hydration. A deterministic matcher reads the amount, app, time window and length from the text. Common goals are answered this way, instantly and for free.
-- **Free-form goals use Google's Gemini free tier, through our server.** The app never holds a key. Only the **typed goal text** is sent to the model: no wallet address, no device information, no history. The free tier lets Google use submitted content to improve its products and allows human review, so the app says this before sending, asks people not to type personal details, and has a switch to turn AI off (then only the templates are used).
-- **The model's answer is never trusted.** It must pass a strict schema and a second set of rules: the proof type must fit the target, amounts must be realistic (too small or too large is refused), only whitelisted parameters survive (no coordinates), hidden or direction-changing characters are removed, and the **trust tier is always decided by the proof type**, never by the plan. Anything that fails falls back to the templates or asks a question. The same checks run again when a pool is created.
-- **Cost: $0.** Default model `gemini-3.5-flash-lite` on the free tier. The server caps its own use (per wallet per hour, per day for everyone), caches answers, and backs off when Google says it is busy. Exact free-tier limits are shown only in Google AI Studio, so none is assumed.
-- Goals no phone can verify (weight, food, smoking, feelings, money) are labelled as such, with a closest checkable version and an optional low-trust "I did it" version with a small stake cap.
+SKR staking is not used. On devnet SKR is our own test token with no value; mainnet SKR is never touched. Leaderboards show other people only as an avatar, a short name and a streak number, and a person can hide themselves in You.
 
-## Camera rep counting
+## How AI is used (and what it costs)
 
-Squats and push-ups are counted on the phone with CameraX and ML Kit pose detection (the model is inside the app; no download). **The camera image is analysed in memory and dropped: it is never stored or sent. Only the rep count and "hand-raise check passed" leave the phone.** Before the set counts, the screen asks for a random hand to be raised at a random moment, which a pre-recorded video cannot answer. The counting logic is unit-tested on a synthetic skeleton; counting a real person is on the real-device checklist (`docs/device-tests.md`) and has not been run yet.
+- **13 built-in templates work with no AI** (squats, push-ups, steps, walking, gym visits, focus time, reading, meditation, app limits, no-use windows, early wake, phone-free sleep, hydration). A deterministic matcher reads amount, app, time and length. Common goals are answered this way, instantly and for free.
+- **Free-form goals use Google's Gemini free tier, through our server.** The app never holds a key. Only the **typed goal text** is sent: no wallet address, device information or history. The free tier lets Google use submitted content to improve its products and allows human review, so the app says so before sending, and has a switch to turn AI off (then only the templates are used). On the hosted server a Gemini answer takes about 12 to 15 seconds, so the server waits up to 28 seconds before falling back to the templates.
+- **The model's answer is never trusted.** It must pass a strict schema and a second set of rules (the proof type must fit the target, amounts must be realistic, only whitelisted parameters survive, hidden characters are removed) and **the trust tier is decided by the proof type, never by the plan**. Anything that fails falls back to templates or asks a question.
+- **Camera rep counting is on the phone** (CameraX and ML Kit pose detection, the model is inside the app). Frames are analysed in memory and dropped; only the rep count and a hand-raise check result leave the phone.
+- **Cost: $0.** Default model `gemini-3.5-flash-lite` on the free tier, with per-wallet and daily caps, an answer cache and backoff.
 
-## Trust model (short)
+## Honesty labels
 
-Funds are held by the program; users sign their own deposits and claims. Daily completion is recorded by an **oracle** key after the backend verifies a device-signed proof. The oracle can be wrong or malicious; mitigations (hardware key attestation, nonces, trust tiers that cap stakes, plausibility limits, void before payout) are in `docs/threat-model.md`. Not built: multiple attestors, dispute voting.
+Anything simulated, sample or test is labelled where it appears, with a short tag and an (i) that explains it:
+
+| Label | Meaning |
+|---|---|
+| **TEST**, **TEST SKR**, tUSDC, tSKR | Devnet test tokens with no value |
+| **DEMO** / **DEMO MODE** | Demo pool: minutes-long "days", test money only, for trying the loop quickly |
+| **SAMPLE** | Made-up or team-created content (sample challenges, sample leaderboard players); never paid |
+| **SIMULATED** | Yield on stakes is not real in this version; the number shown is illustrative |
+| Trust level (High / Medium / Low) | How hard the proof is to fake; caps the stake |
+
+## Run it
+
+Prerequisites: Windows 11 with Git Bash and PowerShell, Node 24 (the backend uses the built-in `node:sqlite`), JDK 17, Android SDK (API 36 emulator), and WSL Ubuntu with Rust, Solana CLI and Anchor 1.2.0 for the program. All commands are also listed in `CLAUDE.md` and `docs/runbook.md`.
+
+```bash
+# backend (Windows): fast tests, then dev server against devnet
+cd backend && npm ci && npm test
+powershell scripts/dev-backend.ps1            # port 8787, throwaway devnet keys from backend/.devnet
+
+# program build and tests (WSL), then the backend suite that runs the real program in a VM
+wsl -d Ubuntu -u root -- bash /mnt/c/Users/hp/Vowed/scripts/program-build.sh
+wsl -d Ubuntu -u root -- bash /mnt/c/Users/hp/Vowed/scripts/backend-test.sh
+
+# Android: unit tests and debug APK, emulator, release APK
+powershell scripts/android-test.ps1
+powershell scripts/emulator.ps1               # AVD vowed_api36 and the Mock MWA Wallet
+powershell -ExecutionPolicy Bypass -File scripts/android-release.ps1   # signed release APK, prints size and SHA-256
+```
+
+The app talks to the hosted devnet backend `https://vowed-backend.onrender.com` by default (release builds can only use that URL; debug builds can switch to a local backend in You). Never put secrets in the repo: use `backend/.env.example` as the template for environment variables; `bash scripts/secret-scan.sh` scans the tree and the whole history before every push.
+
+### Test tokens, devnet SOL and wallets
+
+- **Get test tokens** (Home, tap the test-token pill): a small fixed amount of tUSDC and tSKR, once per wallet per 24 hours. The **first claim also sends 0.01 devnet SOL** for network fees, once per wallet, from a dedicated small wallet (never a public faucet), with daily and total caps. See `docs/runbook.md`.
+- **Using a real wallet:** use a throwaway wallet, switch it to devnet, never share a seed phrase. The app has a "Using a real wallet" screen in You. Phantom (Settings, Developer Settings, Testnet Mode) and Solflare (Settings, Network) document a devnet switch; neither was run by us. The Seed Vault Wallet is unverified. The Mock MWA Wallet works on devnet (verified). Sources in `docs/verified-facts.md`; a real-wallet test checklist is in `docs/device-tests.md`.
+- Circle's devnet USDC is on the allow list for normal pools; creating a pool with it works, joining and claiming with it are not verified.
+
+## What is and is not verified
+
+**Verified** (details and proofs in `docs/submission-notes.md` and `docs/progress.md`): the full loop on devnet with demo pools (create, join, check in, settle, claim) through the app on the emulator with the Mock wallet; the hosted backend; goals, Explore, squads, coach, letters, widget, rewards and streak freeze; leaderboards; the Keystore-encrypted session surviving an app restart; a signed release APK that launches. Tests: program 66, backend 289 passing (18 need the WSL VM), Android 114 unit tests.
+
+**Not verified yet:** any real phone or Seeker (camera counting of a real person, step counter, usage stats, hardware key attestation), Phantom, Solflare and the Seed Vault Wallet over MWA, Circle USDC join and claim, push notifications when the app is closed (needs a Firebase project), real yield (shown as SIMULATED), voice letters.
 
 ## License
 
-To be added before submission.
-
-
-## What SKR does in the app (devnet test SKR only)
-
-1. **Weekly rewards for the top streaks.** After each week a job pays 10, 5 and 3 SKR to the three longest streaks (at least 3 days, in challenges with two or more players; demo pools do not count). Paid by plain token transfers from a rewards wallet; paid at most once per wallet per week.
-2. **A streak freeze costs 1 SKR.** It keeps your streak alive across one missed day. It does not change check-ins, days completed or payouts. The app checks the payment transaction on the phone before your wallet signs it; the server confirms it on chain.
-SKR staking is not used. On devnet SKR is our own test token with no value; mainnet SKR is not touched. Details: `docs/progress.md` (Phase 8), `docs/verified-facts.md`, and the plug-in format in `docs/proof-provider-spec.md`.
+[MIT](LICENSE). Nunito font: SIL Open Font License 1.1 (`docs/licenses`). The Solana logomark and the SKR icon are used as supplied; see `docs/verified-facts.md` and `docs/photo-credits.md` for sources and terms.

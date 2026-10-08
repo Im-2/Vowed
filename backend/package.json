@@ -16,7 +16,6 @@
     "gate:goals": "tsx scripts/gate-goals.ts"
   },
   "dependencies": {
-    "@anchor-lang/core": "1.2.0",
     "@fastify/swagger": "9.9.1",
     "@solana/web3.js": "1.99.0",
     "asn1js": "3.0.10",

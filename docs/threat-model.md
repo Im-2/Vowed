@@ -114,3 +114,75 @@ Camera frames, sensor streams and raw location never reach the backend (the API 
 | A plan that tries to stake on a trivial or absurd target | Per-type minimum and maximum, enforced at parse time and again at pool creation (demo-sized amounts are refused in normal pools) | |
 | Pre-recorded video of squats to the camera | Random hand-raise on a random side at a random time | A second person off camera, or a replayed video that happens to include the right gesture, can still pass; server caps rep rate and requires a minimum session length |
 | Camera frames leaving the phone | Frames are analysed in memory and dropped; only the rep count and a boolean go to the server | A malicious build of the app (not a concern for the published APK) |
+
+
+---
+
+# Phase 9 security review (2026-10-08)
+
+A review of the whole system against SPEC 4.5 (program checklist) and SPEC 10 (security, privacy, compliance), done on the code as it stands. "Evidence" names the test or the file that shows it; "Gap" means it is not done. Nothing here is an audit: the program is unaudited and devnet only.
+
+## A. SPEC 4.5, the program checklist
+
+| Item | Status | Evidence (programs/vowed/tests/src) |
+|---|---|---|
+| Signer checks: only the oracle records check-ins; only the admin runs admin instructions; only the owner claims | Done | `checkin_only_by_the_oracle`, `only_admin_can_pause_and_rotate_oracle`, `only_admin_can_void`, `claim_before_settlement_and_by_wrong_signer_fails`, `init_config_only_by_upgrade_authority`, `join_requires_the_user_to_sign` |
+| PDA seeds and bumps on every account; no account substitution | Done | `cannot_substitute_another_pools_or_users_participation`, `create_pool_cannot_be_repeated_or_squatted`, `join_rejects_bad_token_accounts` |
+| Token checks: mint equals pool mint, token account owner and mint, vault authority is the pool PDA | Done | `claim_rejects_wrong_vault_mint_or_token_owner`, `create_pool_rejects_unlisted_mint_and_wrong_token_program`, `sweep_must_go_to_the_treasurys_token_account` |
+| Checked arithmetic, no overflow in payout math | Done | u128 intermediates and checked conversions; `shared_vectors_payouts`, `payouts_never_exceed_deposits` |
+| Closing and rent, no reinitialisation | Done (by not closing) | `init_config_cannot_run_twice`, `join_twice_is_rejected`, `settle_twice_is_rejected`, `claim_twice_is_rejected`. Accounts are never closed, so rent stays locked (a cost, not a risk) |
+| Max stake and duration limits | Done | `create_pool_validates_params`, `join_validates_amounts_and_timezone`, `demo_stake_cap_is_lower_than_the_normal_cap`, `demo_day_length_is_bounded`, `pool_capacity_is_enforced` |
+| Pause switch honoured by create and join | Done | `pause_blocks_create_and_join_but_not_settlement` |
+| Property tests: total paid out never exceeds total deposited | Done | `payouts_never_exceed_deposits` (pure math, random inputs), `onchain_random_pools_conserve_money` (LiteSVM) |
+| Threat model covering oracle compromise, replay, griefing by non-settlement, front-running on join | Done | sections 1, 2, 3, 5 of the program threat model above |
+| Rerun on 2026-10-08 | Done | program: 66 tests plus 5 in the second test crate, all passing in WSL (`scripts/program-build.sh`); backend with the real program in a VM: 307 of 307 passing (`scripts/backend-test.sh`); Windows run: 289 passing, 18 skipped (they need the VM) |
+
+Open item carried over: no integration test for Token-2022 extension rejection (only the account-size check).
+
+## B. SPEC 10, security, privacy and compliance
+
+| Item | Status | Notes |
+|---|---|---|
+| Threat model file | Done | this file: program, backend, goal parser and camera, and now the app and operations (section C) |
+| The app decodes every transaction and checks program id, accounts and amounts before the wallet signs | Done | `TxChecker.checkCreate/checkJoin/checkClaim/checkFreezePayment`; the review screen shows the decoded values, never the server summary; unit tests in `CoreTest` |
+| Stake caps and pool caps while unaudited; no mainnet without approval | Done | `max_stake`, `max_participants`, trust-tier caps, demo cap; the app and backend are devnet only (`network` in `/v1/meta`) |
+| Privacy policy | **Gap** | not written and not shown in the app. Needed before any public release |
+| In-app data deletion | **Gap** | the app has Disconnect (clears wallet, session, proof key) and Reset connection, and letters can be erased, but there is no single "delete my data" action, and nothing deletes server-side rows (plans, squads, proof records). Needs a backend delete endpoint and a screen |
+| Minimum data collection, no analytics SDKs | Done | no analytics or crash-reporting SDK in `app/build.gradle.kts`; camera frames, sensor streams and raw location stay on the phone (API has no field for them) |
+| Age gate (18+) for stakes with money | **Gap** | there is no age confirmation in the app. The tokens are devnet test tokens with no value, so this is a release blocker only for any real-money version |
+| Not a wager, small stakes, plain language, "rules differ by country" | Partly | wording avoids betting language and the app says devnet/test everywhere; the country note is not yet in the app. Not legal advice; flag for the team |
+| Dependency hygiene | Partly | see "Dependencies" below |
+
+## C. New surface added since the first two sections
+
+| Threat | Mitigation | Residual risk |
+|---|---|---|
+| Stolen phone or backup exposes the session | The backend token is stored only as AES-256-GCM ciphertext under a non-exportable Android Keystore key (`SessionStore`); `allowBackup="false"`; a changed or foreign ciphertext is wiped and treated as signed out. Tokens last 6 hours; `POST /v1/auth/refresh` renews a valid token, hard-capped at 7 days after the wallet signed in (tests: `session.test.ts`, `SessionTest`) | A token is API access only, never signing power. Someone with an unlocked phone can use the app until the token ends, as with any app. The Keystore key is not auth-bound (no biometric) |
+| Longer sessions raise the cost of a leaked token | 6 h instead of 1 h, per-wallet rate limits, refresh limited to 30 a day, sliding renewals stop at 7 days | A leaked token is useful for up to 6 hours and cannot be extended past 7 days from sign-in |
+| Phone key forgotten by the server, then silently re-registered | `device_not_registered` makes the app re-register with the SAME proof key, after the person approves a wallet signature; no hardware attestation is attached, so the server caps trust at low | A person can end up at low trust until they re-attest; shown in You as the trust cap |
+| Test-token and SOL faucets drained | Fixed amounts chosen by the server, once per wallet (SOL) and per 24 h (tokens), daily and total caps (30 gifts a day, 0.5 SOL ever), skip for wallets that already hold SOL, reservation before sending, keys only in server environment, wallet funded by hand (`faucet-sol.test.ts`, `faucet.test.ts`) | Many throwaway wallets can still take the whole 0.5 SOL; the loss is capped at that |
+| Rewards wallet abuse | Ladder fixed by the server; one reward per wallet per week; pools of one do not count; demo pools do not count; idempotent payouts; wallet address now public in `/v1/rewards` for checking (an address is not a secret) (`rewards.test.ts`) | Two wallets in one challenge can farm a small, capped ladder |
+| Leaderboards leak personal data | Others appear only as an avatar seed (wallet), a short name and a streak number; SAMPLE rows are flagged and never paid; a person can hide themselves (`leaderboard.test.ts`) | The wallet address itself is public on chain anyway |
+| Phishing of signing requests | The app builds the review from the decoded transaction and compares it with what the app expected; "Sign with wallet" is only reachable from that screen; the wallet shows its own transaction preview; the help screen says never to share a seed phrase and the app never asks for one | A compromised phone or wallet app can show anything. Not solvable in the app |
+| Malicious deep link | Only `https://vowed.app/join/<CODE>` is handled; the code is upper-cased and cut to 12 characters, then only pre-fills a field in Squads; nothing is sent or signed without a tap; the intent filter is not an app link (no `autoVerify`), so another app could claim the same URL | A user could be shown a wrong invite code; joining a squad is harmless and visible |
+| Exported components | Main activity (launcher and the join link) and the widget receiver (APPWIDGET_UPDATE, required to be exported for widgets) are the only exported components; no content providers; no exported services | |
+| Cleartext traffic | The release build talks to `https://vowed-backend.onrender.com` only (`BuildConfig.BACKEND_URL`); the `http://10.0.2.2` override and the cleartext network config exist only in debug builds | Debug APKs must never be distributed |
+| Release signing key | Generated on this PC, kept outside the repository (`~/.vowed-signing`), passwords never printed; signature verified with `apksigner verify`. This is a demo key for the hackathon APK | If the key is lost, updates to an installed APK cannot be signed. Back it up; use a new key and a new app id for any real release. Not a Play or dApp Store key |
+| Rooted devices and emulators | The server verifies the key attestation chain, boot state and security level; an emulator or unattested key is accepted only with `REQUIRE_ATTESTATION=false` and capped at low trust | Real phones and the Seeker are untested until `docs/device-tests.md` is run on them |
+| Oracle trust (restated for the pitch) | Funds move only by the program; the oracle can mis-record days but cannot take stakes; rotation and `void_pool` exist | Oracle compromise remains the main trust assumption; multiple attestors are roadmap, not built |
+| Hosted backend on a free plan | Secrets only in Render environment variables; the database lives on an ephemeral disk, so a redeploy loses server data (the chain is the source of truth, and the app re-registers the phone) | Not for real users |
+| Goal text sent to Gemini | Only the typed goal text, with a notice and an off switch; free-tier terms quoted in `docs/verified-facts.md`; the model call takes 12 to 15 s from the hosted server, so the server timeout is 28 s (see progress notes) | Users who type personal details anyway |
+
+## D. Dependencies
+
+- Backend: `npm audit --omit=dev` found 7 advisories (2 high). The two high ones came from `@anchor-lang/core`, a dependency nothing imported; **it was removed** (tests still pass). The remaining 4 moderate advisories are inside `@solana/web3.js` 1.x (`jayson`, `stream-json`, `uuid`), reached only through our own configured RPC, and the only fix offered is a breaking major upgrade; accepted for the hackathon, re-audit before any real use.
+- Android: versions are pinned in `app/build.gradle.kts`; no analytics SDK; the pose-detection library is a beta (`18.0.0-beta5`), which is the only Google-published pose model for Android we use. No Android dependency audit tool was run (none is set up).
+- Secrets: `bash scripts/secret-scan.sh` scans the working tree and the whole history before every push; it has been clean at every push.
+
+## E. Gaps to close before any public release (in order)
+
+1. Privacy policy and an in-app "Delete my data" (with a backend delete endpoint).
+2. Age confirmation if stakes ever carry real money; country note.
+3. Test the real wallets and a Seeker (`docs/device-tests.md`, R and S series).
+4. Move the program upgrade authority and the faucet mint authority off the deployer key; multisig or immutable program before any mainnet.
+5. Independent audit of the program; shared rate limiter if the backend runs on more than one instance; app links with `autoVerify` for `vowed.app`.
