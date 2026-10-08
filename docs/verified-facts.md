@@ -230,3 +230,6 @@ Counting method (ours, unit-tested on a synthetic skeleton, not yet on a real pe
 ## SKR token icon (2026-10-08, supplied by the owner)
 - `design/brand/skr-logo.png` (320x320, white S on a black circle with a gray ring) was **supplied by the project owner** and is used as the SKR icon in the token pill, the banner, balances and the SKR rewards and freeze screens (`res/drawable-nodpi/skr_logo.png`, 256 px).
 - **Comparison with an official-looking source:** Jupiter's token list gives the SKR icon as https://r2.solanamobiledappstore.com/skr/seeker.png (a Solana Mobile dApp store host; 500x500). It shows the same S glyph on a black circle, without the gray ring and with the S a little larger. No mismatch in the mark itself; the owner's file is that mark with a ring (a rendering variant). Nothing was switched. I could not confirm which of the two is the preferred brand file: the press kit linked from https://solanamobile.com/skr (Google Drive) cannot be fetched by a script.
+
+## Rewards diagnosis (2026-10-08)
+- Hosted `https://vowed-backend.onrender.com`: `/v1/rewards` enabled; rewards wallet public address reported by the server equals `7rgAagae2f4vepEFBcsSjwUEzEmx6ddMTUKYFQDFWgQ9`; devnet RPC (api.devnet.solana.com) shows 0.019995 SOL and 91 tSKR in its vault. Reward payouts need at least 0.005 SOL for fees.

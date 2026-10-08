@@ -16,7 +16,7 @@ Screens were captured from the debug build on the Android emulator (API 36). **S
 | 14-explore.png, 15-categories.png | Explore (filters, DEMO MODE quick challenges, SAMPLE and DEMO labels) and the categories grid |
 | 17-challenge-detail.png, 18-challenge-detail-demo.png | challenge detail (hero, streak, check-in panel, players, SIMULATED yield label) |
 | 19-squads.png, 20-squad-detail.png | squads list, create and join; squad detail with invite, leaderboard with Nudge, challenges, activity |
-| 21-leaderboard-rewards.png | top streaks and weekly SKR rewards (TEST SKR), streak freeze, SIMULATED yield note |
+| 21-leaderboard-rewards.png, 21b-rewards-lower.png | Rewards screen (round 3): SKR balance, payout countdown, podium, my rank, two-tab leaderboard with SAMPLE rows, streak freeze, collapsed SIMULATED yield (made-up preview data) |
 | 22-you.png, 23-coach.png, 24-letters.png | You hub, coach, letters |
 | 30-launcher-icon-light.png | the app icon in the emulator launcher (the emulator launcher did not follow dark mode, so the dark case is covered by the generated sheet below) |
 | icon-shapes-light-wallpaper.png, icon-shapes-dark-wallpaper.png, icon-themed-monochrome.png | the adaptive icon under circle, squircle and rounded-square masks on light and dark backgrounds, and the themed (monochrome) layer |

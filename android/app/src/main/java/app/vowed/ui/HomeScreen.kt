@@ -137,7 +137,7 @@ private fun HeroBanner(onSquads: () -> Unit) {
             bubble(0.70f, 62f, 46) { Avatar("hero-d-1122334455", 46.dp) }
             bubble(0.56f, 100f, 34) { app.vowed.ui.components.SkrIcon(34.dp) }
             bubble(0.04f, 100f, 30) { Avatar("hero-e-6677889900", 30.dp) }
-            bubble(0.82f, 6f, 30) { app.vowed.ui.components.SkrIcon(30.dp) }
+            bubble(0.77f, 10f, 30) { app.vowed.ui.components.SkrIcon(30.dp) }
         }
     }
 }
