@@ -4,6 +4,8 @@ import android.app.Application
 import app.vowed.data.AccountRepository
 import app.vowed.data.BackendApi
 import app.vowed.data.Prefs
+import app.vowed.data.SessionKeeper
+import app.vowed.data.SessionStore
 import app.vowed.letters.LetterCipher
 import app.vowed.letters.LetterStore
 import app.vowed.proof.ProofEngine
@@ -17,6 +19,11 @@ class AppContainer(val app: Application) {
     val wallet = WalletManager(prefs)
     val deviceKey: (String) -> DeviceKey = { DeviceKey(app, it) }
     val letters = LetterStore(java.io.File(app.filesDir, "letters.bin"), LetterCipher { LetterCipher.keystoreKey() })
+    val sessions = SessionKeeper(
+        store = SessionStore(prefs.sessionKv, LetterCipher { LetterCipher.keystoreKey("vowed-session-v1") }),
+        setToken = { api.token = it },
+        refreshCall = { api.refreshSession() },
+    )
     val account = AccountRepository(this)
     val proofs = ProofEngine(api, { deviceKey(prefs.wallet ?: error("no wallet")) })
 }

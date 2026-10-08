@@ -268,3 +268,12 @@ Done in four commits (logo and theme; splash, onboarding and connect; home, crea
 - **App:** new Rewards screen, "Hide me from the leaderboard" switch and a collapsed Labs section (open proof plug-ins sample) in You, SIMULATED yield as a small collapsed card at the bottom of Rewards.
 - **Home banner:** 5 avatars, exactly two SKR logos, exactly one Solana logo.
 - **Photos:** `study.jpg` added; all 8 category photos present.
+
+## Sign-in reliability, devnet SOL and the real-wallet path (2026-10-08)
+- **Session kept across restarts:** the backend token is saved as Keystore-encrypted ciphertext, restored at start, and renewed quietly (`POST /v1/auth/refresh`, tokens last 6 hours, hard cap 7 days since the wallet signed in; the app checks every 10 minutes). Verified on the emulator: real sign-in with the Mock wallet, force-stop, reopen: Home opens without the wallet. A storage failure never blocks signing in.
+- **Server forgot this phone:** a `device_not_registered` answer makes the app register the phone again (existing proof key kept, lowest trust, one wallet approval) with one plain sentence before and after. A 401 ends the session cleanly with a sign-in prompt instead of repeated failures.
+- **Wallet messages:** locked wallet, slow cold start, timeout, declined, expired transaction, wrong network and no-fee-funds each get one clear sentence (`WalletErrors`). **Reset connection** in You (keeps stakes and the proof key).
+- **Devnet SOL:** the first "Get test tokens" claim also sends 0.01 SOL from a dedicated wallet (once per wallet, 30 gifts a day, 0.5 SOL in total, nothing for wallets that already hold 0.05 SOL; a failed SOL send never fails the token claim). Address `Fmdh1ngUaoYqTpUkCksRXQX9zz9E9bgF1M5e7vmJXsu7`, funded with 0.1 SOL from the deployer (about 10 testers). **Not yet active on the hosted server:** add the line in `backend/.devnet/render-env-sol-faucet.txt` to Render (see docs/runbook.md).
+- **Real wallets:** "Using a real wallet" help screen, wrong-network message, sources in `docs/verified-facts.md`, test checklist in `docs/device-tests.md`. Phantom and Solflare devnet support is documented but not run by us; the Seed Vault Wallet is unverified.
+- **Bug found by the emulator run:** Keystore AES-GCM rejects a caller-chosen IV; fixed in `LetterCipher` (this also fixes Letters on real devices).
+- Tests: backend 289 pass (Windows), Android 102 unit tests pass.

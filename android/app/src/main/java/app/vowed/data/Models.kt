@@ -113,7 +113,10 @@ data class ProofSession(
 @Serializable data class ProofResult(val accepted: Boolean, val trustTier: String, val daysCompleted: Int, val streak: Int, val checkin: CheckinOutcome)
 
 @Serializable data class FaucetToken(val symbol: String, val name: String, val mint: String, val amount: String, val decimals: Int)
-@Serializable data class FaucetBalances(val tUSDC: String = "0", val tSKR: String = "0")
+@Serializable data class FaucetBalances(val tUSDC: String = "0", val tSKR: String = "0", /** lamports of devnet SOL */ val sol: String = "0")
+/** The small one-time gift of devnet SOL for network fees. */
+@Serializable data class FaucetSol(val enabled: Boolean = false, val lamports: String = "0", val received: Boolean = false)
+@Serializable data class SolGift(val status: String, val lamports: String = "0", val reason: String? = null, val signature: String? = null)
 @Serializable
 data class FaucetStatus(
     val enabled: Boolean,
@@ -124,9 +127,10 @@ data class FaucetStatus(
     val nextClaimAt: Long = 0,
     val claimsLeftToday: Int = 0,
     val balances: FaucetBalances = FaucetBalances(),
+    val sol: FaucetSol = FaucetSol(),
 )
 @Serializable data class FaucetMinted(val tUSDC: String, val tSKR: String)
-@Serializable data class FaucetClaim(val signature: String, val minted: FaucetMinted, val nextClaimAt: Long, val label: String)
+@Serializable data class FaucetClaim(val signature: String, val minted: FaucetMinted, val nextClaimAt: Long, val label: String, val sol: SolGift? = null)
 
 @Serializable data class ParseRequest(val text: String, val useAi: Boolean = true)
 @Serializable data class PlanExtras(val needsPlace: Boolean = false, val needsApp: Boolean = false, val limitations: List<String> = emptyList())

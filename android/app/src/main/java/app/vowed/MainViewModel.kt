@@ -14,6 +14,8 @@ import app.vowed.core.TxRejected
 import app.vowed.core.TxReview
 import app.vowed.data.Account
 import app.vowed.data.ApiException
+import app.vowed.data.FaucetText
+import app.vowed.data.SessionKeeper
 import app.vowed.data.Challenge
 import app.vowed.data.ChallengeDetail
 import app.vowed.data.ClaimTxRequest
@@ -181,15 +183,49 @@ data class UiState(
     val newGoalSquadId: String? = null,
     /** an invite code from a link, waiting for the Squads screen */
     val pendingJoinCode: String? = null,
+    /** one plain sentence about something the app did on its own (session ended, phone registered again, connection reset) */
+    val notice: String? = null,
+    /** the server forgot this phone: the app registers it again (the wallet is asked to approve) */
+    val deviceRecovery: DeviceRecovery = DeviceRecovery.None,
 )
+
+enum class DeviceRecovery { None, Needed, Working }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val c = (application as VowedApp).container
     private val _state = MutableStateFlow(UiState(account = c.account.current))
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    init {
+        c.api.onDeviceUnknown = { _state.update { if (it.deviceRecovery == DeviceRecovery.None) it.copy(deviceRecovery = DeviceRecovery.Needed) else it } }
+        c.api.onUnauthorized = {
+            c.account.sessionExpired()
+            _state.update { if (it.signedIn) it.copy(signedIn = false, notice = SESSION_ENDED) else it }
+        }
+        // after a restart: sign back in from the saved encrypted session, without the wallet, while it is still valid
+        if (_state.value.account != null && c.account.restoreSession()) _state.update { it.copy(signedIn = true) }
+        viewModelScope.launch {
+            // keep the session alive quietly: at start, then every 10 minutes while the app is open
+            while (true) {
+                if (c.account.signedIn) refreshSessionNow()
+                kotlinx.coroutines.delay(SESSION_CHECK_MS)
+            }
+        }
+    }
+
+    private suspend fun refreshSessionNow() {
+        if (c.account.refreshSession() == SessionKeeper.Outcome.Expired && _state.value.signedIn) {
+            _state.update { it.copy(signedIn = false, notice = SESSION_ENDED) }
+        }
+    }
+
     val prefs get() = c.prefs
     val hasSavedAccount: Boolean get() = c.account.current != null
+
+    private companion object {
+        const val SESSION_CHECK_MS = 10 * 60 * 1000L
+        const val SESSION_ENDED = "Your session ended. Sign in with your wallet again."
+    }
 
     private fun friendly(e: Throwable): String = when (e) {
         is ApiException -> if (e.code == "network") e.message else "${e.message} (${e.code})"
@@ -230,6 +266,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun dismissConnectError() = _state.update { it.copy(connectError = null) }
+
+    fun dismissNotice() = _state.update { it.copy(notice = null) }
+
+    /** "Reset connection" in You: forget the session and the wallet authorization; the next sign-in starts clean. */
+    fun resetConnection() {
+        c.account.resetConnection()
+        _state.update { it.copy(signedIn = false, connecting = null, connectError = null, notice = "Connection reset. Tap Sign in to connect your wallet again.") }
+    }
+
+    /** The server did not know this phone: register it again, with one clear sentence for the person. */
+    fun recoverDevice(sender: ActivityResultSender) {
+        if (_state.value.deviceRecovery != DeviceRecovery.Needed) return
+        _state.update { it.copy(deviceRecovery = DeviceRecovery.Working, notice = "The server forgot this phone (it was updated), so Vowed is registering it again. Approve the request in your wallet.") }
+        viewModelScope.launch {
+            try {
+                c.account.reRegisterDevice(sender)
+                _state.update { it.copy(deviceRecovery = DeviceRecovery.None, notice = "This phone is registered again. Please repeat what you were doing.") }
+            } catch (e: Throwable) {
+                _state.update { it.copy(deviceRecovery = DeviceRecovery.None, notice = friendly(e)) }
+            }
+        }
+    }
 
     // ------------------------------------------------------------------ data
 
@@ -510,7 +568,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val r = c.api.faucetClaim()
                 val st = runCatching { c.api.faucet() }.getOrNull()
-                _state.update { it.copy(faucet = it.faucet.copy(claiming = false, status = st ?: it.faucet.status, message = "Sent ${app.vowed.core.TxChecker.formatUnits(java.math.BigInteger(r.minted.tUSDC))} tUSDC and ${app.vowed.core.TxChecker.formatUnits(java.math.BigInteger(r.minted.tSKR))} tSKR (test tokens).")) }
+                _state.update { it.copy(faucet = it.faucet.copy(claiming = false, status = st ?: it.faucet.status, message = FaucetText.claimMessage(r))) }
             } catch (e: Throwable) {
                 val st = runCatching { c.api.faucet() }.getOrNull()
                 _state.update { it.copy(faucet = it.faucet.copy(claiming = false, status = st ?: it.faucet.status, error = friendly(e))) }

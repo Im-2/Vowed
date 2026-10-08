@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -71,6 +72,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
     val start = if (vm.prefs.onboarded && state.account != null) "home" else "onboarding"
 
     LaunchedEffect(Unit) { vm.loadMeta() }
+    LaunchedEffect(state.deviceRecovery) { if (state.deviceRecovery == app.vowed.DeviceRecovery.Needed) vm.recoverDevice(sender) }
     LaunchedEffect(state.account?.wallet) { app.vowed.ui.components.Avatars.mineWallet = state.account?.wallet; app.vowed.ui.components.Avatars.mineIndex = vm.prefs.avatarIndex }
     // After a successful connect from onboarding, go home.
     LaunchedEffect(state.signedIn) {
@@ -218,14 +220,16 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
                 onRead = vm::readLetter, onCloseReading = vm::closeLetter, onSimulate = vm::evaluateLetters,
             )
         }
+        composable("wallet-help") { app.vowed.ui.WalletHelpScreen(onBack = { nav.popBackStack() }) }
         composable("practice") { app.vowed.ui.PracticeScreen(onBack = { nav.popBackStack() }) }
         composable("settings") {
-            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onHideFromBoard = vm::setLeaderboardHidden, onLoadBoard = vm::loadRewards, onSampleProvider = vm::runSampleProvider, onDisconnect = {
+            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onResetConnection = vm::resetConnection, onWalletHelp = { nav.navigate("wallet-help") }, onHideFromBoard = vm::setLeaderboardHidden, onLoadBoard = vm::loadRewards, onSampleProvider = vm::runSampleProvider, onDisconnect = {
                 vm.disconnect(sender)
                 nav.navigate("onboarding") { popUpTo(0) }
             })
         }
     }
+    app.vowed.ui.NoticeBanner(state.notice, vm::dismissNotice, Modifier.align(androidx.compose.ui.Alignment.TopCenter).statusBarsPadding())
     } }
     if (splash) app.vowed.ui.SplashScreen { splash = false }
 }

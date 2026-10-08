@@ -99,3 +99,25 @@ Pose counting must be tested by a real person on a real phone; the emulator came
 - L3. "Erase it after I have read it": the letter is gone after Close.
 - C1. Coach: after a real (non-demo) challenge with missed days, Coach shows "go a little easier"; with all days done twice, "ready for a harder one".
 - X1. Widget: You > Add the widget; accept the system dialog; open Today and refresh; the widget shows the count of check-ins due, then "All done today" after a check-in, and the best streak.
+
+## Real-wallet test checklist (sign-in, session, devnet)
+
+Use a **throwaway wallet** made only for this test, on a phone with Phantom or Solflare (or the Seed Vault Wallet on a Seeker). Never type or share a seed phrase; Vowed never asks for one. Result column: fill in per wallet and wallet version.
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| R1 | Wallet still on mainnet: Sign in | Either the wallet refuses (error -7, chain not supported) and Vowed says "Your wallet is not on Solana devnet..." with a pointer to "Using a real wallet", or sign-in works but the first transaction fails; the message must mention devnet, not a raw error | |
+| R2 | Switch the wallet to devnet (Phantom: Settings, Developer Settings, Testnet Mode, Solana Devnet; Solflare: Settings, Network, Devnet), Sign in again | "Wallet connected", Home opens; the TEST pill and DEVNET labels are visible | |
+| R3 | You > "Using a real wallet" | The three rules and the switch steps are readable; nothing asks for a key | |
+| R4 | Home > test-token pill > "Get test tokens" on a wallet with 0 SOL | tUSDC, tSKR and "Plus 0.01 SOL (devnet) for network fees" (if the SOL faucet is on on the server); balance shows the SOL | |
+| R5 | Same wallet, claim again after the cooldown | Tokens again, no second SOL gift | |
+| R6 | Create a demo challenge, review, sign | The wallet shows a devnet transaction; the app shows the stake after approval | |
+| R7 | Approve more than a minute late | "The transaction expired before it was approved" message, nothing lost | |
+| R8 | Lock the wallet, then tap Sign in | A message that says to open the wallet and unlock it, then try again | |
+| R9 | Decline the sign-in in the wallet | "The request was declined in the wallet, so nothing was signed" | |
+| S1 | Sign in, then close the app from recents and open it again | Home opens at once with no wallet prompt (the encrypted session was restored) | |
+| S2 | Leave the app closed for more than 6 hours (or 7 days), open it | Asks to sign in with the wallet again, with one clear sentence | |
+| S3 | Keep the app open for a few hours | No sign-in prompt; the session is renewed quietly (checked every 10 minutes) | |
+| S4 | Server update that wipes the database (Render redeploy on the free plan), then try to join or check in | "The server forgot this phone (it was updated), so Vowed is registering it again. Approve the request in your wallet." then "This phone is registered again. Please repeat what you were doing." | |
+| S5 | You > Reset connection, then Sign in | Back to the sign-in screen with one sentence; sign-in works; challenges and stakes are still there | |
+| S6 | Mock wallet: after a cold start, a first Connect that times out | Message about the wallet taking long and what to do; the second try works once the wallet is warm | |

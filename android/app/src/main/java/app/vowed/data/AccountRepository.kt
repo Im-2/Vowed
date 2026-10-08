@@ -25,6 +25,25 @@ class AccountRepository(private val c: AppContainer) {
 
     val signedIn: Boolean get() = c.api.token != null
 
+    /** After an app restart: sign back in from the saved (encrypted) session, without the wallet, while it is still valid. */
+    fun restoreSession(): Boolean = c.sessions.restore(c.prefs.wallet)
+
+    /** Quietly swaps a token that is about to run out for a new one. */
+    suspend fun refreshSession(): SessionKeeper.Outcome = c.sessions.refreshIfNeeded()
+
+    /** The server said the token is no good. */
+    fun sessionExpired() = c.sessions.expire()
+
+    /**
+     * "Reset connection": forgets the backend session and the wallet's authorization so the next connect starts clean. The proof key on this
+     * phone and the device registration are kept (a stake is bound to that key); the account on the server is not touched.
+     */
+    fun resetConnection() {
+        c.sessions.forget()
+        c.prefs.mwaAuthToken = null
+        c.wallet.forgetAuthorization()
+    }
+
     suspend fun connect(sender: ActivityResultSender, onStep: (ConnectStep) -> Unit = {}): Account {
         onStep(ConnectStep.Wallet)
         val out = c.wallet.connectAndSignIn(sender) { address -> onStep(ConnectStep.SigningIn); c.api.nonce(address) }
@@ -35,7 +54,7 @@ class AccountRepository(private val c: AppContainer) {
                 signature = Base64.encodeToString(out.signature, Base64.NO_WRAP),
             ),
         )
-        c.api.token = res.token
+        c.sessions.adopt(res)
         val previous = c.prefs.wallet
         if (previous != null && previous != res.wallet) c.prefs.clearAccount() // a different wallet: forget the old account's local state
         c.prefs.wallet = res.wallet
@@ -83,9 +102,33 @@ class AccountRepository(private val c: AppContainer) {
         c.prefs.setDeviceTrustCap(wallet, reg.trustCap)
     }
 
+    /**
+     * The server forgot this phone (after an update that wiped its data). Registers the phone again: with the proof key it already has, so that
+     * existing stakes stay valid (without hardware attestation, because a fresh server challenge cannot be added to an old key; the trust cap is
+     * then the lowest), or with a new attested key when there is none.
+     */
+    suspend fun reRegisterDevice(sender: ActivityResultSender) {
+        val wallet = c.prefs.wallet ?: error("no wallet")
+        val key = c.deviceKey(wallet)
+        if (!key.exists) { registerDevice(sender, wallet); return }
+        val ch = c.api.deviceChallenge()
+        val message = "Vowed device registration\nwallet: $wallet\ndevice: ${key.id()}\nchallenge: ${ch.challenge}".encodeToByteArray()
+        val sig = c.wallet.signMessage(sender, wallet, message)
+        val reg = c.api.registerDevice(
+            DeviceRegisterRequest(
+                devicePublicKey = Base64.encodeToString(key.publicKeySpki(), Base64.NO_WRAP),
+                attestationChain = null,
+                challenge = ch.challenge,
+                walletSignature = Base64.encodeToString(sig, Base64.NO_WRAP),
+            ),
+        )
+        c.prefs.setRegisteredDevice(wallet, reg.deviceId)
+        c.prefs.setDeviceTrustCap(wallet, reg.trustCap)
+    }
+
     suspend fun disconnect(sender: ActivityResultSender) {
         c.wallet.disconnect(sender)
-        c.api.token = null
+        c.sessions.forget()
         c.prefs.wallet?.let { c.deviceKey(it).delete() }
         c.prefs.clearAccount()
         c.prefs.onboarded = false

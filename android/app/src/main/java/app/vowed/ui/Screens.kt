@@ -571,6 +571,7 @@ private fun AvatarPicker(wallet: String?) {
 fun SettingsScreen(
     state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit,
     onHideFromBoard: (Boolean) -> Unit = {}, onLoadBoard: () -> Unit = {}, onSampleProvider: () -> Unit = {},
+    onResetConnection: () -> Unit = {}, onWalletHelp: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     LaunchedEffect(state.signedIn) { if (state.signedIn) onLoadBoard() }
@@ -617,6 +618,7 @@ fun SettingsScreen(
                     Switch(checked = hidden == true, onCheckedChange = onHideFromBoard, enabled = hidden != null && !state.rewardsUi.savingHidden)
                 }
             }
+            HubRow("Using a real wallet", "Throwaway wallet, devnet, never share a seed phrase", app.vowed.ui.art.Glyph.User, app.vowed.ui.components.CategoryStyle.colors("sleep"), onWalletHelp)
             LabsSection(onSampleProvider)
             Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (app.vowed.BuildConfig.DEBUG) {
@@ -632,6 +634,16 @@ fun SettingsScreen(
                         }
                         Text("Now: $shown", style = MaterialTheme.typography.bodySmall)
                     }
+                }
+            }
+            AppCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Connection trouble?", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Reset connection forgets the saved sign-in and the wallet permission, so the next Sign in starts clean. Your challenges, your stakes and the proof key on this phone are not touched.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    app.vowed.ui.components.SoftButton("Reset connection", onResetConnection, Modifier.fillMaxWidth())
                 }
             }
             app.vowed.ui.components.SoftButton("Disconnect wallet", onDisconnect)

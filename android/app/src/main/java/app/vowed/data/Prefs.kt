@@ -4,11 +4,18 @@ import android.content.Context
 import app.vowed.BuildConfig
 
 /**
- * Small local settings. Nothing secret is stored: the wallet's auth token is an opaque reference the wallet app itself checks,
- * and the backend token lives in memory only (it is re-obtained through the wallet when the app restarts).
+ * Small local settings. Nothing secret is stored here in plain text: the wallet's auth token is an opaque reference the wallet app itself checks,
+ * and the backend session is kept only as Keystore-encrypted ciphertext (see [SessionStore]).
  */
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("vowed", Context.MODE_PRIVATE)
+
+    /** The encrypted session blob lives in its own preferences file so that clearing settings never leaves a half-written session. */
+    val sessionKv: KeyValue = object : KeyValue {
+        private val ssp = context.getSharedPreferences("vowed_session", Context.MODE_PRIVATE)
+        override fun get(key: String): String? = ssp.getString(key, null)
+        override fun put(key: String, value: String?) = ssp.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()
+    }
 
     var onboarded: Boolean
         get() = sp.getBoolean("onboarded", false)

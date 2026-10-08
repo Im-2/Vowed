@@ -94,6 +94,7 @@ fun PreviewMore(screen: String) {
         "squads" -> SquadsScreen(squadState, none, {}, {}, {}, null)
         "squad-detail" -> SquadDetailScreen(squadState, Samples.ME, none, none, {}, {}, none)
         "you" -> SettingsScreen(st, "https://vowed-backend.onrender.com", none, none, none, none, none, none)
+        "wallet-help" -> app.vowed.ui.WalletHelpScreen(none)
         "rewards" -> RewardsScreen(st, Samples.ME, none, none, { _, _ -> }, none)
         "coach" -> CoachScreen(
             st.copy(

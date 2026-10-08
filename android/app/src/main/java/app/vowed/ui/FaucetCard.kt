@@ -56,6 +56,7 @@ fun FaucetPanel(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim: 
                 app.vowed.ui.components.SkrIcon(20.dp)
                 Text("${fmt(st.balances.tSKR)} tSKR", style = MaterialTheme.typography.titleSmall)
             }
+            Text("Devnet SOL for fees: ${app.vowed.data.FaucetText.sol(st.balances.sol)} SOL", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val usdc = st.tokens.firstOrNull { it.symbol == "tUSDC" }
             val skr = st.tokens.firstOrNull { it.symbol == "tSKR" }
             if (usdc != null && skr != null) Text("One claim gives ${fmt(usdc.amount)} tUSDC and ${fmt(skr.amount)} tSKR, once a day per wallet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -72,7 +73,12 @@ fun FaucetPanel(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim: 
         if (faucet.claiming) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) { app.vowed.ui.components.Spinner(size = 20.dp); Text("Sending test tokens…") }
         faucet.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
         faucet.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        Text("Network fees are paid in devnet SOL, which these tokens do not include.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val sol = st?.sol
+        Text(
+            if (sol != null && sol.enabled && !sol.received) "Network fees are paid in devnet SOL. Your first claim also sends about ${app.vowed.data.FaucetText.sol(sol.lamports)} SOL for fees (once per wallet)."
+            else "Network fees are paid in devnet SOL, which the test tokens do not include.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (wallet != null) {
             androidx.compose.material3.TextButton(onClick = {
                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

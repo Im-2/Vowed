@@ -31,8 +31,8 @@ class WalletManager(private val prefs: Prefs, private val gate: WalletSessionGat
     private fun <T> TransactionResult<T>.unwrap(): T = when (this) {
         is TransactionResult.Success -> payload.also { prefs.mwaAuthToken = adapter.authToken }
         is TransactionResult.NoWalletFound -> throw WalletException("No Solana wallet app was found on this phone. Install a Mobile Wallet Adapter wallet first.")
-        // The library reports declined requests, rejected transactions and a missing wallet with similar wording.
-        is TransactionResult.Failure -> throw WalletException(if (WalletSessionGate.isAssociationFailure(message)) WalletSessionGate.CLOSED_BEFORE_CONNECTING else "The wallet did not complete the request (${message.ifBlank { "no detail" }}). If you were signing a transaction, try again and approve right away: a transaction expires after about a minute.")
+        // The library reports declined requests, rejected transactions and a missing wallet with similar wording; WalletErrors picks the plain sentence.
+        is TransactionResult.Failure -> throw WalletException(WalletErrors.explain(message))
     }
 
     /**
@@ -64,6 +64,12 @@ class WalletManager(private val prefs: Prefs, private val gate: WalletSessionGat
     /** Signs and submits [tx] (an unsigned legacy transaction). Returns the 64-byte transaction signature. */
     suspend fun signAndSend(sender: ActivityResultSender, tx: ByteArray): ByteArray =
         sequential { adapter.transact(sender) { signAndSendTransactions(arrayOf(tx)) } }.unwrap().signatures.first()
+
+    /** Drops the saved wallet authorization (the next connect asks the wallet again). */
+    fun forgetAuthorization() {
+        adapter.authToken = null
+        prefs.mwaAuthToken = null
+    }
 
     suspend fun disconnect(sender: ActivityResultSender) {
         runCatching { adapter.disconnect(sender) }

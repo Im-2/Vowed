@@ -16,6 +16,12 @@ import java.util.concurrent.TimeUnit
 class BackendApi(private val baseUrl: () -> String, private val client: OkHttpClient = defaultClient()) {
     @Volatile var token: String? = null
 
+    /** Called when the server says it does not know this phone's proof key (for example after a server update wiped it). */
+    @Volatile var onDeviceUnknown: (() -> Unit)? = null
+
+    /** Called when a request made with a token is refused with 401 (the token expired or the server no longer accepts it). */
+    @Volatile var onUnauthorized: (() -> Unit)? = null
+
     private val jsonType = "application/json".toMediaType()
 
     private suspend fun <T> call(method: String, path: String, body: String?, idempotent: Boolean = false, parse: (String) -> T): T = withContext(Dispatchers.IO) {
@@ -31,6 +37,8 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
                 val text = res.body?.string().orEmpty()
                 if (!res.isSuccessful) {
                     val err = runCatching { AppJson.decodeFromString<ApiErrorBody>(text).error }.getOrNull()
+                    if (err?.code == DEVICE_NOT_REGISTERED) onDeviceUnknown?.invoke()
+                    if (res.code == 401 && token != null) onUnauthorized?.invoke()
                     throw ApiException(res.code, err?.code ?: "http_${res.code}", err?.message ?: "The server answered ${res.code}.")
                 }
                 parse(text)
@@ -48,6 +56,7 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     suspend fun meta(): Meta = get("/v1/meta")
     suspend fun nonce(wallet: String): NonceResponse = post("/v1/auth/nonce", NonceRequest(wallet))
     suspend fun verify(req: VerifyRequest): VerifyResponse = post("/v1/auth/verify", req)
+    suspend fun refreshSession(): VerifyResponse = post("/v1/auth/refresh", JsonObject(emptyMap()))
     suspend fun deviceChallenge(): DeviceChallengeResponse = post("/v1/devices/challenge", JsonObject(emptyMap()))
     suspend fun registerDevice(req: DeviceRegisterRequest): DeviceRegisterResponse = post("/v1/devices/register", req)
     suspend fun challenges(mine: Boolean = true): ChallengeList = get("/v1/challenges?mine=$mine&limit=50")
@@ -97,6 +106,8 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     suspend fun sync(signature: String): Unit = call("POST", "/v1/challenges/sync", AppJson.encodeToString(SyncRequest(signature))) { }
 
     companion object {
+        const val DEVICE_NOT_REGISTERED = "device_not_registered"
+
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
