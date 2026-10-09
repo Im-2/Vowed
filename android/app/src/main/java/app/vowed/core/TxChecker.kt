@@ -245,6 +245,9 @@ object TxChecker {
     private fun String.short() = if (length > 12) "${take(5)}…${takeLast(5)}" else this
 
     /** Test tokens have 6 decimals. */
+    /** 350 -> "0.4 s", 12500 -> "12.5 s". */
+    fun formatMillis(ms: Long): String = "%.1f s".format(java.util.Locale.US, ms / 1000.0)
+
     fun formatUnits(baseUnits: BigInteger, decimals: Int = 6): String {
         val s = baseUnits.toString().padStart(decimals + 1, '0')
         val whole = s.dropLast(decimals)

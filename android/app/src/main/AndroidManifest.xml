@@ -10,6 +10,11 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <!-- lets the wallet setup screen check whether Phantom or Solflare is installed (package visibility, Android 11 and later) -->
+    <queries>
+        <package android:name="app.phantom" />
+    </queries>
+
     <application
         android:name=".VowedApp"
         android:label="Vowed"

@@ -46,14 +46,23 @@ class AccountRepository(private val c: AppContainer) {
 
     suspend fun connect(sender: ActivityResultSender, onStep: (ConnectStep) -> Unit = {}): Account {
         onStep(ConnectStep.Wallet)
-        val out = c.wallet.connectAndSignIn(sender) { address -> onStep(ConnectStep.SigningIn); c.api.nonce(address) }
-        val res = c.api.verify(
-            VerifyRequest(
-                wallet = out.address,
-                message = Base64.encodeToString(out.signedMessage, Base64.NO_WRAP),
-                signature = Base64.encodeToString(out.signature, Base64.NO_WRAP),
-            ),
-        )
+        // Ask for the nonce NOW, while Vowed is on screen: once the wallet opens, Vowed is in the background and Android (Data Saver, battery
+        // limits) may block its network, which showed up as "Unable to resolve host". Nothing is sent while the wallet is in front.
+        val nonce = SignInNonce.prepare { c.api.openNonce() }
+        val out = c.wallet.connectAndSignIn(sender, nonce) { address -> onStep(ConnectStep.SigningIn); c.api.nonce(address) }
+        onStep(ConnectStep.SigningIn)
+        val res = try {
+            c.api.verify(
+                VerifyRequest(
+                    wallet = out.address,
+                    message = Base64.encodeToString(out.signedMessage, Base64.NO_WRAP),
+                    signature = Base64.encodeToString(out.signature, Base64.NO_WRAP),
+                ),
+            )
+        } catch (e: ApiException) {
+            if (nonce.wasPrefetched && e.status == 401) throw ApiException(401, "sign_in_expired", "Signing in took too long, so the request expired. Tap Connect wallet and approve again.", e.message)
+            throw e
+        }
         c.sessions.adopt(res)
         val previous = c.prefs.wallet
         if (previous != null && previous != res.wallet) c.prefs.clearAccount() // a different wallet: forget the old account's local state

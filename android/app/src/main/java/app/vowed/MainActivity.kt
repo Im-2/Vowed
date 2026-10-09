@@ -18,6 +18,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import app.vowed.wallet.WalletSetupLogic
 import app.vowed.ui.CheckInScreen
 import app.vowed.ui.DetailScreen
 import app.vowed.ui.Page
@@ -71,6 +72,16 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
     val nav: NavHostController = rememberNavController()
     val start = if (vm.prefs.onboarded && state.account != null) "home" else "onboarding"
 
+    // the wallet setup screen is shown when the person first connects, when the wallet turned the connection down for a network reason, or from You
+    val route0 = nav.currentBackStackEntryAsState().value?.destination?.route
+    LaunchedEffect(state.walletSetupReason, route0) {
+        if (state.walletSetupReason != null && route0 != "wallet-setup") nav.navigate("wallet-setup") { launchSingleTop = true }
+        if (state.walletSetupReason == null && route0 == "wallet-setup") nav.popBackStack()
+    }
+    fun connectOrSetup() {
+        val r = vm.setupReasonBeforeConnect()
+        if (r != null) vm.openWalletSetup(r) else vm.connect(sender)
+    }
     LaunchedEffect(Unit) { vm.loadMeta() }
     LaunchedEffect(state.deviceRecovery) { if (state.deviceRecovery == app.vowed.DeviceRecovery.Needed) vm.recoverDevice(sender) }
     LaunchedEffect(state.account?.wallet) { app.vowed.ui.components.Avatars.mineWallet = state.account?.wallet; app.vowed.ui.components.Avatars.mineIndex = vm.prefs.avatarIndex }
@@ -129,7 +140,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         composable("onboarding") { OnboardingScreen(state, onGetStarted = { nav.navigate("connect") }, onPractice = { nav.navigate("practice") }) }
         composable("connect") {
             app.vowed.ui.ConnectScreen(
-                state, onBack = { nav.popBackStack() }, onConnect = { vm.connect(sender) }, onDismissError = vm::dismissConnectError,
+                state, onBack = { nav.popBackStack() }, onConnect = { connectOrSetup() }, onDismissError = vm::dismissConnectError, onCheckConnection = vm::checkConnection,
                 onConnected = { nav.navigate("home") { popUpTo("onboarding") { inclusive = true } } },
             )
         }
@@ -138,7 +149,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
             HomeScreen(
                 state, state.account?.wallet, onNew = { vm.setNewGoalSquad(null); nav.navigate("new") }, onOpen = { nav.navigate("detail/$it") },
                 onCheckIn = { pool -> vm.openCheckIn(pool); nav.navigate("checkin/$pool") }, onRefresh = vm::refreshList,
-                onSettings = { nav.navigate("settings") }, onSignIn = { vm.connect(sender) },
+                onSettings = { nav.navigate("settings") }, onSignIn = { connectOrSetup() },
                 onLoadFaucet = vm::loadFaucet, onClaimFaucet = vm::claimTestTokens,
                 onSquads = { nav.navigate("squads") { launchSingleTop = true } }, onExplore = { nav.navigate("explore") { launchSingleTop = true } },
                 onLoadDiscover = { vm.loadExplore(true); vm.loadRewards() }, onTryGoal = { text -> vm.setNewGoalSquad(null); vm.tryGoal(text, false); nav.navigate("new") },
@@ -220,10 +231,13 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
                 onRead = vm::readLetter, onCloseReading = vm::closeLetter, onSimulate = vm::evaluateLetters,
             )
         }
+        composable("wallet-setup") {
+            app.vowed.ui.WalletSetupScreen(state.walletSetupReason ?: WalletSetupLogic.Reason.Help, onBack = { vm.closeWalletSetup() }, onConnectNow = { vm.connect(sender) })
+        }
         composable("wallet-help") { app.vowed.ui.WalletHelpScreen(onBack = { nav.popBackStack() }) }
         composable("practice") { app.vowed.ui.PracticeScreen(onBack = { nav.popBackStack() }) }
         composable("settings") {
-            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onResetConnection = vm::resetConnection, onHidePastPools = { vm.hidePastPools(System.currentTimeMillis() / 1000) }, onShowHiddenPools = vm::showHiddenPools, onWalletHelp = { nav.navigate("wallet-help") }, onHideFromBoard = vm::setLeaderboardHidden, onLoadBoard = vm::loadRewards, onSampleProvider = vm::runSampleProvider, onDisconnect = {
+            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onResetConnection = vm::resetConnection, onWalletSetup = { vm.openWalletSetup() }, onCheckConnection = vm::checkConnection, onHidePastPools = { vm.hidePastPools(System.currentTimeMillis() / 1000) }, onShowHiddenPools = vm::showHiddenPools, onWalletHelp = { nav.navigate("wallet-help") }, onHideFromBoard = vm::setLeaderboardHidden, onLoadBoard = vm::loadRewards, onSampleProvider = vm::runSampleProvider, onDisconnect = {
                 vm.disconnect(sender)
                 nav.navigate("onboarding") { popUpTo(0) }
             })

@@ -12,6 +12,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -93,6 +97,36 @@ fun NoticeBanner(text: String?, onDismiss: () -> Unit, modifier: Modifier = Modi
         Row(Modifier.padding(start = 14.dp, top = 6.dp, bottom = 6.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(text, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
             TextButton(onClick = onDismiss) { Text("OK") }
+        }
+    }
+}
+
+/** The raw technical text, hidden until asked for. */
+@Composable
+fun ErrorDetails(detail: String?) {
+    if (detail == null) return
+    var open by remember { mutableStateOf(false) }
+    Column {
+        TextButton(onClick = { open = !open }) { Text(if (open) "Hide details" else "Details") }
+        if (open) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** "Check connection": asks the server's health page and says whether it worked and why not. */
+@Composable
+fun ConnectionCheckCard(check: app.vowed.ConnectionCheckUi, onCheck: () -> Unit) {
+    AppCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Check connection", style = MaterialTheme.typography.titleSmall)
+            Text("Tests whether this phone can reach the Vowed server.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            app.vowed.ui.components.SoftButton(if (check.running) "Checking..." else "Check connection", onCheck, Modifier.fillMaxWidth(), enabled = !check.running)
+            check.result?.let { r ->
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    app.vowed.ui.components.StatusBadge(if (r.ok) "PASS" else "FAIL", if (r.ok) app.vowed.ui.components.Tone.Success else app.vowed.ui.components.Tone.Error)
+                    Text(r.summary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                }
+                if (!r.ok) ErrorDetails(r.detail)
+            }
         }
     }
 }

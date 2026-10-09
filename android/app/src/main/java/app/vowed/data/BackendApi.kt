@@ -1,6 +1,7 @@
 package app.vowed.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
@@ -13,7 +14,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /** Thin client for docs/openapi.json. The bearer token is held in memory only. */
-class BackendApi(private val baseUrl: () -> String, private val client: OkHttpClient = defaultClient()) {
+class BackendApi(private val baseUrl: () -> String, private val client: OkHttpClient = defaultClient(), private val retryWaitMs: Long = NetworkSupport.RETRY_WAIT_MS) {
     @Volatile var token: String? = null
 
     /** Called when the server says it does not know this phone's proof key (for example after a server update wiped it). */
@@ -25,27 +26,41 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     private val jsonType = "application/json".toMediaType()
 
     private suspend fun <T> call(method: String, path: String, body: String?, idempotent: Boolean = false, parse: (String) -> T): T = withContext(Dispatchers.IO) {
-        val builder = Request.Builder().url(baseUrl().trimEnd('/') + path)
-        token?.let { builder.header("Authorization", "Bearer $it") }
-        if (idempotent) builder.header("Idempotency-Key", UUID.randomUUID().toString())
-        when (method) {
-            "GET" -> builder.get()
-            else -> builder.post((body ?: "{}").toRequestBody(jsonType))
-        }
-        try {
-            client.newCall(builder.build()).execute().use { res ->
-                val text = res.body?.string().orEmpty()
-                if (!res.isSuccessful) {
-                    val err = runCatching { AppJson.decodeFromString<ApiErrorBody>(text).error }.getOrNull()
-                    if (err?.code == DEVICE_NOT_REGISTERED) onDeviceUnknown?.invoke()
-                    if (res.code == 401 && token != null) onUnauthorized?.invoke()
-                    throw ApiException(res.code, err?.code ?: "http_${res.code}", err?.message ?: "The server answered ${res.code}.")
-                }
-                parse(text)
+        val idemKey = if (idempotent) UUID.randomUUID().toString() else null // the same key on every try of this call
+        var attempt = 0
+        while (true) {
+            val builder = Request.Builder().url(baseUrl().trimEnd('/') + path)
+            token?.let { builder.header("Authorization", "Bearer $it") }
+            if (idemKey != null) builder.header("Idempotency-Key", idemKey)
+            when (method) {
+                "GET" -> builder.get()
+                else -> builder.post((body ?: "{}").toRequestBody(jsonType))
             }
-        } catch (e: IOException) {
-            throw ApiException(0, "network", "Could not reach the Vowed server (${e.message ?: "network error"}).")
+            try {
+                return@withContext client.newCall(builder.build()).execute().use { res ->
+                    val text = res.body?.string().orEmpty()
+                    if (!res.isSuccessful) {
+                        val err = runCatching { AppJson.decodeFromString<ApiErrorBody>(text).error }.getOrNull()
+                        if (err?.code == DEVICE_NOT_REGISTERED) onDeviceUnknown?.invoke()
+                        if (res.code == 401 && token != null) onUnauthorized?.invoke()
+                        throw ApiException(res.code, err?.code ?: "http_${res.code}", err?.message ?: "The server answered ${res.code}.")
+                    }
+                    parse(text)
+                }
+            } catch (e: IOException) {
+                // A DNS or connect failure means the request never reached the server, so trying again is safe. At most MAX_RETRIES extra
+                // tries, one second apart, each on a fresh connection; any other failure is reported at once.
+                if (NetworkSupport.isRetryable(e) && attempt < NetworkSupport.MAX_RETRIES) {
+                    attempt++
+                    client.connectionPool.evictAll()
+                    delay(retryWaitMs)
+                    continue
+                }
+                throw NetworkSupport.unreachable(e)
+            }
         }
+        @Suppress("UNREACHABLE_CODE")
+        error("unreachable")
     }
 
     private suspend inline fun <reified R, reified T> post(path: String, req: R, idempotent: Boolean = false): T =
@@ -55,6 +70,9 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
 
     suspend fun meta(): Meta = get("/v1/meta")
     suspend fun nonce(wallet: String): NonceResponse = post("/v1/auth/nonce", NonceRequest(wallet))
+    /** A nonce that is not tied to a wallet yet: asked for BEFORE the wallet opens, so no request is needed while the wallet is in front. */
+    suspend fun openNonce(): NonceResponse = post("/v1/auth/nonce", NonceRequest())
+    suspend fun health(): Health = get("/v1/health")
     suspend fun verify(req: VerifyRequest): VerifyResponse = post("/v1/auth/verify", req)
     suspend fun refreshSession(): VerifyResponse = post("/v1/auth/refresh", JsonObject(emptyMap()))
     suspend fun deviceChallenge(): DeviceChallengeResponse = post("/v1/devices/challenge", JsonObject(emptyMap()))

@@ -207,7 +207,7 @@ class SessionTest {
         assertTrue(WalletErrors.isWrongNetwork("ERROR_CHAIN_NOT_SUPPORTED"))
         assertTrue(WalletErrors.isWrongNetwork("The wallet does not support the requested chain: not supported"))
         assertEquals(WalletErrors.WRONG_NETWORK, WalletErrors.explain("Authorization failed: chain not supported"))
-        assertTrue(WalletErrors.WRONG_NETWORK.contains("devnet"))
+        assertTrue(WalletErrors.WRONG_NETWORK.contains("Testnet Mode"))
         assertFalse(WalletErrors.isWrongNetwork("User declined"))
     }
 

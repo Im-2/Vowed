@@ -145,7 +145,7 @@ fun OnboardingScreen(state: UiState, onGetStarted: () -> Unit, onPractice: () ->
 
 /** One screen for the wallet connection: no passwords, no sign-up forms. */
 @Composable
-fun ConnectScreen(state: UiState, onBack: () -> Unit, onConnect: () -> Unit, onDismissError: () -> Unit, onConnected: () -> Unit) {
+fun ConnectScreen(state: UiState, onBack: () -> Unit, onConnect: () -> Unit, onDismissError: () -> Unit, onConnected: () -> Unit, onCheckConnection: () -> Unit = {}) {
     var popupDone by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(SoftBackground).statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -195,6 +195,12 @@ fun ConnectScreen(state: UiState, onBack: () -> Unit, onConnect: () -> Unit, onD
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("That did not work", style = MaterialTheme.typography.titleSmall, color = VowedTheme.extra.demo)
                     Text(err, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                    ErrorDetails(state.connectErrorDetail)
+                    if (state.connectionCheck.running || state.connectionCheck.result != null || state.connectErrorDetail != null) {
+                        ConnectionCheckCard(state.connectionCheck, onCheckConnection)
+                    } else {
+                        app.vowed.ui.components.SoftButton("Check connection", onCheckConnection)
+                    }
                     TextButton(onClick = onDismissError) { Text("Dismiss") }
                 }
             }

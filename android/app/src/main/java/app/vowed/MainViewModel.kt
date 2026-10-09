@@ -14,6 +14,7 @@ import app.vowed.core.TxRejected
 import app.vowed.core.TxReview
 import app.vowed.data.Account
 import app.vowed.data.ApiException
+import app.vowed.data.ConnectionResult
 import app.vowed.ui.HomeFilter
 import app.vowed.data.FaucetText
 import app.vowed.data.SessionKeeper
@@ -25,7 +26,9 @@ import app.vowed.data.CreateTxRequest
 import app.vowed.data.DemoRequest
 import app.vowed.data.JoinTxRequest
 import app.vowed.data.Meta
+import app.vowed.wallet.WalletErrors
 import app.vowed.wallet.WalletException
+import app.vowed.wallet.WalletSetupLogic
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -190,7 +193,15 @@ data class UiState(
     val deviceRecovery: DeviceRecovery = DeviceRecovery.None,
     /** debug builds only: pools hidden from Home on this phone */
     val hiddenPools: Set<String> = emptySet(),
+    /** the raw technical text of the last connection error, shown only under "Details" */
+    val connectErrorDetail: String? = null,
+    /** the result of "Check connection" */
+    val connectionCheck: ConnectionCheckUi = ConnectionCheckUi(),
+    /** set when the wallet turned the connection down for a network reason (or when the person opens the help): the setup screen is shown */
+    val walletSetupReason: WalletSetupLogic.Reason? = null,
 )
+
+data class ConnectionCheckUi(val running: Boolean = false, val result: ConnectionResult? = null)
 
 enum class DeviceRecovery { None, Needed, Working }
 
@@ -241,17 +252,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun connect(sender: ActivityResultSender) {
         if (_state.value.connecting != null) return
-        _state.update { it.copy(connecting = ConnectStep.Wallet, connectError = null) }
+        _state.update { it.copy(connecting = ConnectStep.Wallet, connectError = null, connectErrorDetail = null, walletSetupReason = null) }
         viewModelScope.launch {
             try {
                 val account = c.account.connect(sender) { step -> _state.update { s -> s.copy(connecting = step) } }
                 c.prefs.onboarded = true
+                c.prefs.walletEverConnected = true
                 _state.update { it.copy(account = account, signedIn = true, connecting = null) }
                 loadMeta()
                 refreshList()
             } catch (e: Throwable) {
-                _state.update { it.copy(connecting = null, connectError = friendly(e)) }
+                if (e is WalletException && (e.kind == WalletErrors.Kind.NetworkMismatch || e.kind == WalletErrors.Kind.PossibleMismatch)) {
+                    // the wallet is probably on another network: show the friendly setup screen, never the raw error, and do not retry by ourselves
+                    val reason = if (e.kind == WalletErrors.Kind.NetworkMismatch) WalletSetupLogic.Reason.Mismatch else WalletSetupLogic.Reason.PossibleMismatch
+                    _state.update { it.copy(connecting = null, walletSetupReason = reason) }
+                } else {
+                    _state.update { it.copy(connecting = null, connectError = friendly(e), connectErrorDetail = (e as? ApiException)?.detail) }
+                }
             }
+        }
+    }
+
+    private fun practiceNetwork(): Boolean = WalletSetupLogic.isPracticeNetwork(_state.value.meta?.network)
+
+    /** The reason to show "One quick step before connecting" before connecting, or null when the person can connect straight away. */
+    fun setupReasonBeforeConnect(): WalletSetupLogic.Reason? = WalletSetupLogic.reasonToShow(practiceNetwork(), c.prefs.walletEverConnected, null)
+
+    fun openWalletSetup(reason: WalletSetupLogic.Reason = WalletSetupLogic.Reason.Help) = _state.update { it.copy(walletSetupReason = reason) }
+    fun closeWalletSetup() = _state.update { it.copy(walletSetupReason = null) }
+
+    /** "Check connection": asks the server's health page and says whether it worked and why not. */
+    fun checkConnection() {
+        if (_state.value.connectionCheck.running) return
+        _state.update { it.copy(connectionCheck = ConnectionCheckUi(running = true)) }
+        viewModelScope.launch {
+            val t0 = System.currentTimeMillis()
+            val result = try {
+                val h = c.api.health()
+                if (h.ok) ConnectionResult.passed(System.currentTimeMillis() - t0, h.network) else ConnectionResult(false, "The server answered but says it is not healthy.", "ok=false")
+            } catch (e: Throwable) {
+                ConnectionResult.failed(e)
+            }
+            _state.update { it.copy(connectionCheck = ConnectionCheckUi(result = result)) }
         }
     }
 
@@ -268,7 +310,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun dismissConnectError() = _state.update { it.copy(connectError = null) }
+    fun dismissConnectError() = _state.update { it.copy(connectError = null, connectErrorDetail = null) }
 
     /** Debug builds only: hide every pool that Home now lists as past (gate and test runs) on this phone. */
     fun hidePastPools(now: Long) {

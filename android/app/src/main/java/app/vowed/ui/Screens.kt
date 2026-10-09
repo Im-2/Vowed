@@ -572,6 +572,7 @@ fun SettingsScreen(
     state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit,
     onHideFromBoard: (Boolean) -> Unit = {}, onLoadBoard: () -> Unit = {}, onSampleProvider: () -> Unit = {},
     onResetConnection: () -> Unit = {}, onWalletHelp: () -> Unit = {}, onHidePastPools: () -> Unit = {}, onShowHiddenPools: () -> Unit = {},
+    onWalletSetup: () -> Unit = {}, onCheckConnection: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
     LaunchedEffect(state.signedIn) { if (state.signedIn) onLoadBoard() }
@@ -618,6 +619,7 @@ fun SettingsScreen(
                     Switch(checked = hidden == true, onCheckedChange = onHideFromBoard, enabled = hidden != null && !state.rewardsUi.savingHidden)
                 }
             }
+            HubRow("Wallet setup help", "Switch your wallet to the practice network", app.vowed.ui.art.Glyph.Home, app.vowed.ui.components.CategoryStyle.colors("detox"), onWalletSetup)
             HubRow("Using a real wallet", "Throwaway wallet, devnet, never share a seed phrase", app.vowed.ui.art.Glyph.User, app.vowed.ui.components.CategoryStyle.colors("sleep"), onWalletHelp)
             LabsSection(onSampleProvider)
             Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -641,6 +643,7 @@ fun SettingsScreen(
                     }
                 }
             }
+            ConnectionCheckCard(state.connectionCheck, onCheckConnection)
             AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Connection trouble?", style = MaterialTheme.typography.titleSmall)

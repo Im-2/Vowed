@@ -22,6 +22,11 @@ class Prefs(context: Context) {
         get() = sp.getStringSet("hidden_pools", emptySet()) ?: emptySet()
         set(v) = sp.edit().putStringSet("hidden_pools", v).apply()
 
+    /** True once a wallet connection has worked on this phone (kept only here); experienced users then never see the wallet setup screen. */
+    var walletEverConnected: Boolean
+        get() = sp.getBoolean("wallet_ever_connected", false) || sp.getString("wallet", null) != null
+        set(v) = sp.edit().putBoolean("wallet_ever_connected", v).apply()
+
     var onboarded: Boolean
         get() = sp.getBoolean("onboarded", false)
         set(v) = sp.edit().putBoolean("onboarded", v).apply()

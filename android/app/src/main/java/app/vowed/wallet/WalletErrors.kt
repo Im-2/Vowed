@@ -5,6 +5,38 @@ package app.vowed.wallet
  * Wallets word the same problem in many ways, so this looks for the telltale words. Order matters: the most specific causes come first.
  */
 object WalletErrors {
+    /** MWA error codes (ProtocolContract in mobile-wallet-adapter-common 2.2.0): -1 authorization failed, -7 cluster (chain) not supported. */
+    const val CODE_AUTHORIZATION_FAILED = -1
+    const val CODE_CLUSTER_NOT_SUPPORTED = -7
+
+    /** What a failed wallet request most likely means for the person. */
+    enum class Kind {
+        /** the wallet is on another network than the one Vowed asked for: the setup screen is shown */
+        NetworkMismatch,
+        /** the wallet refused to authorize and did not say the person declined: possibly the same cause, the setup screen is shown with softer words */
+        PossibleMismatch,
+        Declined,
+        Other,
+    }
+
+    private val declineWords = listOf("declin", "reject", "denied", "cancel", "user refused", "user denied")
+
+    private fun saidNo(m: String) = declineWords.any { it in m }
+
+    /** Classifies a failure by the MWA error code when there is one (the reliable signal) and by the wording otherwise. */
+    fun classify(message: String?, code: Int?): Kind {
+        val m = message?.lowercase()?.replace('_', ' ').orEmpty()
+        return when {
+            code == CODE_CLUSTER_NOT_SUPPORTED || isWrongNetwork(message) || mentionsNetworkSwitch(m) -> Kind.NetworkMismatch
+            saidNo(m) -> Kind.Declined
+            code == CODE_AUTHORIZATION_FAILED -> Kind.PossibleMismatch
+            else -> Kind.Other
+        }
+    }
+
+    private fun mentionsNetworkSwitch(m: String): Boolean =
+        "testnet mode" in m || ("network" in m && ("mainnet" in m || "devnet" in m || "testnet" in m)) || ("devnet" in m && ("not supported" in m || "unsupported" in m || "mismatch" in m))
+
     const val CLOSED_BEFORE_CONNECTING = WalletSessionGate.CLOSED_BEFORE_CONNECTING
     const val LOCKED = "Open your wallet and unlock it, then try again. Nothing was signed."
     const val SLOW =
@@ -12,23 +44,25 @@ object WalletErrors {
     const val DECLINED = "The request was declined in the wallet, so nothing was signed. Tap the button again when you are ready to approve."
     const val EXPIRED = "The transaction expired before it was approved (they last about a minute). Try again and approve it right away."
     const val WRONG_NETWORK =
-        "Your wallet is not on Solana devnet. Vowed uses devnet test tokens only: open your wallet's settings, switch it to devnet (see \"Using a real wallet\" in You), then try again."
+        "Your wallet is on the real network. Switch it to Testnet Mode (Vowed uses a practice network with no real money) and try again."
+    const val POSSIBLE_MISMATCH =
+        "Your wallet did not connect. If it is on the real network, switch it to Testnet Mode (Vowed uses a practice network with no real money) and try again."
     const val NO_FEE_FUNDS =
         "The wallet could not pay the network fee. It may be on the wrong network (Vowed uses Solana devnet) or have no devnet SOL: switch the wallet to devnet and tap \"Get test tokens\" in Vowed for a little SOL."
 
     /** True when the words say the wallet does not serve the chain we asked for (MWA error ERROR_CHAIN_NOT_SUPPORTED, code -7). */
     fun isWrongNetwork(message: String?): Boolean {
-        val m = message?.lowercase() ?: return false
-        return "chain_not_supported" in m || "chain not supported" in m || ("chain" in m && "not supported" in m) || "unsupported chain" in m ||
+        val m = message?.lowercase()?.replace('_', ' ') ?: return false
+        return "chain not supported" in m || ("chain" in m && "not supported" in m) || "unsupported chain" in m ||
             ("cluster" in m && ("not supported" in m || "mismatch" in m)) || "-7" in Regex("""code[=: ]*-?\d+""").find(m)?.value.orEmpty()
     }
 
     fun explain(message: String?): String {
         val raw = message?.trim().orEmpty()
-        val m = raw.lowercase()
+        val m = raw.lowercase().replace('_', ' ')
         return when {
             WalletSessionGate.isAssociationFailure(raw) -> CLOSED_BEFORE_CONNECTING
-            isWrongNetwork(raw) -> WRONG_NETWORK
+            isWrongNetwork(raw) || mentionsNetworkSwitch(m) -> WRONG_NETWORK
             "usernotauthenticated" in m || "not authenticated" in m || "authentication" in m || "locked" in m || "biometric" in m || "keystore" in m && "auth" in m -> LOCKED
             "timed out" in m || "timeout" in m || "time out" in m || "failed establishing" in m -> SLOW
             "declin" in m || "reject" in m || "denied" in m || "cancel" in m || "not authorized" in m || "user refused" in m -> DECLINED

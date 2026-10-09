@@ -11,7 +11,8 @@ val AppJson = Json {
     encodeDefaults = false
 }
 
-@Serializable data class NonceRequest(val wallet: String)
+@Serializable data class NonceRequest(val wallet: String? = null)
+@Serializable data class Health(val ok: Boolean = false, val network: String? = null, val uptimeSecs: Long = 0)
 @Serializable data class NonceResponse(val nonce: String, val domain: String, val statement: String, val uri: String, val issuedAt: String, val expirationTime: String)
 @Serializable data class VerifyRequest(val wallet: String, val message: String, val signature: String)
 @Serializable data class VerifyResponse(val token: String, val expiresAt: Long, val wallet: String)
@@ -215,7 +216,7 @@ data class ExploreItem(
 @Serializable data class ApiErrorInfo(val code: String, val message: String)
 
 /** A failed API call with the backend's stable error code (see docs/openapi.json). */
-class ApiException(val status: Int, val code: String, override val message: String) : Exception(message)
+class ApiException(val status: Int, val code: String, override val message: String, /** raw technical text, shown only under "Details" */ val detail: String? = null) : Exception(message)
 
 @Serializable
 data class CoachSuggestion(
