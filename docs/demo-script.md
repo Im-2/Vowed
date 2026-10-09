@@ -41,3 +41,8 @@ Close by saying the honest limits: devnet only, test tokens, unaudited program, 
 ## Rehearsal (do it once on the real phone, then record)
 
 Run steps 1 to 7 with a timer. Note every place where the app waited more than 3 seconds or showed an error message, fix the script or the app, and run it again. Keep the best take under 3 minutes.
+
+
+## Update 2026-10-09: the wallet switch comes first
+
+Before the video starts, do the wallet switch on camera-off time: install Phantom, make a **new throwaway wallet**, then Settings, Developer Settings, Testnet Mode on (Solana Devnet). A first-time viewer of the video should see Vowed's "One quick step before connecting" screen (step 1 of the demo) and the connection working right after the switch. If you want to show the screen on camera, use a phone where Vowed has never connected (or You > Wallet setup help). Say in one sentence that Vowed uses a practice network with test money only.

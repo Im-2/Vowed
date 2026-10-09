@@ -95,6 +95,17 @@ fun PreviewMore(screen: String) {
         "squad-detail" -> SquadDetailScreen(squadState, Samples.ME, none, none, {}, {}, none)
         "you" -> SettingsScreen(st, "https://vowed-backend.onrender.com", none, none, none, none, none, none)
         "wallet-help" -> app.vowed.ui.WalletHelpScreen(none)
+        "wallet-setup" -> app.vowed.ui.WalletSetupScreen(app.vowed.wallet.WalletSetupLogic.Reason.First, none, none)
+        "wallet-setup-mismatch" -> app.vowed.ui.WalletSetupScreen(app.vowed.wallet.WalletSetupLogic.Reason.Mismatch, none, none)
+        "connect-unreachable" -> ConnectScreen(
+            st.copy(
+                signedIn = false, connectError = app.vowed.data.NetworkSupport.UNREACHABLE,
+                connectErrorDetail = "UnknownHostException: Unable to resolve host \"vowed-backend.onrender.com\": No address associated with hostname",
+                connectionCheck = app.vowed.ConnectionCheckUi(result = app.vowed.data.ConnectionResult.failed(app.vowed.data.NetworkSupport.unreachable(java.net.UnknownHostException("Unable to resolve host \"vowed-backend.onrender.com\": No address associated with hostname")))),
+            ),
+            none, none, none, none, none,
+        )
+        "you-check" -> SettingsScreen(st.copy(connectionCheck = app.vowed.ConnectionCheckUi(result = app.vowed.data.ConnectionResult.passed(420, "devnet"))), "https://vowed-backend.onrender.com", none, none, none, none, none, none)
         "rewards" -> RewardsScreen(st, Samples.ME, none, none, { _, _ -> }, none)
         "coach" -> CoachScreen(
             st.copy(

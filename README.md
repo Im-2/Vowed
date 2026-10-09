@@ -102,6 +102,10 @@ powershell -ExecutionPolicy Bypass -File scripts/android-release.ps1   # signed 
 
 The app talks to the hosted devnet backend `https://vowed-backend.onrender.com` by default (release builds can only use that URL; debug builds can switch to a local backend in You). Never put secrets in the repo: use `backend/.env.example` as the template for environment variables; `bash scripts/secret-scan.sh` scans the tree and the whole history before every push.
 
+### Switching your wallet to the practice network (devnet)
+
+Vowed uses Solana devnet, a practice network, so no real money is used. A wallet that is on the real network (mainnet) turns the connection down, and an app cannot flip that switch for you, so the first time you tap Connect wallet Vowed shows "One quick step before connecting": open Phantom, then **Settings, Developer Settings, Testnet Mode** (Solana Devnet), and come back. The same screen appears again if a wallet turns the connection down for a network reason, and **You > Wallet setup help** reopens it. If the app cannot reach its server, **Check connection** (in You and on the error) tests it and shows why. Sources and what we could not verify: `docs/verified-facts.md`.
+
 ### Test tokens, devnet SOL and wallets
 
 - **Get test tokens** (Home, tap the test-token pill): a small fixed amount of tUSDC and tSKR, once per wallet per 24 hours. The **first claim also sends 0.01 devnet SOL** for network fees, once per wallet, from a dedicated small wallet (never a public faucet), with daily and total caps. See `docs/runbook.md`.

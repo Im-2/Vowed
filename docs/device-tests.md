@@ -137,3 +137,16 @@ Run on a **clean real phone** (not the development emulator), with the signed re
 | A7 | Rotate the phone, switch to dark mode, large font | Nothing is cut off or unreadable (dark theme has not been checked yet) | |
 | A8 | Check Android settings, Apps, Vowed, Permissions | Camera, location, activity recognition, usage access, notifications are each asked for only when a feature needs them | |
 | A9 | Seeker only: connect with the Seed Vault Wallet | Works on devnet or shows the "wrong network" message (see verified-facts) | |
+
+## Real-phone bug fixes, round 1 (checklist)
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| N1 | Samsung phone, Phantom installed, first run: tap Connect wallet | "One quick step before connecting" appears first, with Open Phantom | |
+| N2 | Phantom still on the real network: tap "I've switched it, connect now" | Phantom turns it down; Vowed shows the same screen again with "Your wallet is on the real network. Switch it to Testnet Mode and try again." No raw error. **Record the exact error Phantom sends (code and text) in docs/verified-facts.md** | |
+| N3 | In Phantom: Settings, Developer Settings, Testnet Mode on (Solana Devnet), come back, tap connect now | Phantom shows its connect sheet; approve; Home opens | |
+| N4 | Open Phantom button with Phantom installed / uninstalled | Launches Phantom / opens the Google Play page with a one-line explanation | |
+| N5 | After one successful connection, Disconnect, tap Connect wallet | No setup screen (experienced users skip it). You > Wallet setup help reopens it | |
+| N6 | Turn Data Saver ON (Samsung: Settings, Connections, Data usage, Data saver) and remove Vowed from "Allow while Data saver on", then connect through Phantom | Sign-in works (the nonce is fetched before the wallet opens). If it fails, You > Check connection tells whether the phone can reach the server, with the reason under Details | |
+| N7 | Airplane mode, tap Connect wallet | "Vowed couldn't reach its server. Check your internet connection and try again. The server may take up to a minute to wake up." and a Details link with the raw text; Check connection shows FAIL | |
+| N8 | Update over the old rc1 APK (same signing key) | Installs as an update, keeps data | |
