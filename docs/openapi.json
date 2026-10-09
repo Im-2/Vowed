@@ -32,7 +32,7 @@
     },
     "/v1/auth/nonce": {
       "post": {
-        "summary": "Get a sign-in nonce and the exact payload to pass to the wallet's sign-in",
+        "summary": "Get a sign-in nonce and the exact payload to pass to the wallet's sign-in. Send the wallet to get a nonce tied to it, or nothing to get an open nonce (valid 10 minutes, single use) that the app can fetch before it opens the wallet",
         "tags": [
           "auth"
         ],
@@ -46,10 +46,7 @@
                   "wallet": {
                     "type": "string"
                   }
-                },
-                "required": [
-                  "wallet"
-                ]
+                }
               }
             }
           }

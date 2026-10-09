@@ -18,6 +18,8 @@ declare module "fastify" {
 }
 
 export const NONCE_TTL_SEC = 300;
+/** A nonce asked for BEFORE the wallet is opened (so the app needs no network while the wallet is in front) is not tied to a wallet yet; a first-time user can spend a few minutes in the wallet app. */
+export const OPEN_NONCE_TTL_SEC = 600;
 /** one token lasts 6 hours; /v1/auth/refresh swaps a still-valid token for a new one, up to SESSION_MAX_SEC after the wallet signed in */
 export const TOKEN_TTL_SEC = 21_600;
 export const SESSION_MAX_SEC = 7 * 86_400;
@@ -93,8 +95,8 @@ export function registerAuthRoutes(app: FastifyInstance, s: Services) {
     {
       schema: {
         tags: ["auth"],
-        summary: "Get a sign-in nonce and the exact payload to pass to the wallet's sign-in",
-        body: z.object({ wallet: pubkeySchema }),
+        summary: "Get a sign-in nonce and the exact payload to pass to the wallet's sign-in. Send the wallet to get a nonce tied to it, or nothing to get an open nonce (valid 10 minutes, single use) that the app can fetch before it opens the wallet",
+        body: z.object({ wallet: pubkeySchema.optional() }),
         response: {
           200: z.object({
             nonce: z.string(),
@@ -110,8 +112,8 @@ export function registerAuthRoutes(app: FastifyInstance, s: Services) {
     async (req) => {
       enforce(s, `ip:${req.ip}:nonce`, 30, 60);
       const nonce = randomBytes(16).toString("hex");
-      const exp = s.wallNow() + NONCE_TTL_SEC;
-      s.db.prepare("INSERT INTO nonces (nonce, purpose, wallet, expires_at) VALUES (?, 'auth', ?, ?)").run(nonce, req.body.wallet, exp);
+      const exp = s.wallNow() + (req.body.wallet ? NONCE_TTL_SEC : OPEN_NONCE_TTL_SEC);
+      s.db.prepare("INSERT INTO nonces (nonce, purpose, wallet, expires_at) VALUES (?, 'auth', ?, ?)").run(nonce, req.body.wallet ?? null, exp);
       return {
         nonce,
         domain: s.config.AUTH_DOMAIN,
@@ -155,7 +157,7 @@ export function registerAuthRoutes(app: FastifyInstance, s: Services) {
 
       const used = s.db
         .prepare(
-          "UPDATE nonces SET used_at = ? WHERE nonce = ? AND purpose = 'auth' AND wallet = ? AND used_at IS NULL AND expires_at > ?",
+          "UPDATE nonces SET used_at = ? WHERE nonce = ? AND purpose = 'auth' AND (wallet = ? OR wallet IS NULL) AND used_at IS NULL AND expires_at > ?",
         )
         .run(s.wallNow(), fields.nonce, wallet, s.wallNow());
       if (Number(used.changes) !== 1) throw unauthorized("nonce unknown, used or expired");

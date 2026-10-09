@@ -88,6 +88,32 @@ describe("wallet sign-in", () => {
     expect((await verify(w, wallet, msgFor(n, wallet), kp)).statusCode).toBe(401);
   });
 
+  it("an open nonce, fetched before the wallet is opened, signs in whichever wallet answers, once, within 10 minutes", async () => {
+    const w = await makeWorld();
+    const open = async () => (await w.app.inject({ method: "POST", url: "/v1/auth/nonce", payload: {} })).json();
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+    const n = await open();
+    expect(n.nonce).toMatch(/^[0-9a-f]{32}$/);
+    expect(Date.parse(n.expirationTime) - Date.parse(n.issuedAt)).toBe(600_000);
+    const message = msgFor(n, wallet);
+    expect((await verify(w, wallet, message, kp)).statusCode).toBe(200);
+    expect((await verify(w, wallet, message, kp)).statusCode).toBe(401); // single use
+    // still bound by the signature: another key cannot sign in as this wallet, and the message must carry the wallet's address
+    const m = await open();
+    expect((await verify(w, wallet, msgFor(m, wallet), Keypair.generate())).statusCode).toBe(401);
+    const other = Keypair.generate();
+    expect((await verify(w, wallet, msgFor(m, other.publicKey.toBase58()), other)).statusCode).toBe(401);
+    // a wallet-bound nonce still cannot be used by another wallet
+    const bound = await nonceFor(w, wallet);
+    const thief = Keypair.generate();
+    expect((await verify(w, thief.publicKey.toBase58(), msgFor(bound, thief.publicKey.toBase58()), thief)).statusCode).toBe(401);
+    // and an open nonce expires after 10 minutes
+    const late = await open();
+    w.clock.wall += 601;
+    expect((await verify(w, wallet, msgFor(late, wallet), kp)).statusCode).toBe(401);
+  });
+
   it("expires tokens after an hour", async () => {
     const w = await makeWorld();
     const { headers } = await signIn(w, Keypair.generate());
