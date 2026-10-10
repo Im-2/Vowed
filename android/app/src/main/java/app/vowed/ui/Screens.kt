@@ -175,7 +175,7 @@ private fun sourceLabel(r: app.vowed.data.ParseResult) = when (r.source) {
 private fun amountText(v: Double) = if (v % 1.0 == 0.0) v.toLong().toString() else v.toString()
 
 @Composable
-fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Unit, onLoadExamples: () -> Unit, onParse: (String) -> Unit, onUseAi: (Boolean) -> Unit, onAlternative: (app.vowed.data.PlanOption) -> Unit, onClear: () -> Unit, onTextConsumed: () -> Unit, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?, String, String?) -> Unit) {
+fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Unit, onLoadExamples: () -> Unit, onParse: (String) -> Unit, onUseAi: (Boolean) -> Unit, onAlternative: (app.vowed.data.PlanOption) -> Unit, onClear: () -> Unit, onTextConsumed: () -> Unit, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?, String, String?, String?) -> Unit) {
     val ctx = LocalContext.current
     androidx.compose.runtime.LaunchedEffect(Unit) { onLoadTemplates(); onLoadExamples() }
     val goal = state.goal
@@ -250,7 +250,7 @@ fun NewGoalScreen(state: UiState, onBack: () -> Unit, onLoadTemplates: () -> Uni
 }
 
 @Composable
-private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content.Context, state: UiState, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?, String, String?) -> Unit) {
+private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content.Context, state: UiState, onStart: (app.vowed.goals.Edit, String, BigInteger, Boolean, Int, Pair<Double, Double>?, String, String?, String?) -> Unit) {
     val plan = result.plan!!
     val type = app.vowed.goals.PlanEdit.proofType(plan)
     var title by remember(plan) { mutableStateOf(app.vowed.goals.PlanEdit.title(plan)) }
@@ -270,7 +270,11 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
 
     val cfg = state.meta?.config
     val demoOn = cfg?.demoEnabled == true
-    val stakeUnits = runCatching { BigDecimal(stake).movePointRight(6).toBigIntegerExact() }.getOrNull()
+    val faucetTokens = state.faucet.status?.tokens.orEmpty()
+    val options = app.vowed.data.StakeTokens.options(cfg, faucetTokens, demoPool = demo && demoOn)
+    var pickedMint by remember { mutableStateOf<String?>(null) }
+    val token = app.vowed.data.StakeTokens.chosen(options, pickedMint)
+    val stakeUnits = (token?.parse(stake)) ?: if (token == null) runCatching { BigDecimal(stake).movePointRight(6).toBigIntegerExact() }.getOrNull() else null
     val base = cfg?.let { if (demo && demoOn) it.demoMaxStake else it.maxStake }?.let { runCatching { BigInteger(it) }.getOrNull() }
     val pct = when (result.trustTier) { "high" -> 100; "medium" -> 50; else -> 10 }
     val tierCap = base?.multiply(BigInteger.valueOf(pct.toLong()))?.divide(BigInteger.valueOf(100))
@@ -306,7 +310,7 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
             Text("Your plan", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 app.vowed.ui.components.LabelChip(app.vowed.ui.components.trustLabel(result.trustTier), app.vowed.ui.components.ChipKind.Neutral)
-                app.vowed.ui.components.LabelChip("TEST USDC", app.vowed.ui.components.ChipKind.Test, moreTitle = "Test tokens", more = "TEST TOKENS: tUSDC and tSKR exist only on Solana devnet and have no real value.")
+                app.vowed.ui.components.LabelChip("TEST ${token?.symbol ?: "TOKENS"}", app.vowed.ui.components.ChipKind.Test, moreTitle = "Test tokens", more = "TEST TOKENS: tUSDC and tSKR exist only on Solana devnet and have no real value. tSKR is a test token we created; it is not the real SKR token.")
             }
             Text(sourceLabel(result), style = MaterialTheme.typography.labelMedium, color = if (result.source == "ai" || result.source == "cache") VowedTheme.extra.warning else MaterialTheme.colorScheme.primary)
             Text("How it is proved: ${proofLabel(type)}", fontWeight = FontWeight.Bold)
@@ -350,7 +354,7 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
             Text("DEMO pool: a day lasts minutes")
         }
         if (demo) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(60 to "1 min", 120 to "2 min", 300 to "5 min", 600 to "10 min").forEach { (secs, label) ->
                     FilterChip(selected = daySecs == secs, onClick = { daySecs = secs }, label = { Text("$label days") })
                 }
@@ -372,14 +376,21 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
             style = MaterialTheme.typography.bodySmall,
         )
     }
-    OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true)
-    if (overCap) Text("Above the limit of ${fmt(tierCap.toString())} for this kind of goal in this kind of pool.", color = MaterialTheme.colorScheme.error)
+    if (options.isNotEmpty()) app.vowed.ui.components.TokenSelector(options, token, state.faucet.status?.balances) { pickedMint = it.mint }
+    Text("A challenge has one stake token for its whole life. People who join it stake the same token.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (${token?.symbol ?: "test tokens"})") }, singleLine = true)
+    tierCap?.let { cap -> Text("Largest stake here: ${token?.format(cap.toString()) ?: fmt(cap.toString())} ${token?.symbol ?: ""} for this kind of goal and pool.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    val balance = token?.balanceOf(state.faucet.status?.balances)?.let { runCatching { BigInteger(it) }.getOrNull() }
+    if (stakeUnits != null && balance != null && stakeUnits > balance) {
+        Text("You have ${token.format(balance.toString())} ${token.symbol}, less than this stake. Get test tokens first (the token pill on Home).", color = VowedTheme.extra.warning, style = MaterialTheme.typography.bodySmall)
+    }
+    if (overCap) Text("Above the limit of ${token?.format(tierCap.toString()) ?: fmt(tierCap.toString())} ${token?.symbol ?: ""} for this kind of goal in this kind of pool.", color = MaterialTheme.colorScheme.error)
     Text("Test tokens on Solana devnet. No real money. Need some? Use \"Get test tokens\" on the Today screen.", style = MaterialTheme.typography.bodySmall)
     app.vowed.ui.components.PrimaryButton(
         "Review",
         {
             val edit = app.vowed.goals.Edit(title = title, value = amountN, totalDays = totalN, requiredDays = requiredN, app = appName.takeIf { result.needsApp }, place = placeName.takeIf { result.needsPlace })
-            onStart(edit, mode, stakeUnits!!, demo && demoOn, daySecs, place, if (squadId != null) "private" else visibility, squadId)
+            onStart(edit, mode, stakeUnits!!, demo && demoOn, daySecs, place, if (squadId != null) "private" else visibility, squadId, token?.mint)
         },
         enabled = valid && state.flow !is TxFlow.Working,
     )
@@ -460,6 +471,9 @@ fun DetailScreen(
             return@Page
         }
         val c: Challenge = d.challenge
+        val faucetTokens = state.faucet.status?.tokens.orEmpty()
+        val poolToken = app.vowed.data.StakeTokens.byMint(c.mint, faucetTokens)
+        val sym = app.vowed.data.StakeTokens.symbolFor(c.mint, faucetTokens)
         val me = d.participants.firstOrNull { it.wallet == myWallet }
         val dv = if (me != null) CheckInLogic.dayView(c, me, now) else null
         val cat = planCategory(c)
@@ -475,7 +489,10 @@ fun DetailScreen(
             AppCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${c.durationDays} days, ${c.requiredDays} needed · day length ${if (c.daySecs >= 3600) "${c.daySecs / 3600} h" else "${c.daySecs} s"}", style = MaterialTheme.typography.bodyMedium)
-                    Text("Pot ${fmt(c.totalDeposits)} · forfeited ${fmt(c.totalForfeit)} test USDC", style = MaterialTheme.typography.titleSmall)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        app.vowed.ui.components.TokenIcon(sym, 22.dp)
+                        Text("Pot ${poolToken?.format(c.totalDeposits) ?: fmt(c.totalDeposits)} · forfeited ${poolToken?.format(c.totalForfeit) ?: fmt(c.totalForfeit)} $sym", style = MaterialTheme.typography.titleSmall)
+                    }
                     val sim = SimulatedYield.estimateTokens(c.totalDeposits, c.durationDays)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         app.vowed.ui.components.LabelChip(
@@ -508,7 +525,7 @@ fun DetailScreen(
                             app.vowed.ui.components.Avatar(p.wallet, 40.dp)
                             Column(Modifier.weight(1f)) {
                                 Text(if (p.wallet == myWallet) "You" else short(p.wallet), style = MaterialTheme.typography.titleSmall)
-                                Text("stake ${fmt(p.stake)} · ${p.daysCompleted} days done · ${p.status}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("stake ${poolToken?.format(p.stake) ?: fmt(p.stake)} $sym · ${p.daysCompleted} days done · ${p.status}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -518,15 +535,24 @@ fun DetailScreen(
             if (canJoin) {
                 AppCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake (test USDC)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        val units = runCatching { BigDecimal(stake).movePointRight(6).toBigIntegerExact() }.getOrNull()
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            app.vowed.ui.components.TokenIcon(sym, 32.dp)
+                            Column {
+                                Text("This challenge is staked in $sym", style = MaterialTheme.typography.titleSmall)
+                                val bal = poolToken?.balanceOf(state.faucet.status?.balances)
+                                Text(if (bal != null) "You have ${poolToken.format(bal)} $sym. The token is fixed for this challenge." else "The token is fixed for this challenge.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        OutlinedTextField(value = stake, onValueChange = { stake = it }, label = { Text("Stake ($sym)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        Text(app.vowed.data.StakeTokens.HONESTY, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val units = (poolToken?.parse(stake)) ?: runCatching { BigDecimal(stake).movePointRight(6).toBigIntegerExact() }.getOrNull()
                         app.vowed.ui.components.PrimaryButton("Join with this stake", { onJoin(units.toString()) }, enabled = units != null && units.signum() > 0 && state.flow !is TxFlow.Working)
                     }
                 }
             }
             val claimable = runCatching { BigInteger(d.me.claimable) }.getOrDefault(BigInteger.ZERO)
             if (d.me.joined && claimable.signum() > 0) {
-                app.vowed.ui.components.PrimaryButton("Claim ${fmt(d.me.claimable)} test USDC", onClaim)
+                app.vowed.ui.components.PrimaryButton("Claim ${poolToken?.format(d.me.claimable) ?: fmt(d.me.claimable)} $sym", onClaim)
             } else if (d.me.joined && c.status != "Open") {
                 Text(if (c.status == "Settled") "Nothing left to claim." else "Settling soon. Payouts are claimable once the challenge settles.", style = MaterialTheme.typography.bodyMedium)
             }

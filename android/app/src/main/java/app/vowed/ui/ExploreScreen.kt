@@ -85,6 +85,18 @@ fun tokenFilters(state: UiState): List<Pair<String, String>> {
 const val DEMO_MODE_TEXT = "DEMO MODE: days last a few minutes and the money is test money, so you can see a whole challenge in minutes."
 const val SAMPLE_TEXT = "SAMPLE: created by the Vowed team so there is always something to try"
 
+/** All tokens / test USDC / test SKR: filters Explore to the token a challenge is staked in. */
+@Composable
+private fun TokenPills(state: UiState, selectedMint: String?, onPick: (String?) -> Unit) {
+    val tokens = state.faucet.status?.tokens.orEmpty()
+    if (tokens.isEmpty()) return
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("Token", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FilterPill(selectedMint == null, "All") { onPick(null) }
+        tokens.forEach { t -> FilterPill(selectedMint == t.mint, t.symbol) { onPick(if (selectedMint == t.mint) null else t.mint) } }
+    }
+}
+
 @Composable
 private fun FilterPill(selected: Boolean, label: String, onClick: () -> Unit) {
     FilterChip(
@@ -141,6 +153,7 @@ fun ExploreScreen(
                     }
                 }
             }
+            item { TokenPills(state, ex.mint) { onFilter(ex.category, it, ex.endingSoon) } }
             ex.message?.let { m -> item { Row(verticalAlignment = Alignment.CenterVertically) { Text(m, Modifier.weight(1f), color = MaterialTheme.colorScheme.primary); TextButton(onClick = onDismissMessage) { Text("OK") } } } }
             ex.error?.let { e -> item { Column { Text(e, color = MaterialTheme.colorScheme.error); OutlinedButton(onClick = onLoad) { Text("Try again") } } } }
             if (ex.loading && ex.items.isEmpty()) item { Spinner() }

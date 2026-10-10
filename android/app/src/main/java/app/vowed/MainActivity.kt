@@ -156,6 +156,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
             )
         }
         composable("new") {
+            LaunchedEffect(state.signedIn) { if (state.signedIn) vm.loadFaucet() }
             NewGoalScreen(
                 state, onBack = { vm.resetFlow(); vm.setNewGoalSquad(null); nav.popBackStack() }, onLoadTemplates = vm::loadTemplates, onLoadExamples = { vm.loadExamples(true) },
                 onParse = vm::parseGoal, onUseAi = vm::setUseAi, onAlternative = vm::useAlternative, onClear = { vm.clearGoal(); vm.resetFlow() },

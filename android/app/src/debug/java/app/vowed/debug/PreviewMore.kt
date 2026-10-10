@@ -87,8 +87,8 @@ fun PreviewMore(screen: String) {
         ),
     )
     when (screen) {
-        "create-start" -> NewGoalScreen(st.copy(goal = GoalUi(examples = examples)), none, none, none, {}, {}, {}, none, none) { _, _, _, _, _, _, _, _ -> }
-        "create-plan" -> NewGoalScreen(st.copy(goal = GoalUi(result = parse, examples = examples)), none, none, none, {}, {}, {}, none, none) { _, _, _, _, _, _, _, _ -> }
+        "create-start" -> NewGoalScreen(st.copy(goal = GoalUi(examples = examples)), none, none, none, {}, {}, {}, none, none) { _, _, _, _, _, _, _, _, _ -> }
+        "create-plan" -> NewGoalScreen(st.copy(goal = GoalUi(result = parse, examples = examples)), none, none, none, {}, {}, {}, none, none) { _, _, _, _, _, _, _, _, _ -> }
         "review" -> ReviewScreen(
             PendingTx(
                 "create",
@@ -104,6 +104,15 @@ fun PreviewMore(screen: String) {
         "squads" -> SquadsScreen(squadState, none, {}, {}, {}, null)
         "squad-detail" -> SquadDetailScreen(squadState, Samples.ME, none, none, {}, {}, none)
         "you" -> SettingsScreen(st, "https://vowed-backend.onrender.com", none, none, none, none, none, none)
+        "join-skr" -> {
+            val skrPool = Samples.challenge("p7", "Walk 6000 steps a day", "steps", "STEPS", "medium", startedDaysAgo = 0, days = 10, deposits = "9000000", count = 3, mint = Samples.SKR_MINT)
+            val d = app.vowed.data.ChallengeDetail(
+                skrPool,
+                listOf(app.vowed.data.Participant("8gXPzzTcPqB9nM7vWzJ3kqRLbq3rXQ6mYaZ5c1Rr9YiYQ", "3000000", 0, 0, "0", "0", "Active"), app.vowed.data.Participant("AdaLo7vCwK2gHt9nRyU4bXpFe8sDmQ1zJ6kTqW3hNv5E", "6000000", 0, 0, "0", "0", "Active")),
+                app.vowed.data.MeInfo(false, "0"),
+            )
+            DetailScreen(st.copy(detail = d), "p7", Samples.ME, none, none, {}, none, none)
+        }
         "camera-ready" -> CameraShot(ready = true)
         "camera-step-back" -> CameraShot(frame = TestPoses.without(TestPoses.standing(Exercise.PUSHUP, 0), JointId.L_WRIST, JointId.R_WRIST))
         "camera-left" -> CameraShot(frame = TestPoses.shifted(TestPoses.standing(Exercise.SQUAT, 0), dx = -0.55f), exercise = Exercise.SQUAT)

@@ -17,18 +17,19 @@ object Samples {
     private const val KAI = "KaiR9xTt2mPq5LwZ8cVb3nYhJd6sUe4gFa7oNk1MxB2C"
     private const val MIA = "MiaQ4vNz8rHs1TpLx6cWb9yKd3eUg5jFa2oBn7MxC1Zt"
     private const val MINT = "C6pXRRmoHsf7Mqa1ZrW3JfspyknhSR1cRqHMUqao63Hv"
+    const val SKR_MINT = "J6X9udvWis7jYpVHic3Kn5iTG3ac6gbBeFixnYKPUkHB"
 
     private fun plan(title: String, category: String, type: String, trust: String): JsonObject =
         Json.parseToJsonElement(
             """{"title":"$title","category":"$category","proofMethods":[{"type":"$type","trustTier":"$trust"}],"target":{"metric":"m","value":30,"unit":"minutes","direction":"atLeast"}}""",
         ).jsonObject
 
-    fun challenge(pool: String, title: String, category: String, type: String, trust: String, demo: Boolean = false, startedDaysAgo: Int = 2, days: Int = 7, deposits: String = "6000000", count: Int = 4): Challenge {
+    fun challenge(pool: String, title: String, category: String, type: String, trust: String, demo: Boolean = false, startedDaysAgo: Int = 2, days: Int = 7, deposits: String = "6000000", count: Int = 4, mint: String = MINT): Challenge {
         val now = System.currentTimeMillis() / 1000
         val daySecs = if (demo) 600 else 86_400
         val start = now - startedDaysAgo * daySecs.toLong() - 600
         return Challenge(
-            pool = pool, creator = BOB, mint = MINT, vault = "v$pool", kind = "Open", mode = "Soft", penaltyBps = 3000, startTs = start, endTs = start + days * daySecs, joinDeadlineTs = now + 40_000,
+            pool = pool, creator = BOB, mint = mint, vault = "v$pool", kind = "Open", mode = "Soft", penaltyBps = 3000, startTs = start, endTs = start + days * daySecs, joinDeadlineTs = now + 40_000,
             settleAfterTs = start + days * daySecs + 7200, durationDays = days, requiredDays = days - 1, goalHash = "0".repeat(64), participantCount = count, maxParticipants = 50, totalDeposits = deposits,
             status = "Open", isDemo = demo, daySecs = daySecs, demoLabel = if (demo) "DEMO POOL: each \"day\" lasts 10 minutes. For demonstration only, with test money." else null,
             plan = plan(title, category, type, trust),
@@ -70,10 +71,12 @@ object Samples {
         val list = if (empty) emptyList() else listOf(junk1, a, b, junk2, c, past1, past2)
         return UiState(
             account = app.vowed.data.Account(ME, "dev", "low"), signedIn = true,
+            meta = Meta("BMTX", "devnet", "vowed.app", true, MetaConfig("o", "t", 0, false, "100000000", "7200", listOf(StakeTokens.CIRCLE_USDC_MINT, MINT, SKR_MINT), true, "20000000", listOf(MINT, SKR_MINT))),
             challenges = list,
             details = if (empty) emptyMap() else mapOf("p1" to detail(a, "3", 2), "p2" to detail(b, "7", 3), "p3" to detail(c, "0", 0)),
             faucet = app.vowed.FaucetUi(
-                status = FaucetStatus(true, "devnet", "TEST TOKENS: tUSDC and tSKR exist only on Solana devnet and have no real value.", canClaim = false, nextClaimAt = System.currentTimeMillis() / 1000 + 20_000, balances = FaucetBalances("127900000", "20000000")),
+                status = FaucetStatus(true, "devnet", "TEST TOKENS: tUSDC and tSKR exist only on Solana devnet and have no real value.", canClaim = false, nextClaimAt = System.currentTimeMillis() / 1000 + 20_000, balances = FaucetBalances("127900000", "20000000"),
+                    tokens = listOf(FaucetToken("tUSDC", "Test USDC", MINT, "20000000", 6), FaucetToken("tSKR", "Test SKR", SKR_MINT, "20000000", 6))),
             ),
             explore = app.vowed.ExploreUi(items = explore().filter { !it.isDemo }, demoPools = explore().filter { it.isDemo }, loaded = true),
             rewardsUi = app.vowed.RewardsUi(

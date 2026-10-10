@@ -211,7 +211,7 @@ fun HomeScreen(
                 }
                 dueCards.forEach { (c, dv, me) -> TodayCard(c, dv, me.daysCompleted, onOpen, onCheckIn) }
                 val others = lists.active.filter { ch -> dueCards.none { it.first.pool == ch.pool } }
-                others.forEach { c -> ChallengeRow(c, onOpen) }
+                others.forEach { c -> ChallengeRow(c, state.faucet.status?.tokens.orEmpty(), onOpen) }
             }
 
             val picks = (state.explore.items + state.explore.demoPools).filter { !it.createdByYou && !it.joined }.take(8)
@@ -242,7 +242,7 @@ fun HomeScreen(
                 }
             }
 
-            PastChallenges(lists.past, onOpen)
+            PastChallenges(lists.past, state.faucet.status?.tokens.orEmpty(), onOpen)
         }
     }
     if (sheet) {
@@ -291,7 +291,7 @@ private fun TodayCard(c: Challenge, dv: app.vowed.DayView, daysDone: Int, onOpen
 
 /** Finished and settled challenges, collapsed until opened. The count is always in the header. */
 @Composable
-private fun PastChallenges(past: List<Challenge>, onOpen: (String) -> Unit) {
+private fun PastChallenges(past: List<Challenge>, tokens: List<app.vowed.data.FaucetToken>, onOpen: (String) -> Unit) {
     if (past.isEmpty()) return
     var open by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -301,12 +301,12 @@ private fun PastChallenges(past: List<Challenge>, onOpen: (String) -> Unit) {
                 Text(if (open) "Hide" else "Show", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
         }
-        if (open) past.forEach { c -> ChallengeRow(c, onOpen) }
+        if (open) past.forEach { c -> ChallengeRow(c, tokens, onOpen) }
     }
 }
 
 @Composable
-private fun ChallengeRow(c: Challenge, onOpen: (String) -> Unit) {
+private fun ChallengeRow(c: Challenge, tokens: List<app.vowed.data.FaucetToken>, onOpen: (String) -> Unit) {
     val cat = planCategory(c)
     AppCard(onClick = { onOpen(c.pool) }, Modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -315,7 +315,7 @@ private fun ChallengeRow(c: Challenge, onOpen: (String) -> Unit) {
                 Text(planTitle(c), style = MaterialTheme.typography.titleSmall, maxLines = 1)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (c.isDemo) LabelChip("DEMO", ChipKind.Demo, moreTitle = "Demo pool", more = c.demoLabel ?: "DEMO POOL: minutes-long days, test money only")
-                    Text("${c.status} · pot ${fmt(c.totalDeposits)} test USDC", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${c.status} · pot ${app.vowed.data.StakeTokens.amountText(c.totalDeposits, c.mint, tokens)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             GlyphIcon(Glyph.Chevron, MaterialTheme.colorScheme.onSurfaceVariant, 22.dp)

@@ -58,6 +58,8 @@ class GoalDraft(
     /** "private" (default), "public" (listed in Explore) or, with [squadId], a squad challenge (always private). */
     val visibility: String = "private",
     val squadId: String? = null,
+    /** the stake token chosen on the new-challenge screen (a pool has ONE stake token, fixed when it is created); null lets the server list decide */
+    val mint: String? = null,
 ) {
     val totalDays: Int get() = app.vowed.goals.PlanEdit.totalDays(plan)
     val requiredDays: Int get() = app.vowed.goals.PlanEdit.requiredDays(plan)
@@ -438,7 +440,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val account = requireAccount()
                 val meta = _state.value.meta ?: c.api.meta().also { m -> _state.update { it.copy(meta = m) } }
                 val cfg = meta.config ?: throw ApiException(0, "not_initialised", "The Vowed program is not set up on this network yet.")
-                val mint = (if (draft.demo) cfg.demoMints else cfg.allowedMints).firstOrNull() ?: throw ApiException(0, "no_token", "No token is enabled for this kind of challenge.")
+                val accepted = if (draft.demo) cfg.demoMints else cfg.allowedMints
+                // the chosen token must be one the program accepts for this kind of pool; with no choice the first one on the list is used (older behaviour)
+                val mint = draft.mint?.also { if (it !in accepted) throw ApiException(0, "no_token", "That token cannot be used for this kind of challenge.") }
+                    ?: accepted.firstOrNull() ?: throw ApiException(0, "no_token", "No token is enabled for this kind of challenge.")
                 setFlow(TxFlow.Working("Checking your wallet has enough…"))
                 if (!affordable("create", mint = mint, stake = draft.stakeBaseUnits.toString())) return@launch
                 setFlow(TxFlow.Working("Preparing your challenge…"))
@@ -744,7 +749,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * The user pressed Review on the preview: apply their edits, have the server validate the exact plan, then continue exactly like
      * a template goal (the phone re-checks the transaction against this plan before it asks the wallet to sign).
      */
-    fun startFromPreview(edit: app.vowed.goals.Edit, mode: String, stakeBaseUnits: BigInteger, demo: Boolean, demoDaySecs: Int, place: Pair<Double, Double>?, visibility: String = "private", squadId: String? = null) {
+    fun startFromPreview(edit: app.vowed.goals.Edit, mode: String, stakeBaseUnits: BigInteger, demo: Boolean, demoDaySecs: Int, place: Pair<Double, Double>?, visibility: String = "private", squadId: String? = null, mint: String? = null) {
         val base = _state.value.goal.result?.plan ?: return
         setFlow(TxFlow.Working("Checking your plan…"))
         viewModelScope.launch {
@@ -753,7 +758,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val v = c.api.validateGoal(edited, demo = false)
                 if (!v.ok || v.plan == null) throw ApiException(0, "plan_invalid", v.reason ?: "That plan cannot be staked on.")
                 val chosen = if (demo) v.demoPlan ?: throw ApiException(0, "no_demo_version", "This goal has no demo version; turn off the demo pool.") else v.plan
-                startChallenge(GoalDraft(chosen, mode, stakeBaseUnits, demo, demoDaySecs, edit.app, place, visibility, squadId))
+                startChallenge(GoalDraft(chosen, mode, stakeBaseUnits, demo, demoDaySecs, edit.app, place, visibility, squadId, mint))
             } catch (e: Throwable) {
                 setFlow(TxFlow.Failed(friendly(e)))
             }
