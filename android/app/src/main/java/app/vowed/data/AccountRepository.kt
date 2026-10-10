@@ -2,10 +2,14 @@ package app.vowed.data
 
 import android.util.Base64
 import app.vowed.AppContainer
+import app.vowed.wallet.AppForeground
+import app.vowed.wallet.SessionRetry
+import app.vowed.wallet.SignInMode
+import app.vowed.wallet.WalletDiagnostics
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 
 /** Progress shown while connecting: each step is plain language. */
-enum class ConnectStep { Wallet, SigningIn, RegisteringDevice, Done }
+enum class ConnectStep { Wallet, ReturnToVowed, SigningIn, RegisteringDevice, Done }
 
 class Account(val wallet: String, val deviceId: String, val trustCap: String)
 
@@ -44,12 +48,52 @@ class AccountRepository(private val c: AppContainer) {
         c.wallet.forgetAuthorization()
     }
 
+    /**
+     * Waits until Vowed is on screen again. Some wallets (Phantom, in the field tests) leave their own screen up when they are done, so the app keeps
+     * running behind it; opening the wallet again or calling the server from there can fail (Android refuses background screen starts and may block a
+     * background app's network). The app first tries to bring itself forward, then asks the person to return, and waits up to 90 s.
+     */
+    private suspend fun waitForVowed(onStep: (ConnectStep) -> Unit) {
+        val trace = WalletDiagnostics.current
+        if (AppForeground.isResumed) return
+        trace.add("waiting for Vowed to be on screen", "bring to front: ${c.wallet.tryBringToFront()}")
+        if (AppForeground.awaitResumed(1_500)) { trace.add("Vowed is on screen"); return }
+        onStep(ConnectStep.ReturnToVowed)
+        val back = AppForeground.awaitResumed(90_000)
+        trace.add(if (back) "Vowed is on screen again" else "gave up waiting for Vowed to come back (90 s)")
+        onStep(ConnectStep.SigningIn)
+    }
+
     suspend fun connect(sender: ActivityResultSender, onStep: (ConnectStep) -> Unit = {}): Account {
+        val trace = WalletDiagnostics.begin()
+        trace.add("connect started", "foreground=${AppForeground.isResumed}, saved preference: ${if (c.prefs.walletSplitSession) "two sessions" else "one session"}")
         onStep(ConnectStep.Wallet)
         // Ask for the nonce NOW, while Vowed is on screen: once the wallet opens, Vowed is in the background and Android (Data Saver, battery
         // limits) may block its network, which showed up as "Unable to resolve host". Nothing is sent while the wallet is in front.
         val nonce = SignInNonce.prepare { c.api.openNonce() }
-        val out = c.wallet.connectAndSignIn(sender, nonce) { address -> onStep(ConnectStep.SigningIn); c.api.nonce(address) }
+        trace.add("sign-in nonce", if (nonce.wasPrefetched) "fetched before the wallet opened" else "not available; will be asked after the wallet answers (older server)")
+        val fetch: suspend (String) -> NonceResponse = { address -> onStep(ConnectStep.SigningIn); c.api.nonce(address) }
+        val wait: suspend () -> Unit = { waitForVowed(onStep) }
+        val first = if (c.prefs.walletSplitSession) SignInMode.SplitSessions else SignInMode.SingleSession
+        val out = try {
+            if (first == SignInMode.SplitSessions) {
+                c.wallet.connectAndSignIn(sender, nonce, fetch, SignInMode.SplitSessions, wait)
+            } else {
+                // One automatic retry after "the wallet closed the session", in fresh sessions, and the app remembers it for next time (no loops)
+                SessionRetry.run(
+                    trace,
+                    first = { c.wallet.connectAndSignIn(sender, nonce, fetch, SignInMode.SingleSession, wait) },
+                    retry = {
+                        c.prefs.walletSplitSession = true
+                        waitForVowed(onStep)
+                        c.wallet.connectAndSignIn(sender, nonce, fetch, SignInMode.SplitSessions, wait)
+                    },
+                )
+            }
+        } finally {
+            // the wallet may have left the app behind its own screen: network calls below must wait until Vowed is in front
+            waitForVowed(onStep)
+        }
         onStep(ConnectStep.SigningIn)
         val res = try {
             c.api.verify(
@@ -60,9 +104,11 @@ class AccountRepository(private val c: AppContainer) {
                 ),
             )
         } catch (e: ApiException) {
+            trace.add("verify failed", "HTTP ${e.status}, ${e.code}")
             if (nonce.wasPrefetched && e.status == 401) throw ApiException(401, "sign_in_expired", "Signing in took too long, so the request expired. Tap Connect wallet and approve again.", e.message)
             throw e
         }
+        trace.add("verified by the server")
         c.sessions.adopt(res)
         val previous = c.prefs.wallet
         if (previous != null && previous != res.wallet) c.prefs.clearAccount() // a different wallet: forget the old account's local state

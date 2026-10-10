@@ -16,6 +16,8 @@ object WalletErrors {
         /** the wallet refused to authorize and did not say the person declined: possibly the same cause, the setup screen is shown with softer words */
         PossibleMismatch,
         Declined,
+        /** the wallet closed the Mobile Wallet Adapter session before the app finished (for example the library's "Cannot send in CLOSED") */
+        SessionClosed,
         Other,
     }
 
@@ -27,6 +29,7 @@ object WalletErrors {
     fun classify(message: String?, code: Int?): Kind {
         val m = message?.lowercase()?.replace('_', ' ').orEmpty()
         return when {
+            isSessionClosed(m) -> Kind.SessionClosed
             code == CODE_CLUSTER_NOT_SUPPORTED || isWrongNetwork(message) || mentionsNetworkSwitch(m) -> Kind.NetworkMismatch
             saidNo(m) -> Kind.Declined
             code == CODE_AUTHORIZATION_FAILED -> Kind.PossibleMismatch
@@ -34,10 +37,30 @@ object WalletErrors {
         }
     }
 
+    /** The library's text when a request is sent after the wallet closed the session, and the wording of similar closures. */
+    fun isSessionClosed(text: String?): Boolean {
+        val m = text?.lowercase()?.replace('_', ' ') ?: return false
+        return "cannot send in" in m || "session closed" in m || "session was closed" in m || "connection closed" in m || "socket closed" in m || "websocket closed" in m
+    }
+
+    /** The messages of an exception and of everything it wraps, joined, so a closed session is found wherever the library hid it. */
+    fun flatten(e: Throwable?): String {
+        val parts = ArrayList<String>()
+        var t = e
+        var depth = 0
+        while (t != null && depth++ < 6) {
+            parts.add("${t.javaClass.simpleName}: ${t.message ?: "no message"}")
+            t = t.cause
+        }
+        return parts.joinToString(" <- ")
+    }
+
     private fun mentionsNetworkSwitch(m: String): Boolean =
         "testnet mode" in m || ("network" in m && ("mainnet" in m || "devnet" in m || "testnet" in m)) || ("devnet" in m && ("not supported" in m || "unsupported" in m || "mismatch" in m))
 
     const val CLOSED_BEFORE_CONNECTING = WalletSessionGate.CLOSED_BEFORE_CONNECTING
+    const val SESSION_CLOSED =
+        "The wallet closed the connection before it finished. Open Vowed, tap Connect again, and approve in your wallet right away. If the wallet stays on its home screen, return to Vowed manually."
     const val LOCKED = "Open your wallet and unlock it, then try again. Nothing was signed."
     const val SLOW =
         "The wallet took too long to answer. Open your wallet and unlock it, give it a moment to start (the first start can take up to a minute), then try again."
@@ -61,6 +84,7 @@ object WalletErrors {
         val raw = message?.trim().orEmpty()
         val m = raw.lowercase().replace('_', ' ')
         return when {
+            isSessionClosed(m) -> SESSION_CLOSED
             WalletSessionGate.isAssociationFailure(raw) -> CLOSED_BEFORE_CONNECTING
             isWrongNetwork(raw) || mentionsNetworkSwitch(m) -> WRONG_NETWORK
             "usernotauthenticated" in m || "not authenticated" in m || "authentication" in m || "locked" in m || "biometric" in m || "keystore" in m && "auth" in m -> LOCKED

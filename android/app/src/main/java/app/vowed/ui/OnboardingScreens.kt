@@ -178,6 +178,7 @@ fun ConnectScreen(state: UiState, onBack: () -> Unit, onConnect: () -> Unit, onD
                     Text(
                         when (step) {
                             ConnectStep.Wallet -> "Waiting for your wallet…"
+                            ConnectStep.ReturnToVowed -> "Approved in your wallet. Switch back to Vowed to continue."
                             ConnectStep.SigningIn -> "Signing in…"
                             ConnectStep.RegisteringDevice -> "Registering this phone…"
                             ConnectStep.Done -> "Done"

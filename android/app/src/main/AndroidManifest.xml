@@ -13,6 +13,11 @@
     <!-- lets the wallet setup screen check whether Phantom or Solflare is installed (package visibility, Android 11 and later) -->
     <queries>
         <package android:name="app.phantom" />
+        <!-- which wallet apps answer the Mobile Wallet Adapter association link (for the diagnostics) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="solana-wallet" />
+        </intent>
     </queries>
 
     <application

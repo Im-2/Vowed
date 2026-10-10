@@ -101,14 +101,19 @@ fun NoticeBanner(text: String?, onDismiss: () -> Unit, modifier: Modifier = Modi
     }
 }
 
-/** The raw technical text, hidden until asked for. */
+/** The raw technical text and the wallet timeline, hidden until asked for, with a button that copies them (they hold no keys, signatures or tokens). */
 @Composable
 fun ErrorDetails(detail: String?) {
     if (detail == null) return
     var open by remember { mutableStateOf(false) }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
     Column {
         TextButton(onClick = { open = !open }) { Text(if (open) "Hide details" else "Details") }
-        if (open) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (open) {
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(detail)); copied = true }) { Text(if (copied) "Copied" else "Copy diagnostics") }
+        }
     }
 }
 

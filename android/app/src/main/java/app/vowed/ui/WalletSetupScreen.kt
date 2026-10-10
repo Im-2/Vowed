@@ -62,6 +62,11 @@ fun WalletSetupScreen(reason: WalletSetupLogic.Reason, onBack: () -> Unit, onCon
             SetupStep(2, "Settings, then Developer Settings", "Tap the settings icon, then Developer Settings.") { MenuArt() }
             SetupStep(3, "Turn on Testnet Mode", "Switch Testnet Mode on and pick Solana Devnet. You only do this once.") { ToggleArt() }
 
+            Text(
+                "Phantom may say Vowed's identity could not be verified. That is expected for a hackathon test app on a practice network.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             PrimaryButton("Open Phantom", {
                 val launch = ctx.packageManager.getLaunchIntentForPackage(WalletSetupLogic.PHANTOM_PACKAGE)
                 if (launch != null) {

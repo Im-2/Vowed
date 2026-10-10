@@ -26,6 +26,7 @@ import app.vowed.data.CreateTxRequest
 import app.vowed.data.DemoRequest
 import app.vowed.data.JoinTxRequest
 import app.vowed.data.Meta
+import app.vowed.wallet.WalletDiagnostics
 import app.vowed.wallet.WalletErrors
 import app.vowed.wallet.WalletException
 import app.vowed.wallet.WalletSetupLogic
@@ -267,7 +268,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val reason = if (e.kind == WalletErrors.Kind.NetworkMismatch) WalletSetupLogic.Reason.Mismatch else WalletSetupLogic.Reason.PossibleMismatch
                     _state.update { it.copy(connecting = null, walletSetupReason = reason) }
                 } else {
-                    _state.update { it.copy(connecting = null, connectError = friendly(e), connectErrorDetail = (e as? ApiException)?.detail) }
+                    // the raw technical text and the timeline of this attempt go under "Details" (and "Copy diagnostics"); they hold no keys, signatures or tokens
+                    val raw = when (e) { is ApiException -> e.detail; is WalletException -> e.raw; else -> null }
+                    val detail = listOfNotNull(raw, WalletDiagnostics.render()).joinToString("\n\n")
+                    _state.update { it.copy(connecting = null, connectError = friendly(e), connectErrorDetail = detail) }
                 }
             }
         }

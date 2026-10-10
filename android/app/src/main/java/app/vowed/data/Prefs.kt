@@ -27,6 +27,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("wallet_ever_connected", false) || sp.getString("wallet", null) != null
         set(v) = sp.edit().putBoolean("wallet_ever_connected", v).apply()
 
+    /** Set after a wallet closed its session before the sign-in finished: from then on the sign-in uses two fresh wallet sessions straight away. */
+    var walletSplitSession: Boolean
+        get() = sp.getBoolean("wallet_split_session", false)
+        set(v) = sp.edit().putBoolean("wallet_split_session", v).apply()
+
     var onboarded: Boolean
         get() = sp.getBoolean("onboarded", false)
         set(v) = sp.edit().putBoolean("onboarded", v).apply()
