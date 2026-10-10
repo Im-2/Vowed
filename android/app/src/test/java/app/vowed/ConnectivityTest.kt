@@ -140,6 +140,7 @@ class ConnectivityTest {
         assertEquals(WalletErrors.Kind.AuthorizationRefused, WalletErrors.classify("authorization failed", WalletErrors.CODE_AUTHORIZATION_FAILED))
         assertEquals(WalletErrors.Kind.Declined, WalletErrors.classify("User declined authorization request", WalletErrors.CODE_AUTHORIZATION_FAILED))
         assertEquals(WalletErrors.Kind.Declined, WalletErrors.classify("Request cancelled", null))
+        assertEquals("a crashed or closed wallet is not a decline", WalletErrors.Kind.Other, WalletErrors.classify("CancellationException: no message", null))
         assertEquals(WalletErrors.Kind.Other, WalletErrors.classify("Request timed out", null))
         assertEquals(WalletErrors.Kind.Other, WalletErrors.classify(null, null))
     }

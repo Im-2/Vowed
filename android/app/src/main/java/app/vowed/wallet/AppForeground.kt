@@ -34,13 +34,13 @@ object AppForeground {
     }
 }
 
-/** One automatic retry after a "session closed" error, in a fresh wallet session, and never a second one. */
+/** One automatic retry after a "session closed" error or a refused saved authorization, in a fresh wallet session, and never a second one. */
 object SessionRetry {
     suspend fun <T> run(trace: WalletTrace?, first: suspend () -> T, retry: suspend () -> T): T = try {
         first()
     } catch (e: WalletException) {
-        if (e.kind != WalletErrors.Kind.SessionClosed) throw e
-        trace?.add("retry", "the wallet closed the session; trying once in a fresh session")
+        if (e.kind != WalletErrors.Kind.SessionClosed && e.kind != WalletErrors.Kind.AuthorizationRefused) throw e
+        trace?.add("retry", if (e.kind == WalletErrors.Kind.SessionClosed) "the wallet closed the session; trying once in a fresh session" else "the wallet no longer accepts the saved authorization; trying once in a fresh session")
         retry()
     }
 }

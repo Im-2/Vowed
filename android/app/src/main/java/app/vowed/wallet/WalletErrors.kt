@@ -26,7 +26,8 @@ object WalletErrors {
 
     private val declineWords = listOf("declin", "reject", "denied", "cancel", "user refused", "user denied", "did not authorize")
 
-    private fun saidNo(m: String) = declineWords.any { it in m }
+    // a Kotlin "CancellationException" is how a wallet that crashed or closed looks from outside; it is not the person saying no
+    private fun saidNo(m: String) = m.replace("cancellationexception", "").let { t -> declineWords.any { it in t } }
 
     /** Classifies a failure by the MWA error code when there is one (the reliable signal) and by the wording otherwise. */
     fun classify(message: String?, code: Int?): Kind {

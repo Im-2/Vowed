@@ -209,3 +209,21 @@ Do each on a real phone, with a person who is not you holding the phone if possi
 | S5 | Explore token filter | All / tUSDC / tSKR pills filter the list; cards show the token symbol | |
 | S6 | Settle and claim in a tSKR pool | The claim button and the payout are in tSKR with the right decimals | |
 | S7 | Streak freeze and rewards | Still paid in tSKR as before | |
+
+## Sign-in and approvals on a real phone (round 5)
+
+Phantom with Testnet Mode on and Solana Devnet selected. Install the new APK over the old one (same signing key). Before each run tap **You > Reset connection** if you want a clean first sign-in. After a failure, tap Details and then Copy diagnostics and keep the text.
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| W1 | First sign-in: tap Connect wallet | The app says "Waking up the Vowed server" at most about a minute, THEN opens Phantom once. Phantom shows ONE sign-in sheet if it supports the sign-in payload, or Connect and Sign message in the SAME visit if it does not. Note which, and how many taps Phantom needed | |
+| W2 | After Confirm in Phantom | Back in Vowed: "Signing in", "Registering this phone" (no second Phantom screen), then "Wallet connected". Count the Phantom screens in total | |
+| W3 | Diagnostics line "sign-in result from the wallet: yes/NO" (Copy diagnostics after any failure, or from the debug build's logcat) | Tells whether Phantom handled the sign-in payload | |
+| W4 | Close Vowed and open it again (within 7 days) | Signed in straight away, ZERO Phantom screens | |
+| W5 | Turn off mobile data after tapping Connect, before the server answers | The message names the step ("Vowed could not reach its server before opening your wallet"); Phantom is NOT opened | |
+| W6 | Server asleep (wait 20 minutes idle, then Connect) | "Waking up the Vowed server", then the normal flow; no wallet-network message | |
+| W7 | A failure AFTER Phantom approved (for example, airplane mode right after Confirm) | "Wallet approved, but signing in with the Vowed server failed ... Your approval is kept"; Try again does NOT open Phantom; it finishes the sign-in | |
+| W8 | The "Your wallet needs one switch" screen | Appears ONLY if Phantom itself says the network is not supported (turn Testnet Mode OFF to see it). Never with Testnet Mode on | |
+| J1 | Join a challenge | ONE Phantom approval sheet for ONE transaction. Note what it shows (simulation, fee) | |
+| J2 | New challenge and stake | ONE approval for the combined create-and-stake transaction (previously two) | |
+| J3 | Join with too little SOL | "Not sent to your wallet yet" card with the numbers, Phantom is not opened, Get test tokens works | |

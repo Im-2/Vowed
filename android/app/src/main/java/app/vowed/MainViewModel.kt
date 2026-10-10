@@ -19,6 +19,7 @@ import app.vowed.data.CreateJoin
 import app.vowed.ui.HomeFilter
 import app.vowed.data.FaucetText
 import app.vowed.data.SessionKeeper
+import app.vowed.data.TxSubmitter
 import app.vowed.data.Challenge
 import app.vowed.data.ChallengeDetail
 import app.vowed.data.ClaimTxRequest
@@ -558,25 +559,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 WalletDiagnostics.begin()
-                val sig = try {
-                    c.wallet.signAndSend(sender, tx.txBytes, tx.kind, tx.simulationNote) {
-                        // a second try opens the wallet again: only from the foreground (Android refuses it from the background)
-                        AppForeground.ensureOnScreen(WalletDiagnostics.current, { c.wallet.tryBringToFront() }, { setFlow(TxFlow.Working("Switch back to Vowed to try again…")) })
-                        setFlow(TxFlow.Working("Waiting for your wallet…"))
-                    }
-                } finally {
-                    // some wallets stay on their own screen afterwards; the network calls below must wait until Vowed is in front
-                    AppForeground.ensureOnScreen(WalletDiagnostics.current, { c.wallet.tryBringToFront() }, { setFlow(TxFlow.Working("Approved. Switch back to Vowed to continue…")) })
-                }
-                setFlow(TxFlow.Working("Confirming on Solana…"))
-                val signature = Base58.encode(sig)
-                // the transaction is already submitted; tell the backend so it mirrors the result right away
-                var synced = tx.kind == "freeze" // a token payment is not a Vowed program transaction: nothing to mirror
-                repeat(6) { attempt ->
-                    if (!synced) {
-                        try { c.api.sync(signature); synced = true } catch (e: ApiException) { if (e.code != "not_found") throw e; delay(2_000L + attempt * 500L) }
-                    }
-                }
+                val submitter = TxSubmitter(
+                    signAndSend = { bytes, kind, sim ->
+                        c.wallet.signAndSend(sender, bytes, kind, sim) {
+                            // a second try opens the wallet again: only from the foreground (Android refuses it from the background)
+                            AppForeground.ensureOnScreen(WalletDiagnostics.current, { c.wallet.tryBringToFront() }, { setFlow(TxFlow.Working("Switch back to Vowed to try again…")) })
+                            setFlow(TxFlow.Working("Waiting for your wallet…"))
+                        }
+                    },
+                    // some wallets stay on their own screen afterwards; the network calls that follow must wait until Vowed is in front
+                    backOnScreen = { AppForeground.ensureOnScreen(WalletDiagnostics.current, { c.wallet.tryBringToFront() }, { setFlow(TxFlow.Working("Approved. Switch back to Vowed to continue…")) }); Unit },
+                    sync = { signature -> c.api.sync(signature) },
+                )
+                val signature = submitter.submit(tx) { setFlow(TxFlow.Working(it)) }
                 val next = tx.after
                 if (next != null) {
                     next(signature)

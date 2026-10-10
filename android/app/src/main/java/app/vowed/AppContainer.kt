@@ -43,6 +43,7 @@ class VowedApp : Application() {
         LifecycleLog.markProcessStart(System.currentTimeMillis())
         LifecycleLog.record("Application.onCreate (process started)")
         container = AppContainer(this)
+        WalletDiagnostics.echoToLogcat = BuildConfig.DEBUG
         WalletDiagnostics.header = { WalletEnvironment.header(this) }
         // the Android lifecycle of the app's screens, so a wallet problem can be placed next to "Vowed went to the background" or "was restarted"
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {

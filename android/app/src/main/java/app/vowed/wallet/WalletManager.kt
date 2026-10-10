@@ -161,7 +161,7 @@ class WalletManager(
         suspend fun attempt(n: Int): ByteArray {
             t.add("session $n opened", "saved authorization: ${if (adapter.authToken != null) "yes (reauthorize)" else "no (authorize)"}")
             val result = kotlinx.coroutines.withTimeoutOrNull(WALLET_ATTEMPT_TIMEOUT_MS) {
-                sequential {
+                sequential(retryConnection = false) {
                     adapter.transact(sender) { auth ->
                         t.add("authorized", "accounts=${auth.accounts.size}, address=${Base58.encode(auth.accounts.first().publicKey)}")
                         t.add("request sent", "sign_and_send_transactions (1 transaction)")
@@ -173,7 +173,17 @@ class WalletManager(
                 t.add("no answer", "the wallet did not answer within ${WALLET_ATTEMPT_TIMEOUT_MS / 1000} s")
                 throw WalletException(WalletErrors.NO_RESPONSE, WalletErrors.Kind.NoResponse, raw = "no answer from the wallet within ${WALLET_ATTEMPT_TIMEOUT_MS / 1000} s")
             }
-            return result.unwrap("session $n").signatures.first()
+            try {
+                return result.unwrap("session $n").signatures.first()
+            } catch (e: WalletException) {
+                // ERROR_AUTHORIZATION_FAILED (-1) after a saved authorization was sent means the wallet no longer accepts it (MWA spec): discard it
+                // so the single retry in a fresh session authorizes from scratch
+                if (e.kind == WalletErrors.Kind.AuthorizationRefused && adapter.authToken != null) {
+                    t.add("saved authorization discarded", "the wallet answered -1; the next try authorizes again")
+                    forgetAuthorization()
+                }
+                throw e
+            }
         }
         return SessionRetry.run(t, first = { attempt(1) }, retry = { waitForUser(); attempt(2) })
     }

@@ -1,5 +1,6 @@
 package app.vowed.ui
 
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -401,25 +402,40 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
 /** The "Get test tokens" action, provided once at the top of the app so any screen can offer it (no wallet is opened for it). */
 val LocalGetTestTokens = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun FlowStatus(flow: TxFlow) {
     when (flow) {
         is TxFlow.Working -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             app.vowed.ui.components.Spinner(size = 24.dp); Text(flow.message)
         }
-        is TxFlow.Failed -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(flow.message, color = MaterialTheme.colorScheme.error)
+        // A problem found BEFORE the wallet opens must not hide below the fold: it is a framed card that scrolls itself into view
+        is TxFlow.Failed -> StatusCard(flow, "That did not go through") {
+            Text(flow.message, color = MaterialTheme.colorScheme.onSurface)
             ErrorDetails(flow.detail)
         }
         is TxFlow.Blocked -> {
             val getTokens = LocalGetTestTokens.current
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatusCard(flow, "Not sent to your wallet yet") {
                 Text(flow.message, color = MaterialTheme.colorScheme.onSurface)
                 if (flow.canGetTokens) app.vowed.ui.components.PrimaryButton("Get test tokens", getTokens)
             }
         }
         is TxFlow.Done -> Text(flow.message, color = MaterialTheme.colorScheme.primary)
         else -> Unit
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun StatusCard(key: Any, title: String, content: @Composable () -> Unit) {
+    val requester = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    LaunchedEffect(key) { requester.bringIntoView() }
+    AppCard(Modifier.fillMaxWidth().bringIntoViewRequester(requester), container = VowedTheme.extra.demoTint) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = VowedTheme.extra.demo)
+            content()
+        }
     }
 }
 

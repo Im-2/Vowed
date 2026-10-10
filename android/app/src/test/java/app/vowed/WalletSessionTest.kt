@@ -174,4 +174,17 @@ class WalletSessionTest {
         assertTrue(AppForeground.isResumed)
         AppForeground.set(false)
     }
+
+    @Test fun aRefusedSavedAuthorizationIsRetriedOnceInAFreshSessionButADeclineIsNot() = runBlocking {
+        var first = 0
+        var retry = 0
+        val refused = WalletException(WalletErrors.AUTHORIZATION_REFUSED, WalletErrors.Kind.AuthorizationRefused, code = -1)
+        assertEquals("ok", SessionRetry.run(null, first = { first++; throw refused }, retry = { retry++; "ok" }))
+        assertEquals(1, first); assertEquals(1, retry)
+        var declinedRetry = 0
+        val declined = WalletException(WalletErrors.DECLINED, WalletErrors.Kind.Declined)
+        val e = runCatching { SessionRetry.run(null, first = { throw declined }, retry = { declinedRetry++; "never" }) }.exceptionOrNull()
+        assertTrue(e is WalletException)
+        assertEquals(0, declinedRetry)
+    }
 }
