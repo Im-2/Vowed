@@ -13,16 +13,11 @@ import com.solana.mobilewalletadapter.common.signin.SignInWithSolana
 /** The wallet said no, was not installed, or the connection failed. The message is safe to show; [raw] is the technical text for "Details". */
 class WalletException(message: String, val kind: WalletErrors.Kind = WalletErrors.Kind.Other, val code: Int? = null, val raw: String? = null) : Exception(message)
 
-class SignInOutcome(val address: String, val signedMessage: ByteArray, val signature: ByteArray)
-
-/** How the sign-in uses the wallet. */
-enum class SignInMode {
-    /** one wallet session: connect, then ask for the signature in the same session (works with the Mock wallet) */
-    SingleSession,
-
-    /** two fresh wallet sessions: connect, return to Vowed, then a second session for the signature (for wallets that end the session after connecting) */
-    SplitSessions,
-}
+/**
+ * What the wallet returned for the sign-in. [viaPayload] is true when the wallet signed the sign-in text as part of connecting (ONE prompt) and
+ * false when it ignored the payload and Vowed had to ask for a signature in the same session. [validUntilMs] is when the server's nonce runs out.
+ */
+class SignInOutcome(val address: String, val signedMessage: ByteArray, val signature: ByteArray, val viaPayload: Boolean = true, val validUntilMs: Long = Long.MAX_VALUE)
 
 /**
  * Everything that touches the user's wallet goes through Mobile Wallet Adapter (MWA). The app never holds a private key:
@@ -78,7 +73,8 @@ class WalletManager(
             trace().add("$step: failed", "kind=$kind${if (code != null) ", wallet error code $code" else ""}; $text")
             throw WalletException(
                 when (kind) {
-                    WalletErrors.Kind.PossibleMismatch -> WalletErrors.POSSIBLE_MISMATCH
+                    WalletErrors.Kind.AuthorizationRefused -> WalletErrors.AUTHORIZATION_REFUSED
+                    WalletErrors.Kind.NetworkMismatch -> WalletErrors.WRONG_NETWORK
                     WalletErrors.Kind.SessionClosed -> WalletErrors.SESSION_CLOSED
                     else -> WalletErrors.explain(message)
                 },
@@ -87,66 +83,54 @@ class WalletManager(
         }
     }
 
-    /** One wallet session at a time, with a short gap and one retry of a failed connection step (see [WalletSessionGate]). */
-    private suspend fun <T> sequential(attempt: suspend () -> TransactionResult<T>): TransactionResult<T> =
-        gate.run({ r: TransactionResult<T> -> r is TransactionResult.Failure && WalletSessionGate.isAssociationFailure(r.message) }, attempt)
-
-    private fun buildMessage(n: app.vowed.data.NonceResponse, addressBytes: ByteArray): ByteArray {
-        val payload = SignInWithSolana.Payload(n.domain, addressBytes, n.statement, Uri.parse(n.uri), "1", null, n.nonce, n.issuedAt, n.expirationTime, null, null, null)
-        return payload.prepareMessage(addressBytes).encodeToByteArray()
-    }
+    /** How many times the wallet was launched since the app started (every Mobile Wallet Adapter session counts once). Read by tests and the diagnostics. */
+    val launches = java.util.concurrent.atomic.AtomicInteger(0)
 
     /**
-     * Connects to the wallet and has it sign the Sign-In-With-Solana message. In [SignInMode.SingleSession] both happen in one wallet session; in
-     * [SignInMode.SplitSessions] the connection is one session and the signature a second, fresh one, with [waitForUser] in between (it returns when
-     * Vowed is on screen again, so the second wallet screen is opened from the foreground). The backend's nonce was fetched before the wallet opened
-     * (see SignInNonce); [fetchNonce] only runs for an older server.
+     * One wallet session at a time, with a short gap (see [WalletSessionGate]). [retryConnection] allows ONE quiet retry when the wallet closed before
+     * it connected; the sign-in turns it off so that one tap never launches the wallet twice.
      */
-    suspend fun connectAndSignIn(
-        sender: ActivityResultSender,
-        nonce: app.vowed.data.SignInNonce,
-        fetchNonce: suspend (String) -> app.vowed.data.NonceResponse,
-        mode: SignInMode,
-        waitForUser: suspend () -> Unit,
-    ): SignInOutcome {
+    private suspend fun <T> sequential(retryConnection: Boolean = true, attempt: suspend () -> TransactionResult<T>): TransactionResult<T> =
+        gate.run({ r: TransactionResult<T> -> retryConnection && r is TransactionResult.Failure && WalletSessionGate.isAssociationFailure(r.message) }) {
+            launches.incrementAndGet()
+            attempt()
+        }
+
+    private fun payloadFor(n: app.vowed.data.NonceResponse, address: ByteArray?): SignInWithSolana.Payload =
+        SignInWithSolana.Payload(n.domain, address, n.statement, Uri.parse(n.uri), "1", null, n.nonce, n.issuedAt, n.expirationTime, null, null, null)
+
+    /** The time the server's nonce stops being accepted (the expiry in the payload), with a fallback for a text that cannot be read. */
+    private fun validUntil(n: app.vowed.data.NonceResponse): Long =
+        runCatching { java.time.Instant.parse(n.expirationTime).toEpochMilli() }.getOrDefault(System.currentTimeMillis() + 8 * 60_000)
+
+    /**
+     * Connect AND sign in with ONE wallet request and ONE visit: the official Sign-In-With-Solana payload goes with the authorize request
+     * (`transact(sender, payload)`), so a wallet that supports it shows a single sign-in sheet and returns the signed text with the connection.
+     * A wallet that ignores the payload (no sign-in result comes back) is asked for the signature in the SAME session, so it is still one visit,
+     * never a second one. The server's nonce must already be in hand: nothing needs the network while the wallet is in front.
+     */
+    suspend fun signIn(sender: ActivityResultSender, nonce: app.vowed.data.NonceResponse): SignInOutcome {
         // "Connect wallet" is a new connection: forget any earlier authorization (it may belong to another wallet) so the wallet asks, not reauthorizes
         adapter.authToken = null
         val t = trace()
-        t.add("association started", "mode=$mode, chain=${adapter.blockchain.fullName}")
-        return when (mode) {
-            SignInMode.SingleSession -> sequential {
-                t.add("session 1 opened", "authorize, then sign_messages in the same session")
-                adapter.transact(sender) { auth ->
-                    val addressBytes = auth.accounts.first().publicKey
-                    val address = Base58.encode(addressBytes)
-                    t.add("authorize result", "accounts=${auth.accounts.size}, address=$address")
-                    val n = nonce.forWallet(address, fetchNonce)
-                    val message = buildMessage(n, addressBytes)
-                    t.add("request sent", "sign_messages (1 message) in the same session")
+        t.add("wallet visit started", "one request: authorize with a sign-in payload (domain ${nonce.domain}), chain=${adapter.blockchain.fullName}")
+        return sequential(retryConnection = false) {
+            adapter.transact(sender, payloadFor(nonce, null as ByteArray?)) { auth ->
+                val addressBytes = auth.accounts.first().publicKey
+                val address = Base58.encode(addressBytes)
+                val sir = auth.signInResult
+                t.add("authorize result", "accounts=${auth.accounts.size}, address=$address, sign-in result from the wallet: ${if (sir != null) "yes (signature ${sir.signature.size} bytes, message ${sir.signedMessage.size} bytes)" else "NO (the wallet ignored the payload)"}")
+                if (sir != null) {
+                    SignInOutcome(address, sir.signedMessage, sir.signature, viaPayload = true, validUntilMs = validUntil(nonce))
+                } else {
+                    val message = payloadFor(nonce, addressBytes).prepareMessage(addressBytes).encodeToByteArray()
+                    t.add("request sent", "sign_messages in the same session (the wallet ignored the sign-in payload)")
                     val signature = signMessagesDetached(arrayOf(message), arrayOf(addressBytes)).messages.first().signatures.first()
                     t.add("sign_messages result", "1 signature received")
-                    SignInOutcome(address, message, signature)
+                    SignInOutcome(address, message, signature, viaPayload = false, validUntilMs = validUntil(nonce))
                 }
-            }.unwrap("session 1")
-
-            SignInMode.SplitSessions -> {
-                val addressBytes = sequential {
-                    t.add("session 1 opened", "authorize only")
-                    adapter.transact(sender) { auth ->
-                        t.add("authorize result", "accounts=${auth.accounts.size}, address=${Base58.encode(auth.accounts.first().publicKey)}")
-                        auth.accounts.first().publicKey
-                    }
-                }.unwrap("session 1")
-                val address = Base58.encode(addressBytes)
-                t.add("session 1 ended", "waiting for Vowed to be on screen before opening the wallet again")
-                waitForUser()
-                val n = nonce.forWallet(address, fetchNonce)
-                val message = buildMessage(n, addressBytes)
-                t.add("session 2 opened", "sign_messages only, in a fresh session")
-                val signature = signMessage(sender, address, message)
-                SignInOutcome(address, message, signature)
             }
-        }
+        }.unwrap("wallet visit")
     }
 
     /** Detached ed25519 signature of [message] by the connected account (its own wallet session). */

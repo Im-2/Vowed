@@ -131,12 +131,13 @@ class ConnectivityTest {
     @Test fun clusterNotSupportedCodeIsAMismatchWhateverTheMessage() {
         assertEquals(WalletErrors.Kind.NetworkMismatch, WalletErrors.classify("something odd", WalletErrors.CODE_CLUSTER_NOT_SUPPORTED))
         assertEquals(WalletErrors.Kind.NetworkMismatch, WalletErrors.classify("ERROR_CLUSTER_NOT_SUPPORTED", null))
-        assertEquals(WalletErrors.Kind.NetworkMismatch, WalletErrors.classify("Please switch to Testnet Mode in settings", null))
-        assertEquals(WalletErrors.Kind.NetworkMismatch, WalletErrors.classify("This network (mainnet) does not match devnet", null))
+        // wording that merely mentions a network is NOT a mismatch: only the wallet's own "not supported" answer is (a false setup screen sent people in circles)
+        assertEquals(WalletErrors.Kind.Other, WalletErrors.classify("Please switch to Testnet Mode in settings", null))
+        assertEquals(WalletErrors.Kind.Other, WalletErrors.classify("This network (mainnet) does not match devnet", null))
     }
 
-    @Test fun anAuthorizationRefusalWithoutADeclineIsAPossibleMismatchButADeclineIsNot() {
-        assertEquals(WalletErrors.Kind.PossibleMismatch, WalletErrors.classify("authorization failed", WalletErrors.CODE_AUTHORIZATION_FAILED))
+    @Test fun anAuthorizationRefusalWithoutADeclineIsItsOwnKindNeverANetworkProblem() {
+        assertEquals(WalletErrors.Kind.AuthorizationRefused, WalletErrors.classify("authorization failed", WalletErrors.CODE_AUTHORIZATION_FAILED))
         assertEquals(WalletErrors.Kind.Declined, WalletErrors.classify("User declined authorization request", WalletErrors.CODE_AUTHORIZATION_FAILED))
         assertEquals(WalletErrors.Kind.Declined, WalletErrors.classify("Request cancelled", null))
         assertEquals(WalletErrors.Kind.Other, WalletErrors.classify("Request timed out", null))
@@ -147,7 +148,7 @@ class ConnectivityTest {
         assertEquals(WalletErrors.WRONG_NETWORK, WalletErrors.explain("ERROR_CLUSTER_NOT_SUPPORTED"))
         assertTrue(WalletErrors.WRONG_NETWORK.startsWith("Your wallet is on the real network. Switch it to Testnet Mode"))
         assertFalse(WalletErrors.WRONG_NETWORK.contains("ERROR"))
-        assertTrue(WalletErrors.POSSIBLE_MISMATCH.contains("Testnet Mode"))
+        assertFalse(WalletErrors.AUTHORIZATION_REFUSED.contains("Testnet Mode"))
         assertTrue(WalletErrors.WRONG_NETWORK.contains("no real money"))
     }
 
@@ -164,12 +165,12 @@ class ConnectivityTest {
     @Test fun aMismatchShowsItAgainEvenForExperiencedUsers() {
         assertEquals(WalletSetupLogic.Reason.Mismatch, WalletSetupLogic.reasonToShow(true, true, WalletErrors.Kind.NetworkMismatch))
         assertEquals(WalletSetupLogic.Reason.Mismatch, WalletSetupLogic.reasonToShow(true, false, WalletErrors.Kind.NetworkMismatch))
-        assertEquals(WalletSetupLogic.Reason.PossibleMismatch, WalletSetupLogic.reasonToShow(true, false, WalletErrors.Kind.PossibleMismatch))
     }
 
     @Test fun otherFailuresDoNotShowIt() {
         assertNull(WalletSetupLogic.reasonToShow(true, true, WalletErrors.Kind.Declined))
         assertNull(WalletSetupLogic.reasonToShow(true, true, WalletErrors.Kind.Other))
+        assertNull(WalletSetupLogic.reasonToShow(true, true, WalletErrors.Kind.AuthorizationRefused))
         assertEquals("a declined first try still counts as first time", WalletSetupLogic.Reason.First, WalletSetupLogic.reasonToShow(true, false, WalletErrors.Kind.Declined))
     }
 

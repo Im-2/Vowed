@@ -225,4 +225,26 @@ class CoreTest {
             assertEquals(o["sha256"]!!.jsonPrimitive.content, PlanHash.hash(o["plan"]!!).joinToString("") { "%02x".format(it) })
         }
     }
+
+    // ------------------------------------------------------------------ create and stake in ONE transaction
+    @Test fun createAndStakeInOneTransactionIsCheckedBothWays() {
+        val review = TxChecker.checkCreateAndJoin(tx("createJoin"), createExp(), joinExp())
+        assertTrue(review.title.contains("DEMO") && review.title.contains("stake"))
+        assertTrue(review.lines.any { it.first == "Stake" && it.second.startsWith("4 tokens") })
+        assertTrue(review.lines.any { it.first == "What you pay" && it.second.contains("One approval") })
+    }
+
+    @Test fun createAndStakeRefusesAnythingThatIsNotExactlyThatPair() {
+        reject { TxChecker.checkCreateAndJoin(tx("createJoin"), createExp(), joinExp(stake = "5000000")) } // another stake than chosen
+        reject { TxChecker.checkCreateAndJoin(tx("createJoin"), createExp(), joinExp(tz = 0)) }
+        reject { TxChecker.checkCreateAndJoin(tx("createJoin"), createExp(), joinExp(device = ByteArray(32))) } // another phone key
+        reject { TxChecker.checkCreateAndJoin(tx("swapped"), createExp(), joinExp()) } // join before create
+        reject { TxChecker.checkCreateAndJoin(tx("create"), createExp(), joinExp()) } // only one instruction
+        reject { TxChecker.checkCreateAndJoin(tx("join"), createExp(), joinExp()) }
+        // the stake must be for the pool the transaction creates, not another pool
+        reject { TxChecker.checkCreateAndJoin(tx("createJoin"), createExp(), JoinExpectation(key("wallet"), key("otherWallet"), key("mint"), "4000000", 60, hexToBytes(s("deviceKeyHash")))) }
+        // the plain checks still demand exactly one instruction
+        reject { TxChecker.checkCreate(tx("createJoin"), createExp()) }
+        reject { TxChecker.checkJoin(tx("createJoin"), joinExp()) }
+    }
 }

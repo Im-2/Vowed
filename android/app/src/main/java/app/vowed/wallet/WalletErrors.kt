@@ -14,8 +14,8 @@ object WalletErrors {
     enum class Kind {
         /** the wallet is on another network than the one Vowed asked for: the setup screen is shown */
         NetworkMismatch,
-        /** the wallet refused to authorize and did not say the person declined: possibly the same cause, the setup screen is shown with softer words */
-        PossibleMismatch,
+        /** the wallet refused to authorize (code -1) and did not say the person declined: shown as its own message, NEVER as a network problem */
+        AuthorizationRefused,
         Declined,
         /** the wallet closed the Mobile Wallet Adapter session before the app finished (for example the library's "Cannot send in CLOSED") */
         SessionClosed,
@@ -33,9 +33,10 @@ object WalletErrors {
         val m = message?.lowercase()?.replace('_', ' ').orEmpty()
         return when {
             isSessionClosed(m) -> Kind.SessionClosed
-            code == CODE_CLUSTER_NOT_SUPPORTED || isWrongNetwork(message) || mentionsNetworkSwitch(m) -> Kind.NetworkMismatch
+            // only the wallet's own "chain/cluster not supported" answer (code -7) counts as a network mismatch; wording that merely mentions a network does not
+            code == CODE_CLUSTER_NOT_SUPPORTED || isWrongNetwork(message) -> Kind.NetworkMismatch
             saidNo(m) || code == CODE_NOT_SIGNED -> Kind.Declined
-            code == CODE_AUTHORIZATION_FAILED -> Kind.PossibleMismatch
+            code == CODE_AUTHORIZATION_FAILED -> Kind.AuthorizationRefused
             else -> Kind.Other
         }
     }
@@ -58,14 +59,11 @@ object WalletErrors {
         return parts.joinToString(" <- ")
     }
 
-    private fun mentionsNetworkSwitch(m: String): Boolean =
-        "testnet mode" in m || ("network" in m && ("mainnet" in m || "devnet" in m || "testnet" in m)) || ("devnet" in m && ("not supported" in m || "unsupported" in m || "mismatch" in m))
-
     const val CLOSED_BEFORE_CONNECTING = WalletSessionGate.CLOSED_BEFORE_CONNECTING
     const val SESSION_CLOSED =
         "The wallet closed the connection before it finished. Open Vowed, tap Connect again, and approve in your wallet right away. If the wallet stays on its home screen, return to Vowed manually."
     const val NO_RESPONSE =
-        "Your wallet did not answer. Open your wallet, check it is unlocked and set to Testnet Mode (the practice network), then return to Vowed and tap Sign again. If the wallet shows nothing, the request may not have reached it."
+        "Your wallet did not answer. Open your wallet, check it is unlocked, then return to Vowed and tap Sign again. If the wallet shows nothing, the request may not have reached it."
     const val LOCKED = "Open your wallet and unlock it, then try again. Nothing was signed."
     const val SLOW =
         "The wallet took too long to answer. Open your wallet and unlock it, give it a moment to start (the first start can take up to a minute), then try again."
@@ -73,8 +71,8 @@ object WalletErrors {
     const val EXPIRED = "The transaction expired before it was approved (they last about a minute). Try again and approve it right away."
     const val WRONG_NETWORK =
         "Your wallet is on the real network. Switch it to Testnet Mode (Vowed uses a practice network with no real money) and try again."
-    const val POSSIBLE_MISMATCH =
-        "Your wallet did not connect. If it is on the real network, switch it to Testnet Mode (Vowed uses a practice network with no real money) and try again."
+    const val AUTHORIZATION_REFUSED =
+        "Your wallet refused the request. Open your wallet, make sure it is unlocked, then try again. If it keeps happening, tap Details and Copy diagnostics."
     const val NO_FEE_FUNDS =
         "The wallet could not pay the network fee. It may be on the wrong network (Vowed uses Solana devnet) or have no devnet SOL: switch the wallet to devnet and tap \"Get test tokens\" in Vowed for a little SOL."
 
@@ -91,7 +89,7 @@ object WalletErrors {
         return when {
             isSessionClosed(m) -> SESSION_CLOSED
             WalletSessionGate.isAssociationFailure(raw) -> CLOSED_BEFORE_CONNECTING
-            isWrongNetwork(raw) || mentionsNetworkSwitch(m) -> WRONG_NETWORK
+            isWrongNetwork(raw) -> WRONG_NETWORK
             "usernotauthenticated" in m || "not authenticated" in m || "authentication" in m || "locked" in m || "biometric" in m || "keystore" in m && "auth" in m -> LOCKED
             "timed out" in m || "timeout" in m || "time out" in m || "failed establishing" in m -> SLOW
             "declin" in m || "reject" in m || "denied" in m || "cancel" in m || "not authorized" in m || "did not authorize" in m || "user refused" in m -> DECLINED

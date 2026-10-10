@@ -75,7 +75,7 @@ class PreflightTest {
         assertEquals(WalletErrors.EXPIRED, WalletErrors.explain("Transaction payloads invalid"))
         assertEquals(WalletErrors.NO_FEE_FUNDS, WalletErrors.explain("Attempt to debit an account but found no record of a prior credit."))
         assertTrue(WalletErrors.NO_RESPONSE.startsWith("Your wallet did not answer."))
-        assertTrue(WalletErrors.NO_RESPONSE.contains("Testnet Mode"))
+        assertTrue("a missing answer is not blamed on the network setting", !WalletErrors.NO_RESPONSE.contains("Testnet Mode"))
         for (m in listOf(WalletErrors.NO_RESPONSE, WalletErrors.SESSION_CLOSED, WalletErrors.DECLINED)) assertFalse(m.contains("Exception"))
     }
 

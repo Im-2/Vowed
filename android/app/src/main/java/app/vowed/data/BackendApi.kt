@@ -130,8 +130,9 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(40, TimeUnit.SECONDS)
-            .callTimeout(55, TimeUnit.SECONDS)
+            // the free hosting plan puts the server to sleep when idle; waking it up can take about a minute
+            .readTimeout(80, TimeUnit.SECONDS)
+            .callTimeout(100, TimeUnit.SECONDS)
             .build()
     }
 }

@@ -15,6 +15,7 @@ import app.vowed.core.TxReview
 import app.vowed.data.Account
 import app.vowed.data.ApiException
 import app.vowed.data.ConnectionResult
+import app.vowed.data.CreateJoin
 import app.vowed.ui.HomeFilter
 import app.vowed.data.FaucetText
 import app.vowed.data.SessionKeeper
@@ -30,6 +31,7 @@ import app.vowed.wallet.AppForeground
 import app.vowed.wallet.WalletDiagnostics
 import app.vowed.wallet.WalletErrors
 import app.vowed.wallet.WalletException
+import app.vowed.data.SignInException
 import app.vowed.wallet.WalletSetupLogic
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import kotlinx.coroutines.delay
@@ -227,6 +229,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         // after a restart: sign back in from the saved encrypted session, without the wallet, while it is still valid
         if (_state.value.account != null && c.account.restoreSession()) _state.update { it.copy(signedIn = true) }
+        // wake the server up (a sleeping free host needs up to a minute) while the person reads the first screens
+        viewModelScope.launch { runCatching { c.api.health() } }
         viewModelScope.launch {
             // keep the session alive quietly: at start, then every 10 minutes while the app is open
             while (true) {
@@ -253,6 +257,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun friendly(e: Throwable): String = when (e) {
         is ApiException -> if (e.code == "network") e.message else "${e.message} (${e.code})"
         is WalletException -> e.message ?: "The wallet request failed."
+        is SignInException -> e.message ?: e.step.label
         is TxRejected -> "Stopped before signing: ${e.message}"
         else -> e.message ?: e.javaClass.simpleName
     }
@@ -261,7 +266,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun connect(sender: ActivityResultSender) {
         if (_state.value.connecting != null) return
-        _state.update { it.copy(connecting = ConnectStep.Wallet, connectError = null, connectErrorDetail = null, walletSetupReason = null) }
+        _state.update { it.copy(connecting = ConnectStep.Server, connectError = null, connectErrorDetail = null, walletSetupReason = null) }
         viewModelScope.launch {
             try {
                 val account = c.account.connect(sender) { step -> _state.update { s -> s.copy(connecting = step) } }
@@ -271,13 +276,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 loadMeta()
                 refreshList()
             } catch (e: Throwable) {
-                if (e is WalletException && (e.kind == WalletErrors.Kind.NetworkMismatch || e.kind == WalletErrors.Kind.PossibleMismatch)) {
-                    // the wallet is probably on another network: show the friendly setup screen, never the raw error, and do not retry by ourselves
-                    val reason = if (e.kind == WalletErrors.Kind.NetworkMismatch) WalletSetupLogic.Reason.Mismatch else WalletSetupLogic.Reason.PossibleMismatch
-                    _state.update { it.copy(connecting = null, walletSetupReason = reason) }
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (e is WalletException && e.kind == WalletErrors.Kind.NetworkMismatch) {
+                    // ONLY the wallet's own "this network is not supported" answer shows the setup screen; every other failure names its step below
+                    WalletDiagnostics.current.add("wallet reported a network mismatch", "code ${e.code}")
+                    _state.update { it.copy(connecting = null, walletSetupReason = WalletSetupLogic.Reason.Mismatch, connectErrorDetail = WalletDiagnostics.render()) }
                 } else {
                     // the raw technical text and the timeline of this attempt go under "Details" (and "Copy diagnostics"); they hold no keys, signatures or tokens
-                    val raw = when (e) { is ApiException -> e.detail; is WalletException -> e.raw; else -> null }
+                    val raw = when (e) { is ApiException -> e.detail; is WalletException -> e.raw; is SignInException -> e.detail; else -> null }
                     val detail = listOfNotNull(raw, WalletDiagnostics.render()).joinToString("\n\n")
                     _state.update { it.copy(connecting = null, connectError = friendly(e), connectErrorDetail = detail) }
                 }
@@ -348,13 +354,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** The server did not know this phone: register it again, with one clear sentence for the person. */
-    fun recoverDevice(sender: ActivityResultSender) {
+    fun recoverDevice() {
         if (_state.value.deviceRecovery != DeviceRecovery.Needed) return
-        _state.update { it.copy(deviceRecovery = DeviceRecovery.Working, notice = "The server forgot this phone (it was updated), so Vowed is registering it again. Approve the request in your wallet.") }
+        _state.update { it.copy(deviceRecovery = DeviceRecovery.Working, notice = "The server forgot this phone (it was updated), so Vowed is registering it again.") }
         viewModelScope.launch {
             try {
-                c.account.reRegisterDevice(sender)
-                _state.update { it.copy(deviceRecovery = DeviceRecovery.None, notice = "This phone is registered again. Please repeat what you were doing.") }
+                if (c.account.reRegisterDevice()) {
+                    _state.update { it.copy(deviceRecovery = DeviceRecovery.None, notice = "This phone is registered again. Please repeat what you were doing.") }
+                } else {
+                    _state.update { it.copy(deviceRecovery = DeviceRecovery.None, signedIn = false, notice = "The server forgot this phone. Tap Sign in once to register it again.") }
+                }
             } catch (e: Throwable) {
                 _state.update { it.copy(deviceRecovery = DeviceRecovery.None, notice = friendly(e)) }
             }
@@ -426,7 +435,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** The error shown for a failed step, with the raw text and the wallet timeline under "Details". */
     private fun failure(e: Throwable): TxFlow.Failed {
-        val raw = when (e) { is ApiException -> e.detail; is WalletException -> e.raw; else -> null }
+        val raw = when (e) { is ApiException -> e.detail; is WalletException -> e.raw; is SignInException -> e.detail; else -> null }
         val detail = if (e is WalletException) listOfNotNull(raw, WalletDiagnostics.render()).joinToString("\n\n") else raw
         return TxFlow.Failed(friendly(e), detail)
     }
@@ -458,8 +467,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val plan: JsonObject = draft.plan
                 val goalHash = PlanHash.hash(plan)
 
+                // create the pool AND stake in it with ONE transaction: one wallet approval, one visit
+                val tz = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60_000
                 val resp = c.api.createTx(
                     CreateTxRequest(
+                        join = CreateJoin(draft.stakeBaseUnits.toString(), tz, account.deviceId),
                         mint = mint, kind = null, visibility = if (draft.squadId != null) "private" else draft.visibility, mode = draft.mode, penaltyBps = if (draft.mode == "Soft") penaltyBps else null,
                         startTs = startTs, joinWindowSecs = joinWindow, maxParticipants = maxParticipants, plan = plan,
                         demo = if (draft.demo) DemoRequest(daySecs) else null,
@@ -468,7 +480,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val txBytes = Base64.decode(resp.transaction, Base64.DEFAULT)
                 val poolId = resp.summary["poolId"]?.let { (it as kotlinx.serialization.json.JsonPrimitive).content }
                     ?: throw TxRejected("the server did not say which pool this is")
-                val review = TxChecker.checkCreate(
+                val review = TxChecker.checkCreateAndJoin(
                     txBytes,
                     CreateExpectation(
                         wallet = Base58.decode(account.wallet), mint = Base58.decode(mint), poolId = poolId, mode = draft.mode, penaltyBps = penaltyBps,
@@ -476,6 +488,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         maxParticipants = maxParticipants, demoDaySecs = if (draft.demo) daySecs else 0, goalHash = goalHash,
                         kind = if (draft.squadId == null && draft.visibility == "public") 1 else 0,
                     ),
+                    JoinExpectation(Base58.decode(account.wallet), Base58.decode(resp.pool), Base58.decode(mint), draft.stakeBaseUnits.toString(), tz, hex(account.deviceId)),
                 )
                 val pool = resp.pool
                 draft.place?.let { (lat, lon) -> c.prefs.setPlace(pool, lat, lon) }
@@ -483,9 +496,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 setFlow(
                     TxFlow.Review(
                         PendingTx("create", review, txBytes, pool, simulationNote = simNote(resp.simulation)) {
-                            // a squad challenge is linked to its squad as soon as the pool exists, then the creator joins with the chosen stake
+                            // a squad challenge is linked to its squad as soon as the pool exists; the creator's stake was in the same transaction
                             draft.squadId?.let { sid -> runCatching { c.api.linkPool(sid, pool) } }
-                            prepareJoin(pool, mint, draft.stakeBaseUnits.toString(), final = true)
+                            setFlow(TxFlow.Done(pool, "You're in. Your challenge is created and your stake is held by the program."))
+                            refreshList()
                         },
                     ),
                 )

@@ -162,8 +162,8 @@ fun ConnectScreen(state: UiState, onBack: () -> Unit, onConnect: () -> Unit, onD
         Spacer(Modifier.height(18.dp))
         AppCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ConnectPoint("1", "Approve a sign-in message", "It proves the wallet is yours. No funds move.")
-                ConnectPoint("2", "Register this phone's proof key", "A key made on this phone signs your daily proofs. It never leaves the phone.")
+                ConnectPoint("1", "Approve once in your wallet", "One sign-in approval proves the wallet is yours. No funds move.")
+                ConnectPoint("2", "Register this phone's proof key", "Done by Vowed with no extra wallet screen. A key made on this phone signs your daily proofs and never leaves the phone.")
                 ConnectPoint("3", "You stay in charge", "Vowed never holds a key. Each stake is approved in your wallet after the app checks the transaction on your phone.")
             }
         }
@@ -177,6 +177,7 @@ fun ConnectScreen(state: UiState, onBack: () -> Unit, onConnect: () -> Unit, onD
                     Spinner()
                     Text(
                         when (step) {
+                            ConnectStep.Server -> "Waking up the Vowed server… (this can take up to a minute the first time)"
                             ConnectStep.Wallet -> "Waiting for your wallet…"
                             ConnectStep.ReturnToVowed -> "Approved in your wallet. Switch back to Vowed to continue."
                             ConnectStep.SigningIn -> "Signing in…"
@@ -188,7 +189,7 @@ fun ConnectScreen(state: UiState, onBack: () -> Unit, onConnect: () -> Unit, onD
                 }
             }
         } else {
-            PrimaryButton("Connect wallet", onConnect)
+            PrimaryButton(if (state.connectError != null) "Try again" else "Connect wallet", onConnect)
         }
         state.connectError?.let { err ->
             Spacer(Modifier.height(14.dp))

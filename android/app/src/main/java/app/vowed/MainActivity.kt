@@ -79,11 +79,12 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         if (state.walletSetupReason == null && route0 == "wallet-setup") nav.popBackStack()
     }
     fun connectOrSetup() {
-        val r = vm.setupReasonBeforeConnect()
+        // a retry after a failure goes straight to connecting: the setup screen is only for the very first connection
+        val r = if (state.connectError != null) null else vm.setupReasonBeforeConnect()
         if (r != null) vm.openWalletSetup(r) else vm.connect(sender)
     }
     LaunchedEffect(Unit) { vm.loadMeta() }
-    LaunchedEffect(state.deviceRecovery) { if (state.deviceRecovery == app.vowed.DeviceRecovery.Needed) vm.recoverDevice(sender) }
+    LaunchedEffect(state.deviceRecovery) { if (state.deviceRecovery == app.vowed.DeviceRecovery.Needed) vm.recoverDevice() }
     LaunchedEffect(state.account?.wallet) { app.vowed.ui.components.Avatars.mineWallet = state.account?.wallet; app.vowed.ui.components.Avatars.mineIndex = vm.prefs.avatarIndex }
     // After a successful connect from onboarding, go home.
     LaunchedEffect(state.signedIn) {

@@ -11,8 +11,6 @@ object WalletSetupLogic {
         First,
         /** the wallet said it does not support the network Vowed asked for */
         Mismatch,
-        /** the wallet refused without saying why; it may be the network */
-        PossibleMismatch,
         /** opened by hand from You */
         Help,
     }
@@ -24,7 +22,6 @@ object WalletSetupLogic {
     fun reasonToShow(practiceNetwork: Boolean, everConnected: Boolean, lastFailure: WalletErrors.Kind?): Reason? = when {
         !practiceNetwork -> null
         lastFailure == WalletErrors.Kind.NetworkMismatch -> Reason.Mismatch
-        lastFailure == WalletErrors.Kind.PossibleMismatch -> Reason.PossibleMismatch
         !everConnected -> Reason.First
         else -> null
     }
@@ -37,14 +34,12 @@ object WalletSetupLogic {
 
     fun headline(reason: Reason): String = when (reason) {
         Reason.First, Reason.Help -> "One quick step before connecting"
-        Reason.Mismatch, Reason.PossibleMismatch -> "Your wallet needs one switch"
+        Reason.Mismatch -> "Your wallet needs one switch"
     }
 
     fun message(reason: Reason): String = when (reason) {
         Reason.First, Reason.Help ->
             "Vowed runs on a practice network (called devnet), so no real money is ever used. Your wallet has to be switched to it once."
         Reason.Mismatch -> "Your wallet is on the real network. Switch it to Testnet Mode and try again. Vowed uses a practice network with no real money."
-        Reason.PossibleMismatch ->
-            "Your wallet did not connect. If it is on the real network, switch it to Testnet Mode and try again. Vowed uses a practice network with no real money."
     }
 }

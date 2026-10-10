@@ -48,7 +48,7 @@ class WalletSessionTest {
     @Test fun otherKindsAreUnchanged() {
         assertEquals(WalletErrors.Kind.Declined, WalletErrors.classify("User declined authorization request", null))
         assertEquals(WalletErrors.Kind.NetworkMismatch, WalletErrors.classify("x", WalletErrors.CODE_CLUSTER_NOT_SUPPORTED))
-        assertEquals(WalletErrors.Kind.PossibleMismatch, WalletErrors.classify("authorization failed", WalletErrors.CODE_AUTHORIZATION_FAILED))
+        assertEquals(WalletErrors.Kind.AuthorizationRefused, WalletErrors.classify("authorization failed", WalletErrors.CODE_AUTHORIZATION_FAILED))
         assertEquals(WalletErrors.Kind.Other, WalletErrors.classify("Request timed out", null))
     }
 

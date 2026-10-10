@@ -18,7 +18,7 @@ val AppJson = Json {
 @Serializable data class VerifyResponse(val token: String, val expiresAt: Long, val wallet: String)
 
 @Serializable data class DeviceChallengeResponse(val challenge: String, val expiresAt: Long)
-@Serializable data class DeviceRegisterRequest(val devicePublicKey: String, val attestationChain: List<String>? = null, val challenge: String, val walletSignature: String)
+@Serializable data class DeviceRegisterRequest(val devicePublicKey: String, val attestationChain: List<String>? = null, val challenge: String, val walletSignature: String? = null)
 @Serializable data class AttestationInfo(val level: String, val verifiedBoot: String, val note: String)
 @Serializable data class DeviceRegisterResponse(val deviceId: String, val trustCap: String, val attestation: AttestationInfo)
 
@@ -35,7 +35,10 @@ data class CreateTxRequest(
     val maxParticipants: Int? = null,
     val plan: JsonObject,
     val demo: DemoRequest? = null,
+    val join: CreateJoin? = null,
 )
+/** Stake in the new pool in the same transaction (one wallet approval for create and stake). */
+@Serializable data class CreateJoin(val stake: String, val tzOffsetMinutes: Int, val deviceId: String)
 @Serializable data class JoinTxRequest(val pool: String, val stake: String, val tzOffsetMinutes: Int, val deviceId: String)
 @Serializable data class ClaimTxRequest(val pool: String)
 @Serializable data class SyncRequest(val signature: String)

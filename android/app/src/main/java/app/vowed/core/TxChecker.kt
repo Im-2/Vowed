@@ -68,7 +68,30 @@ object TxChecker {
         val tx = TxDecoder.decode(txBytes)
         requireFeePayer(tx, exp.wallet)
         if (tx.instructions.size != 1) throw TxRejected("expected exactly one instruction")
-        val ix = tx.instructions[0]
+        return createReview(tx.instructions[0], exp)
+    }
+
+    /**
+     * Creating a challenge AND staking in it in ONE transaction (one wallet approval): exactly two instructions, create_pool then join_pool, both
+     * checked on the phone. The join must be for the pool the first instruction creates, with the stake and device key the person chose.
+     */
+    fun checkCreateAndJoin(txBytes: ByteArray, exp: CreateExpectation, join: JoinExpectation): TxReview {
+        val tx = TxDecoder.decode(txBytes)
+        requireFeePayer(tx, exp.wallet)
+        if (tx.instructions.size != 2) throw TxRejected("expected exactly two instructions: create the pool, then join it")
+        val created = createReview(tx.instructions[0], exp)
+        val pool = addr.pool(exp.wallet, BigInteger(exp.poolId).toLong())
+        if (!join.pool.contentEquals(pool)) throw TxRejected("the stake is not for the pool this transaction creates")
+        if (!join.wallet.contentEquals(exp.wallet) || !join.mint.contentEquals(exp.mint)) throw TxRejected("the stake is not from your wallet in the token you chose")
+        val joined = joinReview(tx.instructions[1], join)
+        return TxReview(
+            if (created.title.startsWith("Create a DEMO")) "Create a DEMO pool and stake" else "Create the challenge and stake",
+            created.lines.filterNot { it.first == "What you pay" } + joined.lines.filter { it.first == "Stake" || it.first == "Bound to" } +
+                listOf("What you pay" to "the stake, plus network fee and account rent in SOL. One approval covers both steps."),
+        )
+    }
+
+    private fun createReview(ix: DecodedInstruction, exp: CreateExpectation): TxReview {
         requireProgram(ix, vowed, "the Vowed program")
         requireDiscriminator(ix, Programs.CREATE_POOL, "create a pool")
 
@@ -122,7 +145,10 @@ object TxChecker {
         val tx = TxDecoder.decode(txBytes)
         requireFeePayer(tx, exp.wallet)
         if (tx.instructions.size != 1) throw TxRejected("expected exactly one instruction")
-        val ix = tx.instructions[0]
+        return joinReview(tx.instructions[0], exp)
+    }
+
+    private fun joinReview(ix: DecodedInstruction, exp: JoinExpectation): TxReview {
         requireProgram(ix, vowed, "the Vowed program")
         requireDiscriminator(ix, Programs.JOIN_POOL, "join a pool")
         requireAccounts(
