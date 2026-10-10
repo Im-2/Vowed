@@ -23,6 +23,8 @@ class PoseSession(
     private var countingStartMs = 0L
     private var counter = RepCounter(exercise)
     private var liveness: Liveness? = null
+    /** how the framing is right now; counting only happens while the whole body is in frame */
+    val framingTracker = FramingTracker()
     private var livenessFailures = 0
     var livenessPassed = false
         private set
@@ -32,6 +34,16 @@ class PoseSession(
         private set
 
     val reps: Int get() = counter.reps
+
+    /** false while the body is not (fully) in frame: no rep is counted then */
+    var inFrame = false
+        private set
+
+    /** true once the target is reached: counting stops there, the hand-raise check may still be pending */
+    val targetReached: Boolean get() = counter.reps >= targetReps
+
+    /** the Start button is offered only after the body has been in frame for a moment */
+    fun canStart(nowMs: Long): Boolean = stage == Stage.READY && framingTracker.stableReady(nowMs)
     val livenessPrompt: String? get() = liveness?.prompt
     var hint: String? = null
         private set
@@ -70,8 +82,17 @@ class PoseSession(
         }
     }
 
+    /** The model found nobody in this picture (the clock still runs). */
+    fun onNoBody(nowMs: Long) {
+        framingTracker.update(null, exercise, nowMs)
+        inFrame = false
+        if (stage == Stage.COUNTING) hint = framingTracker.last.hint
+        tick(nowMs)
+    }
+
     fun onFrame(f: PoseFrame) {
         val now = f.tsMillis
+        framingTracker.update(f, exercise, now)
         tick(now)
         when (stage) {
             Stage.READY, Stage.DONE -> return
@@ -79,8 +100,17 @@ class PoseSession(
             Stage.COUNTING -> if (now < countingStartMs) return // a frame from before counting began
         }
         val sinceStart = now - countingStartMs
-        val u = counter.update(f)
-        hint = u.hint
+        // reps count only while the whole body is in frame; out of frame the person is told what to change and nothing is counted
+        val framing = framingTracker.last
+        inFrame = framing.ready
+        if (!inFrame) {
+            hint = framing.hint
+        } else if (counter.reps < targetReps) {
+            // at the target counting stops; the hand-raise check can still be answered
+            hint = counter.update(f).hint
+        } else {
+            hint = null
+        }
         val l = liveness
         if (l != null && !livenessPassed) {
             when (l.update(sinceStart, f)) {
@@ -121,6 +151,6 @@ class PoseSession(
         livenessPassed = livenessPassed,
         startedAtSec = startedAtSec,
         endedAtSec = endedAtSec,
-        summary = "pose ${exercise.key} reps=$reps liveness=$livenessPassed frames=${counter.framesUsed}/${counter.framesSkipped} angle=${"%.0f".format(counter.deepest)}..${"%.0f".format(counter.shallowest)}",
+        summary = "pose ${exercise.key} reps=$reps target=$targetReps liveness=$livenessPassed frames=${counter.framesUsed}/${counter.framesSkipped} angle=${"%.0f".format(counter.deepest)}..${"%.0f".format(counter.shallowest)}",
     )
 }

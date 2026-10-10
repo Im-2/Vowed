@@ -29,7 +29,17 @@ import app.vowed.ui.DetailScreen
 import app.vowed.ui.ExploreScreen
 import app.vowed.ui.LettersScreen
 import app.vowed.ui.NewGoalScreen
+import app.vowed.proof.pose.Exercise
+import app.vowed.proof.pose.FramingCheck
+import app.vowed.proof.pose.JointId
+import app.vowed.proof.pose.PoseFrame
+import app.vowed.proof.pose.PoseSession
+import app.vowed.proof.pose.TestPoses
+import app.vowed.ui.CameraUi
+import app.vowed.ui.PoseCameraOverlay
 import app.vowed.ui.RewardsScreen
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import app.vowed.ui.ReviewScreen
 import app.vowed.ui.SettingsScreen
 import app.vowed.ui.SquadDetailScreen
@@ -94,6 +104,15 @@ fun PreviewMore(screen: String) {
         "squads" -> SquadsScreen(squadState, none, {}, {}, {}, null)
         "squad-detail" -> SquadDetailScreen(squadState, Samples.ME, none, none, {}, {}, none)
         "you" -> SettingsScreen(st, "https://vowed-backend.onrender.com", none, none, none, none, none, none)
+        "camera-ready" -> CameraShot(ready = true)
+        "camera-step-back" -> CameraShot(frame = TestPoses.without(TestPoses.standing(Exercise.PUSHUP, 0), JointId.L_WRIST, JointId.R_WRIST))
+        "camera-left" -> CameraShot(frame = TestPoses.shifted(TestPoses.standing(Exercise.SQUAT, 0), dx = -0.55f), exercise = Exercise.SQUAT)
+        "camera-light" -> CameraShot(frame = TestPoses.dim(TestPoses.standing(Exercise.SQUAT, 0)), exercise = Exercise.SQUAT)
+        "camera-raise" -> CameraShot(frame = TestPoses.shifted(TestPoses.standing(Exercise.SQUAT, 0), dy = 0.2f), exercise = Exercise.SQUAT)
+        "camera-count-0" -> CameraShot(stage = PoseSession.Stage.COUNTING, reps = 0, ready = true)
+        "camera-count-mid" -> CameraShot(stage = PoseSession.Stage.COUNTING, reps = 9, ready = true, motion = 110f)
+        "camera-count-done" -> CameraShot(stage = PoseSession.Stage.DONE, reps = 20, ready = true, succeeded = true)
+        "camera-paused" -> CameraShot(stage = PoseSession.Stage.COUNTING, reps = 6, frame = TestPoses.without(TestPoses.standing(Exercise.SQUAT, 0), JointId.L_ANKLE, JointId.R_ANKLE), exercise = Exercise.SQUAT)
         "wallet-help" -> app.vowed.ui.WalletHelpScreen(none)
         "wallet-setup" -> app.vowed.ui.WalletSetupScreen(app.vowed.wallet.WalletSetupLogic.Reason.First, none, none)
         "wallet-setup-mismatch" -> app.vowed.ui.WalletSetupScreen(app.vowed.wallet.WalletSetupLogic.Reason.Mismatch, none, none)
@@ -149,4 +168,24 @@ fun PreviewMore(screen: String) {
         "connect-success" -> ConnectScreen(st.copy(signedIn = true), none, none, none, none)
         else -> androidx.compose.material3.Text("No preview for $screen")
     }
+}
+
+
+/** A made-up camera screen for screenshots: a dark stand-in for the live picture, with a made-up skeleton on top. Nothing here comes from a camera. */
+@androidx.compose.runtime.Composable
+private fun CameraShot(
+    stage: PoseSession.Stage = PoseSession.Stage.READY, reps: Int = 0, ready: Boolean = false, succeeded: Boolean = false,
+    frame: PoseFrame? = null, exercise: Exercise = Exercise.PUSHUP, motion: Float = 168f,
+) {
+    val f = frame ?: if (exercise == Exercise.PUSHUP) TestPoses.pushup(motion, 0) else TestPoses.squat(motion, 0)
+    val framing = FramingCheck.check(f, exercise)
+    val ui = CameraUi(
+        stage = stage, reps = reps, target = 20, exerciseLabel = exercise.label, framing = framing, canStart = framing.ready && stage == PoseSession.Stage.READY,
+        inFrame = framing.ready, hint = if (stage == PoseSession.Stage.COUNTING && !framing.ready) framing.hint else null, frame = f, elapsedSec = 41, succeeded = succeeded,
+    )
+    PoseCameraOverlay(ui, preview = {
+        androidx.compose.foundation.layout.Box(
+            androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(androidx.compose.ui.graphics.Color(0xFF3B4252), androidx.compose.ui.graphics.Color(0xFF1B1F2A)))),
+        )
+    })
 }

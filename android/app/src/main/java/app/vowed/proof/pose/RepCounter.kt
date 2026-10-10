@@ -15,7 +15,8 @@ enum class JointId { L_SHOULDER, R_SHOULDER, L_ELBOW, R_ELBOW, L_WRIST, R_WRIST,
 /** A landmark in image coordinates (any consistent scale) and the model's confidence (0..1) that it is really in the frame. */
 class Joint(val x: Float, val y: Float, val likelihood: Float)
 
-class PoseFrame(val tsMillis: Long, val joints: Map<JointId, Joint>)
+/** [aspect] is the width divided by the height of the upright picture the joints are measured in (about 0.56 for a 16:9 camera held upright). */
+class PoseFrame(val tsMillis: Long, val joints: Map<JointId, Joint>, val aspect: Float = 0.5625f)
 
 enum class Exercise(val key: String, val label: String, val downBelow: Float, val upAbove: Float) {
     SQUAT("squat", "squats", 105f, 160f),
