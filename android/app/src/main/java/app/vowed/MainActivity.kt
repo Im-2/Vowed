@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
         // Must be created before the activity is STARTED.
         val sender = ActivityResultSender(this)
         handleLink(intent)
-        setContent { VowedTheme { Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { Root(vm, sender) } } }
+        setContent { VowedTheme { Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { androidx.compose.runtime.CompositionLocalProvider(app.vowed.ui.LocalGetTestTokens provides { vm.claimTestTokens() }) { Root(vm, sender) } } } }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

@@ -54,14 +54,8 @@ class AccountRepository(private val c: AppContainer) {
      * background app's network). The app first tries to bring itself forward, then asks the person to return, and waits up to 90 s.
      */
     private suspend fun waitForVowed(onStep: (ConnectStep) -> Unit) {
-        val trace = WalletDiagnostics.current
-        if (AppForeground.isResumed) return
-        trace.add("waiting for Vowed to be on screen", "bring to front: ${c.wallet.tryBringToFront()}")
-        if (AppForeground.awaitResumed(1_500)) { trace.add("Vowed is on screen"); return }
-        onStep(ConnectStep.ReturnToVowed)
-        val back = AppForeground.awaitResumed(90_000)
-        trace.add(if (back) "Vowed is on screen again" else "gave up waiting for Vowed to come back (90 s)")
-        onStep(ConnectStep.SigningIn)
+        AppForeground.ensureOnScreen(WalletDiagnostics.current, { c.wallet.tryBringToFront() }, { onStep(ConnectStep.ReturnToVowed) })
+        if (AppForeground.isResumed) onStep(ConnectStep.SigningIn)
     }
 
     suspend fun connect(sender: ActivityResultSender, onStep: (ConnectStep) -> Unit = {}): Account {

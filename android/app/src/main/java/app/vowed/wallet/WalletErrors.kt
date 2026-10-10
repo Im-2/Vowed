@@ -7,6 +7,7 @@ package app.vowed.wallet
 object WalletErrors {
     /** MWA error codes (ProtocolContract in mobile-wallet-adapter-common 2.2.0): -1 authorization failed, -7 cluster (chain) not supported. */
     const val CODE_AUTHORIZATION_FAILED = -1
+    const val CODE_NOT_SIGNED = -3
     const val CODE_CLUSTER_NOT_SUPPORTED = -7
 
     /** What a failed wallet request most likely means for the person. */
@@ -18,10 +19,12 @@ object WalletErrors {
         Declined,
         /** the wallet closed the Mobile Wallet Adapter session before the app finished (for example the library's "Cannot send in CLOSED") */
         SessionClosed,
+        /** the wallet never answered within the wait (the app's own timeout) */
+        NoResponse,
         Other,
     }
 
-    private val declineWords = listOf("declin", "reject", "denied", "cancel", "user refused", "user denied")
+    private val declineWords = listOf("declin", "reject", "denied", "cancel", "user refused", "user denied", "did not authorize")
 
     private fun saidNo(m: String) = declineWords.any { it in m }
 
@@ -31,7 +34,7 @@ object WalletErrors {
         return when {
             isSessionClosed(m) -> Kind.SessionClosed
             code == CODE_CLUSTER_NOT_SUPPORTED || isWrongNetwork(message) || mentionsNetworkSwitch(m) -> Kind.NetworkMismatch
-            saidNo(m) -> Kind.Declined
+            saidNo(m) || code == CODE_NOT_SIGNED -> Kind.Declined
             code == CODE_AUTHORIZATION_FAILED -> Kind.PossibleMismatch
             else -> Kind.Other
         }
@@ -61,6 +64,8 @@ object WalletErrors {
     const val CLOSED_BEFORE_CONNECTING = WalletSessionGate.CLOSED_BEFORE_CONNECTING
     const val SESSION_CLOSED =
         "The wallet closed the connection before it finished. Open Vowed, tap Connect again, and approve in your wallet right away. If the wallet stays on its home screen, return to Vowed manually."
+    const val NO_RESPONSE =
+        "Your wallet did not answer. Open your wallet, check it is unlocked and set to Testnet Mode (the practice network), then return to Vowed and tap Sign again. If the wallet shows nothing, the request may not have reached it."
     const val LOCKED = "Open your wallet and unlock it, then try again. Nothing was signed."
     const val SLOW =
         "The wallet took too long to answer. Open your wallet and unlock it, give it a moment to start (the first start can take up to a minute), then try again."
@@ -89,7 +94,7 @@ object WalletErrors {
             isWrongNetwork(raw) || mentionsNetworkSwitch(m) -> WRONG_NETWORK
             "usernotauthenticated" in m || "not authenticated" in m || "authentication" in m || "locked" in m || "biometric" in m || "keystore" in m && "auth" in m -> LOCKED
             "timed out" in m || "timeout" in m || "time out" in m || "failed establishing" in m -> SLOW
-            "declin" in m || "reject" in m || "denied" in m || "cancel" in m || "not authorized" in m || "user refused" in m -> DECLINED
+            "declin" in m || "reject" in m || "denied" in m || "cancel" in m || "not authorized" in m || "did not authorize" in m || "user refused" in m -> DECLINED
             "blockhash" in m || "payloads invalid" in m || "invalid for signing" in m || "expired" in m -> EXPIRED
             "debit an account" in m || "no record of a prior credit" in m || "insufficient funds for fee" in m || "insufficient lamports" in m || "simulation failed" in m && "fee" in m -> NO_FEE_FUNDS
             else -> "The wallet did not complete the request (${raw.ifBlank { "no detail" }}). If you were signing a transaction, try again and approve right away: a transaction expires after about a minute."

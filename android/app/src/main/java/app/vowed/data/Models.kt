@@ -39,7 +39,15 @@ data class CreateTxRequest(
 @Serializable data class JoinTxRequest(val pool: String, val stake: String, val tzOffsetMinutes: Int, val deviceId: String)
 @Serializable data class ClaimTxRequest(val pool: String)
 @Serializable data class SyncRequest(val signature: String)
-@Serializable data class TxResponse(val transaction: String, val blockhash: String, val lastValidBlockHeight: Long, val pool: String, val summary: JsonObject)
+/** What the server found when it ran the transaction on the cluster without sending it. */
+@Serializable data class SimulationInfo(val ok: Boolean, val skipped: Boolean, val unitsConsumed: Long? = null)
+@Serializable data class TxResponse(val transaction: String, val blockhash: String, val lastValidBlockHeight: Long, val pool: String, val summary: JsonObject, val simulation: SimulationInfo? = null)
+
+/** Can this wallet afford the transaction it is about to sign? Asked BEFORE the wallet is opened. */
+@Serializable data class PreflightSol(val balance: String, val needed: String, val enough: Boolean, val fee: String, val rent: String, val keep: String)
+@Serializable data class PreflightToken(val mint: String, val symbol: String? = null, val balance: String, val needed: String, val accountExists: Boolean, val enough: Boolean)
+@Serializable data class PreflightReason(val code: String, val message: String)
+@Serializable data class Preflight(val kind: String, val ok: Boolean, val sol: PreflightSol, val token: PreflightToken? = null, val reasons: List<PreflightReason> = emptyList())
 
 @Serializable
 data class Challenge(

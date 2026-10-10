@@ -73,6 +73,8 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
     /** A nonce that is not tied to a wallet yet: asked for BEFORE the wallet opens, so no request is needed while the wallet is in front. */
     suspend fun openNonce(): NonceResponse = post("/v1/auth/nonce", NonceRequest())
     suspend fun health(): Health = get("/v1/health")
+    suspend fun preflight(kind: String, pool: String? = null, mint: String? = null, stake: String? = null): Preflight =
+        get("/v1/preflight?kind=$kind" + (pool?.let { "&pool=$it" } ?: "") + (mint?.let { "&mint=$it" } ?: "") + (stake?.let { "&stake=$it" } ?: ""))
     suspend fun verify(req: VerifyRequest): VerifyResponse = post("/v1/auth/verify", req)
     suspend fun refreshSession(): VerifyResponse = post("/v1/auth/refresh", JsonObject(emptyMap()))
     suspend fun deviceChallenge(): DeviceChallengeResponse = post("/v1/devices/challenge", JsonObject(emptyMap()))

@@ -18,6 +18,20 @@ object AppForeground {
 
     /** Waits until Vowed is on screen; false when [timeoutMs] passes first. */
     suspend fun awaitResumed(timeoutMs: Long): Boolean = withTimeoutOrNull(timeoutMs) { resumed.first { it } } != null
+
+    /**
+     * Makes sure Vowed is on screen before the app goes on (network calls, a second wallet screen). Tries to bring the app forward, then asks the
+     * person to switch back ([onReturnNeeded]) and waits up to [patienceMs]. Everything is written to the [trace].
+     */
+    suspend fun ensureOnScreen(trace: WalletTrace, bringToFront: () -> String, onReturnNeeded: () -> Unit, patienceMs: Long = 90_000): Boolean {
+        if (isResumed) return true
+        trace.add("waiting for Vowed to be on screen", "bring to front: ${bringToFront()}")
+        if (awaitResumed(1_500)) { trace.add("Vowed is on screen"); return true }
+        onReturnNeeded()
+        val back = awaitResumed(patienceMs)
+        trace.add(if (back) "Vowed is on screen again" else "gave up waiting for Vowed to come back (${patienceMs / 1000} s)")
+        return back
+    }
 }
 
 /** One automatic retry after a "session closed" error, in a fresh wallet session, and never a second one. */

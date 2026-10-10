@@ -162,9 +162,37 @@ class WalletManager(
         return result.unwrap("session 2").messages.first().signatures.first()
     }
 
-    /** Signs and submits [tx] (an unsigned legacy transaction). Returns the 64-byte transaction signature. */
-    suspend fun signAndSend(sender: ActivityResultSender, tx: ByteArray): ByteArray =
-        sequential { adapter.transact(sender) { signAndSendTransactions(arrayOf(tx)) } }.unwrap("sign and send").signatures.first()
+    /**
+     * Signs and submits [tx] (an unsigned legacy transaction) with `sign_and_send_transactions`, in its own fresh wallet session (the library
+     * reauthorizes with the saved authorization first). Returns the 64-byte transaction signature.
+     *
+     * Like the sign-in: at most ONE retry, in another fresh session, after the wallet closed the session; the wait for the wallet answer is bounded
+     * (the library waits up to [WALLET_REQUEST_TIMEOUT_MS] for a request, so the whole attempt is allowed [WALLET_ATTEMPT_TIMEOUT_MS]) and a wallet
+     * that never answers ends in [WalletErrors.Kind.NoResponse] instead of waiting for ever. [kind] and [simulation] only describe the transaction in
+     * the diagnostics (no keys, no signatures).
+     */
+    suspend fun signAndSend(sender: ActivityResultSender, tx: ByteArray, kind: String = "transaction", simulation: String? = null, waitForUser: suspend () -> Unit = {}): ByteArray {
+        val t = trace()
+        t.add("transaction", "kind=$kind, ${tx.size} bytes, wallet method sign_and_send_transactions, server simulation: ${simulation ?: "not reported"}")
+        suspend fun attempt(n: Int): ByteArray {
+            t.add("session $n opened", "saved authorization: ${if (adapter.authToken != null) "yes (reauthorize)" else "no (authorize)"}")
+            val result = kotlinx.coroutines.withTimeoutOrNull(WALLET_ATTEMPT_TIMEOUT_MS) {
+                sequential {
+                    adapter.transact(sender) { auth ->
+                        t.add("authorized", "accounts=${auth.accounts.size}, address=${Base58.encode(auth.accounts.first().publicKey)}")
+                        t.add("request sent", "sign_and_send_transactions (1 transaction)")
+                        signAndSendTransactions(arrayOf(tx))
+                    }
+                }
+            }
+            if (result == null) {
+                t.add("no answer", "the wallet did not answer within ${WALLET_ATTEMPT_TIMEOUT_MS / 1000} s")
+                throw WalletException(WalletErrors.NO_RESPONSE, WalletErrors.Kind.NoResponse, raw = "no answer from the wallet within ${WALLET_ATTEMPT_TIMEOUT_MS / 1000} s")
+            }
+            return result.unwrap("session $n").signatures.first()
+        }
+        return SessionRetry.run(t, first = { attempt(1) }, retry = { waitForUser(); attempt(2) })
+    }
 
     /** Drops the saved wallet authorization (the next connect asks the wallet again). */
     fun forgetAuthorization() {
@@ -182,5 +210,8 @@ class WalletManager(
 
     companion object {
         const val WALLET_REQUEST_TIMEOUT_MS = 120_000
+
+        /** one whole wallet attempt: launching the wallet (20 s), connecting to it (10 s) and one request (120 s), plus a little room */
+        const val WALLET_ATTEMPT_TIMEOUT_MS = 160_000L
     }
 }

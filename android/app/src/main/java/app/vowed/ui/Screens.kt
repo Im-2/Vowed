@@ -387,13 +387,26 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
     FlowStatus(state.flow)
 }
 
+/** The "Get test tokens" action, provided once at the top of the app so any screen can offer it (no wallet is opened for it). */
+val LocalGetTestTokens = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
+
 @Composable
 fun FlowStatus(flow: TxFlow) {
     when (flow) {
         is TxFlow.Working -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             app.vowed.ui.components.Spinner(size = 24.dp); Text(flow.message)
         }
-        is TxFlow.Failed -> Text(flow.message, color = MaterialTheme.colorScheme.error)
+        is TxFlow.Failed -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(flow.message, color = MaterialTheme.colorScheme.error)
+            ErrorDetails(flow.detail)
+        }
+        is TxFlow.Blocked -> {
+            val getTokens = LocalGetTestTokens.current
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(flow.message, color = MaterialTheme.colorScheme.onSurface)
+                if (flow.canGetTokens) app.vowed.ui.components.PrimaryButton("Get test tokens", getTokens)
+            }
+        }
         is TxFlow.Done -> Text(flow.message, color = MaterialTheme.colorScheme.primary)
         else -> Unit
     }
