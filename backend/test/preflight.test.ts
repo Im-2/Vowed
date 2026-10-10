@@ -132,6 +132,26 @@ describe("pre-flight check before the wallet is opened", () => {
     expect(few.token).toMatchObject({ balance: "1000000", needed: "2000000", enough: false });
   });
 
+  it("names the token in the message: test USDC and test SKR each get their own words", async () => {
+    const usdc = newMint();
+    const skr = newMint();
+    const chain = new TokenChain();
+    const w = await makeWorld({ chain, env: { FAUCET_USDC_MINT: usdc, FAUCET_SKR_MINT: skr, FAUCET_AUTHORITY_SECRET_KEY: JSON.stringify(Array.from(Keypair.generate().secretKey)) } });
+    const kp = Keypair.generate();
+    const me = { wallet: kp.publicKey.toBase58(), headers: (await signIn(w, kp)).headers };
+    chain.fund(me.wallet, 100_000_000n);
+    for (const [mint, symbol] of [[usdc, "tUSDC"], [skr, "tSKR"]] as const) {
+      const none = (await pre(w, me, `kind=create&mint=${mint}&stake=1000000`)).json();
+      expect(none.token).toMatchObject({ symbol, accountExists: false, enough: false });
+      expect(none.reasons[0].message).toBe(`Your wallet has no ${symbol} yet. Tap Get test tokens to receive some.`);
+      tokenAccount(chain, me.wallet, mint, 500_000n);
+      const few = (await pre(w, me, `kind=create&mint=${mint}&stake=1000000`)).json();
+      expect(few.reasons[0].message).toBe(`You do not have enough ${symbol} for this stake. Tap Get test tokens to receive some.`);
+      tokenAccount(chain, me.wallet, mint, 5_000_000n);
+      expect((await pre(w, me, `kind=create&mint=${mint}&stake=1000000`)).json().ok).toBe(true);
+    }
+  });
+
   it("a create is checked for the pool, its vault and the creator's own join, plus the stake", async () => {
     const { w, chain, me } = await world();
     const mint = newMint();

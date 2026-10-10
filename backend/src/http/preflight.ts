@@ -64,8 +64,9 @@ export async function preflight(s: Services, wallet: string, kind: CostKind, inp
     const tokenBalance = tokenAcc ? tokenAmount(tokenAcc.data) : 0n;
     const enough = tokenBalance >= stake;
     token = { mint, symbol: symbolOf(s, mint), balance: tokenBalance.toString(), needed: stake.toString(), accountExists: Boolean(tokenAcc), enough };
-    if (!tokenAcc) reasons.push({ code: "no_token_account", message: "Your wallet has no test tokens yet. Tap Get test tokens to receive some." });
-    else if (!enough) reasons.push({ code: "low_tokens", message: "You do not have enough test tokens for this stake. Tap Get test tokens to receive some." });
+    const name = token.symbol ?? "test tokens";
+    if (!tokenAcc) reasons.push({ code: "no_token_account", message: `Your wallet has no ${name} yet. Tap Get test tokens to receive some.` });
+    else if (!enough) reasons.push({ code: "low_tokens", message: `You do not have enough ${name} for this stake. Tap Get test tokens to receive some.` });
   }
   return {
     kind,
