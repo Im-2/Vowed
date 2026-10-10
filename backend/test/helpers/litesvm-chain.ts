@@ -13,6 +13,7 @@ import {
   type Chain,
   type SendResult,
   type SignatureInfo,
+  type SimulationResult,
 } from "../../src/chain/types.js";
 import { VowedProgram, BPF_LOADER_UPGRADEABLE } from "../../src/program/client.js";
 
@@ -124,6 +125,23 @@ export class LiteSvmChain implements Chain {
       throw new ChainError(`transaction failed: ${String((res as import("litesvm").FailedTransactionMetadata).err())}`, logs, parseAnchorError(logs));
     }
     return { signature, logs };
+  }
+
+  /** Runs the transaction against the real program without sending it. Signatures are not checked (the backend builds unsigned transactions). */
+  async simulate(tx: Transaction): Promise<SimulationResult> {
+    const kitTx = getTransactionDecoder().decode(tx.serialize({ requireAllSignatures: false, verifySignatures: false }));
+    this.svm.withSigverify(false);
+    try {
+      const res = this.svm.simulateTransaction(kitTx);
+      if (res instanceof this.lib.FailedTransactionMetadata) {
+        const meta = (res as import("litesvm").FailedTransactionMetadata).meta();
+        return { err: String((res as import("litesvm").FailedTransactionMetadata).err()), logs: meta.logs() };
+      }
+      const meta = (res as import("litesvm").SimulatedTransactionInfo).meta();
+      return { err: null, logs: meta.logs(), unitsConsumed: Number(meta.computeUnitsConsumed()) };
+    } finally {
+      this.svm.withSigverify(true);
+    }
   }
 
   async getSignaturesForAddress(address: string, opts?: { until?: string; before?: string; limit?: number }): Promise<SignatureInfo[]> {

@@ -17,6 +17,7 @@ import { registerDeviceRoutes } from "./devices.js";
 import { registerExploreRoutes } from "./explore.js";
 import { registerFaucetRoutes } from "./faucet.js";
 import { registerPerkRoutes } from "./perks.js";
+import { registerPreflightRoutes } from "./preflight.js";
 import { registerAttestationRoutes } from "./attestations.js";
 import { registerNotificationRoutes } from "./notifications.js";
 import { registerGoalRoutes } from "./goals.js";
@@ -102,6 +103,7 @@ export async function buildApp(s: Services, opts: { logger?: boolean } = {}): Pr
   registerSquadRoutes(app, s);
   registerFaucetRoutes(app, s);
   registerPerkRoutes(app, s);
+  registerPreflightRoutes(app, s);
   registerAttestationRoutes(app, s);
   registerExploreRoutes(app, s);
   registerNotificationRoutes(app, s);

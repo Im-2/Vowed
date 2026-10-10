@@ -1,4 +1,4 @@
-import { Connection, PublicKey, SendTransactionError, type Transaction } from "@solana/web3.js";
+import { Connection, PublicKey, SendTransactionError, VersionedTransaction, type Transaction } from "@solana/web3.js";
 import {
   ChainError,
   parseAnchorError,
@@ -6,6 +6,7 @@ import {
   type Chain,
   type SendResult,
   type SignatureInfo,
+  type SimulationResult,
 } from "./types.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -72,6 +73,13 @@ export class Web3Chain implements Chain {
       throw new ChainError(`transaction failed: ${JSON.stringify(res.value.err)}`, logs, parseAnchorError(logs));
     }
     return { signature, logs };
+  }
+
+  /** Runs the transaction on the cluster without sending it: no signatures are checked and a fresh blockhash is used for the run. */
+  async simulate(tx: Transaction): Promise<SimulationResult> {
+    const vtx = new VersionedTransaction(tx.compileMessage());
+    const res = await rpc("simulateTransaction", () => this.connection.simulateTransaction(vtx, { sigVerify: false, replaceRecentBlockhash: true, commitment: "confirmed" }));
+    return { err: res.value.err ? JSON.stringify(res.value.err) : null, logs: res.value.logs ?? [], unitsConsumed: res.value.unitsConsumed };
   }
 
   nowSec(): number {

@@ -47,6 +47,14 @@ export interface TokenTransfer {
   amount: bigint;
 }
 
+/** The result of running a transaction on the cluster without sending it. */
+export interface SimulationResult {
+  /** null when the transaction would succeed; otherwise the JSON of the cluster's error */
+  err: string | null;
+  logs: string[];
+  unitsConsumed?: number;
+}
+
 /** Everything the backend needs from Solana. Implemented over RPC for devnet and over LiteSVM in tests. */
 export interface Chain {
   getAccount(address: string): Promise<AccountData | null>;
@@ -61,4 +69,6 @@ export interface Chain {
   getTransactionLogs(signature: string): Promise<string[] | null>;
   /** The token transfers of a CONFIRMED, SUCCESSFUL transaction, or null when it is unknown or failed. */
   getTokenTransfers(signature: string): Promise<TokenTransfer[] | null>;
+  /** Runs the transaction on the cluster WITHOUT sending it (no signatures needed). Optional: test chains that cannot do it leave it out. */
+  simulate?(tx: Transaction): Promise<SimulationResult>;
 }

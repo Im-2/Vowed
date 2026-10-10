@@ -8,6 +8,7 @@ import { rewardsEnabled } from "../config.js";
 import { getChallenge, getParticipant } from "../challenges/sync.js";
 import { dayIndexFor, windowFor } from "../domain/schedule.js";
 import { ApiError, badRequest, conflict, notFound } from "../errors.js";
+import { simulateOrThrow } from "../chain/simulate.js";
 import type { Services } from "../services.js";
 import { ataAddress, ixCreateAtaIdempotent, ixTransferChecked } from "../util/token.js";
 import { REWARD_DECIMALS } from "../rewards/service.js";
@@ -66,6 +67,7 @@ export async function buildFreezeTx(s: Services, wallet: string, pool: string, d
   const bh = await s.chain.latestBlockhash();
   const tx = new Transaction({ feePayer: owner, blockhash: bh.blockhash, lastValidBlockHeight: bh.lastValidBlockHeight });
   tx.add(ixCreateAtaIdempotent(owner, payee, mint), ixTransferChecked(src, mint, dest, owner, price, REWARD_DECIMALS));
+  await simulateOrThrow(s.chain, tx); // a payment that would fail is refused here, with a plain reason, instead of being handed to the wallet
   return {
     price: price.toString(),
     mint: mint.toBase58(),

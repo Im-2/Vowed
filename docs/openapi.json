@@ -1048,6 +1048,25 @@
                           }
                         ]
                       }
+                    },
+                    "simulation": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "skipped": {
+                          "type": "boolean"
+                        },
+                        "unitsConsumed": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "skipped"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -1140,6 +1159,25 @@
                           }
                         ]
                       }
+                    },
+                    "simulation": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "skipped": {
+                          "type": "boolean"
+                        },
+                        "unitsConsumed": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "skipped"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -1216,6 +1254,25 @@
                           }
                         ]
                       }
+                    },
+                    "simulation": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "skipped": {
+                          "type": "boolean"
+                        },
+                        "unitsConsumed": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "skipped"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -3349,6 +3406,179 @@
                   "required": [
                     "pool",
                     "dayIndex"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/preflight": {
+      "get": {
+        "summary": "Can this wallet afford the transaction it is about to sign? Checks devnet SOL (fee, rent of new accounts, the balance a wallet must keep) and, for a stake, the token balance, so the app can say so BEFORE it opens the wallet",
+        "tags": [
+          "challenges"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "create",
+                "join",
+                "claim",
+                "freeze"
+              ]
+            },
+            "in": "query",
+            "name": "kind",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "pool",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "mint",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,20}$"
+            },
+            "in": "query",
+            "name": "stake",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "create",
+                        "join",
+                        "claim",
+                        "freeze"
+                      ]
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "sol": {
+                      "type": "object",
+                      "properties": {
+                        "balance": {
+                          "type": "string"
+                        },
+                        "needed": {
+                          "type": "string"
+                        },
+                        "enough": {
+                          "type": "boolean"
+                        },
+                        "fee": {
+                          "type": "string"
+                        },
+                        "rent": {
+                          "type": "string"
+                        },
+                        "keep": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "balance",
+                        "needed",
+                        "enough",
+                        "fee",
+                        "rent",
+                        "keep"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "token": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "mint": {
+                          "type": "string"
+                        },
+                        "symbol": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "balance": {
+                          "type": "string"
+                        },
+                        "needed": {
+                          "type": "string"
+                        },
+                        "accountExists": {
+                          "type": "boolean"
+                        },
+                        "enough": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "mint",
+                        "symbol",
+                        "balance",
+                        "needed",
+                        "accountExists",
+                        "enough"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "low_sol",
+                              "no_token_account",
+                              "low_tokens"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "ok",
+                    "sol",
+                    "token",
+                    "reasons"
                   ],
                   "additionalProperties": false
                 }
