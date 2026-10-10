@@ -36,6 +36,15 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   /** Domain shown in the wallet sign-in message and checked on verify. */
   AUTH_DOMAIN: z.string().min(3).default("vowed.app"),
+  /**
+   * The host the app presents to wallets as its identity, and the domain inside the sign-in message. Defaults to the Render hostname Render sets
+   * (RENDER_EXTERNAL_HOSTNAME), so a hosted backend vouches for itself; otherwise AUTH_DOMAIN.
+   */
+  SIWS_DOMAIN: z.string().min(3).optional(),
+  RENDER_EXTERNAL_HOSTNAME: z.string().min(3).optional(),
+  /** public SHA-256 fingerprint(s) of the release signing certificate, colon-separated hex, published in assetlinks.json */
+  ANDROID_CERT_SHA256: z.string().optional(),
+  ANDROID_PACKAGE: z.string().default("app.vowed"),
   ORACLE_SECRET_KEY: secretKey,
   /** Pays fees for permissionless settlement/sweep. Separate from the oracle key. */
   CRANK_SECRET_KEY: secretKey,
@@ -115,6 +124,11 @@ export type Config = z.infer<typeof schema>;
 /** The faucet is usable only when its key and both mints are configured and the network is a test network. */
 export function faucetEnabled(c: Config): boolean {
   return Boolean(c.FAUCET_AUTHORITY_SECRET_KEY && c.FAUCET_USDC_MINT && c.FAUCET_SKR_MINT);
+}
+
+/** The domain used in sign-in messages and as the app identity host. */
+export function siwsDomain(c: Config): string {
+  return c.SIWS_DOMAIN ?? c.RENDER_EXTERNAL_HOSTNAME ?? c.AUTH_DOMAIN;
 }
 
 export function rewardsEnabled(c: Config): boolean {

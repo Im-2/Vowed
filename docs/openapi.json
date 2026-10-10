@@ -196,6 +196,34 @@
         }
       }
     },
+    "/.well-known/assetlinks.json": {
+      "get": {
+        "summary": "Digital Asset Links for the Android app (wallets check it to verify the app identity). Public",
+        "tags": [
+          "meta"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/icon.png": {
+      "get": {
+        "summary": "The app icon shown by wallets (relative to the identity URI). Public",
+        "tags": [
+          "meta"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/v1/meta": {
       "get": {
         "summary": "Program and deployment facts the app needs (no secrets)",

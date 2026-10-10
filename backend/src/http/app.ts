@@ -11,6 +11,7 @@ import { ChainError } from "../chain/types.js";
 import { ApiError } from "../errors.js";
 import type { Services } from "../services.js";
 import { registerAuthRoutes } from "./auth.js";
+import { registerIdentityRoutes } from "./identity.js";
 import { registerChallengeRoutes } from "./challenges.js";
 import { registerDeviceRoutes } from "./devices.js";
 import { registerExploreRoutes } from "./explore.js";
@@ -94,6 +95,7 @@ export async function buildApp(s: Services, opts: { logger?: boolean } = {}): Pr
   app.get("/v1/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 
   registerAuthRoutes(app, s);
+  registerIdentityRoutes(app, s);
   registerChallengeRoutes(app, s);
   registerDeviceRoutes(app, s);
   registerProofRoutes(app, s);

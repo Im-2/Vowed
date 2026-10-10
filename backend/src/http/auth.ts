@@ -5,6 +5,7 @@ import { jwtVerify, SignJWT } from "jose";
 import nacl from "tweetnacl";
 import { z } from "zod";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { siwsDomain } from "../config.js";
 import { badRequest, unauthorized } from "../errors.js";
 import type { Services } from "../services.js";
 import { enforce } from "./ratelimit.js";
@@ -116,9 +117,9 @@ export function registerAuthRoutes(app: FastifyInstance, s: Services) {
       s.db.prepare("INSERT INTO nonces (nonce, purpose, wallet, expires_at) VALUES (?, 'auth', ?, ?)").run(nonce, req.body.wallet ?? null, exp);
       return {
         nonce,
-        domain: s.config.AUTH_DOMAIN,
+        domain: siwsDomain(s.config),
         statement: STATEMENT,
-        uri: `https://${s.config.AUTH_DOMAIN}`,
+        uri: `https://${siwsDomain(s.config)}`,
         issuedAt: new Date(s.wallNow() * 1000).toISOString(),
         expirationTime: new Date(exp * 1000).toISOString(),
       };
@@ -151,7 +152,8 @@ export function registerAuthRoutes(app: FastifyInstance, s: Services) {
 
       const fields = parseSiws(new TextDecoder().decode(msgBytes));
       if (!fields || fields.address !== wallet) throw unauthorized("message does not match the wallet");
-      if (fields.domain !== s.config.AUTH_DOMAIN) throw unauthorized("wrong domain");
+      // the current sign-in domain, or the older AUTH_DOMAIN that earlier app builds were given
+      if (fields.domain !== siwsDomain(s.config) && fields.domain !== s.config.AUTH_DOMAIN) throw unauthorized("wrong domain");
       if (!fields.nonce) throw unauthorized("message has no nonce");
       if (fields.expirationTime && Date.parse(fields.expirationTime) < s.wallNow() * 1000) throw unauthorized("message expired");
 
