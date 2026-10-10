@@ -166,3 +166,46 @@ Setup for each wallet: a NEW throwaway wallet, then the wallet's own switch to t
 | S2 | Solflare | Approve | Same behaviour as P2 and P3 | |
 | I1 | both | Identity | Note exactly what the wallet shows for the app name, icon and any warning. If the icon is the Vowed V on a lavender square, the identity file and icon were read | |
 | T1 | both | Wait 60 s on the wallet's sheet before approving | The app keeps waiting (the wallet request timeout is 120 s) and still connects | |
+
+## Camera checklist (round 4, full-screen camera and counter)
+
+Do each on a real phone, with a person who is not you holding the phone if possible. Use the front and the rear camera. Exercises: squats and push-ups. Note phone model and Android version.
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| K1 | Open the camera from a check-in or from the practice screen | Preview fills the whole screen edge to edge (status and navigation bars hidden, nothing stretched, picture cut equally left and right); Android may show "Viewing full screen" once | |
+| K2 | Phone with a notch or punch-hole | Picture runs behind it, the close button and counter stay visible | |
+| K3 | Turn the phone while the camera is open | The screen stays as it is (orientation locked), the set is not restarted | |
+| K4 | Stand 2 to 3 m away, whole body in view (front camera) | Dashed frame turns green, skeleton lines and dots sit on your joints, "You are in frame. Press Start." and the Start button enables after about a second | |
+| K5 | Move your hand: does the dot on your wrist follow it on screen, without a sideways flip? | Overlay matches the live picture (checks mirroring) for the FRONT camera | |
+| K6 | Same with the REAR camera | Overlay matches, no mirroring | |
+| K7 | Step so your feet are cut off | Hint "Step back so your whole body is in view" (or "Raise your phone"); Start stays disabled; counting would pause | |
+| K8 | Stand at the left or right edge | "Move to the right" / "Move to the left" | |
+| K9 | Dim light | "Better lighting needed" after a few seconds | |
+| K10 | Nobody in view for 5 s | Faint figure guide, then the lighting hint | |
+| K11 | Slow phone (low-end device) | Preview stays smooth; the overlay may update less often; no crash | |
+| C1 | Press Start | 3-2-1 countdown, then counting; the number shows "0 / <target>" with an empty ring | |
+| C2 | Do 3 squats / push-ups | Each rep adds one at the moment you come back up: "1 / 20", "2 / 20", "3 / 20"; a short vibration and a brief pulse of the number; the ring fills | |
+| C3 | Do half reps | Not counted ("Go lower") | |
+| C4 | Bounce quickly at the bottom | Not counted twice | |
+| C5 | Walk out of frame mid-set | "... Counting is paused."; no rep is added until you are back in frame | |
+| C6 | Reach the target | Counting stops at the target; "That is all of them. One last step: raise your hand when it asks." then, after the hand-raise check, the green "Done" with a check mark and the submit button | |
+| C7 | Count against a person who counts aloud | Counted reps within about one of the true number over 10 reps. **Accuracy on a real person has not been verified yet** | |
+| C8 | The sound toggle | Off by default; on gives a short beep per rep | |
+| C9 | Look at the screen | The line "Your camera picture is analysed on this phone only. Nothing is stored or sent" is visible | |
+
+## Transaction approval and token choice (round 4)
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| T1 | Phantom, join a challenge | Phantom shows an approval sheet for the transaction (note exactly what it shows). If not: Details > Copy diagnostics and paste the timeline | |
+| T2 | A wallet with no SOL, tap join | Before the wallet opens: "Your wallet needs a little devnet SOL for network fees. Tap Get test tokens to receive some." with the button | |
+| T3 | A wallet with SOL but no tokens | "Your wallet has no tUSDC yet..." (or tSKR) with the button | |
+| T4 | Wallet that already used its SOL gift | The message says the free SOL was already sent and points to faucet.solana.com | |
+| S1 | Stake with SKR: New challenge > plan | A "Stake token" selector with tUSDC and tSKR, each with its icon and your balance; the note that tSKR is a test token, not real SKR | |
+| S2 | Choose tSKR, stake 1, review, sign | The review shows the tSKR mint; after signing the pot shows "1 tSKR" | |
+| S3 | Open that pool as another wallet | "This challenge is staked in tSKR", the token cannot be changed, balance of tSKR shown | |
+| S4 | Wallet with tUSDC only joins the tSKR pool | Pre-flight: "Your wallet has no tSKR yet..." and nothing opens | |
+| S5 | Explore token filter | All / tUSDC / tSKR pills filter the list; cards show the token symbol | |
+| S6 | Settle and claim in a tSKR pool | The claim button and the payout are in tSKR with the right decimals | |
+| S7 | Streak freeze and rewards | Still paid in tSKR as before | |
