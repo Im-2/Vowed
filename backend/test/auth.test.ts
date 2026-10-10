@@ -143,3 +143,43 @@ describe("wallet sign-in", () => {
     expect((await w.app.inject({ method: "POST", url: "/v1/auth/nonce", payload: { wallet } })).statusCode).toBe(200);
   });
 });
+
+describe("sign-in shaped like a real wallet's (Phantom) answer", () => {
+  const HOST = "vowed-backend.onrender.com";
+  const open = (w: Awaited<ReturnType<typeof makeWorld>>) => w.app.inject({ method: "POST", url: "/v1/auth/nonce", payload: {} }).then((r) => r.json());
+
+  it("accepts the Render host as the domain, an open nonce asked for before the wallet opened, and the message the wallet built from our payload", async () => {
+    const w = await makeWorld({ env: { RENDER_EXTERNAL_HOSTNAME: HOST } });
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+    const n = await open(w);
+    expect(n.domain).toBe(HOST);
+    expect(n.uri).toBe(`https://${HOST}`);
+    // the wallet fills in the address and builds the text from the payload (the Android library's prepareMessage), adding the Version and optionally a Chain ID line
+    const message = msgFor(n, wallet).replace("Version: 1\n", "Version: 1\nChain ID: devnet\n");
+    expect((await verify(w, wallet, message, kp)).statusCode).toBe(200);
+  });
+
+  it("tolerates CRLF line ends, a trailing newline and extra optional lines (Request ID, Resources)", async () => {
+    const w = await makeWorld({ env: { RENDER_EXTERNAL_HOSTNAME: HOST } });
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+    const n = await open(w);
+    const message = `${msgFor(n, wallet)}\nRequest ID: abc\nResources:\n- https://${HOST}/terms`.replace(/\n/g, "\r\n") + "\r\n";
+    expect((await verify(w, wallet, message, kp)).statusCode).toBe(200);
+  });
+
+  it("names the failing check: a wrong domain, a wrong address and a used nonce each get their own reason", async () => {
+    const w = await makeWorld({ env: { RENDER_EXTERNAL_HOSTNAME: HOST } });
+    const kp = Keypair.generate();
+    const wallet = kp.publicKey.toBase58();
+    const n = await open(w);
+    const wrongDomain = await verify(w, wallet, msgFor(n, wallet, { domain: "evil.example" }), kp);
+    expect(wrongDomain.statusCode).toBe(401);
+    expect(wrongDomain.json().error.message).toBe("wrong domain");
+    const wrongAddr = await verify(w, wallet, msgFor(n, Keypair.generate().publicKey.toBase58()), kp);
+    expect(wrongAddr.json().error.message).toBe("message does not match the wallet");
+    expect((await verify(w, wallet, msgFor(n, wallet), kp)).statusCode).toBe(200);
+    expect((await verify(w, wallet, msgFor(n, wallet), kp)).json().error.message).toBe("nonce unknown, used or expired");
+  });
+});

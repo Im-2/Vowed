@@ -87,6 +87,8 @@ const fixtures = {
   deviceKeyHash,
   plan: thePlan,
   create: { tx: buildTx([createIx]), expected: { mode: "Hard", penaltyBps: 10_000, startTs: 1_800_000_000, durationDays: 2, requiredDays: 2, joinWindowSecs: 60, maxParticipants: 10, demoDaySecs: 60 } },
+  createJoin: { tx: buildTx([createIx, joinIx]) }, // create the pool and stake in ONE transaction
+  swapped: { tx: buildTx([joinIx, createIx]) },
   join: { tx: buildTx([joinIx]), expected: { stake: "4000000", tzOffsetMinutes: 60 } },
   claim: { tx: buildTx(claimIxs) },
   freeze: { tx: buildTx(freezeIxs), payee: payee.publicKey.toBase58(), price: "1000000" },

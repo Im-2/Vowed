@@ -12,6 +12,8 @@ import { authenticate, decodeB64 } from "./auth.js";
 import { enforce } from "./ratelimit.js";
 
 const CHALLENGE_TTL_SEC = 600;
+/** A phone may be registered WITHOUT a second wallet signature while the wallet's sign-in is this fresh: the sign-in already proved the person controls the wallet. */
+export const FRESH_SIGNIN_SEC = 600;
 
 /** The exact text the wallet signs when registering a device (signed with MWA signMessages). */
 export function deviceRegistrationMessage(wallet: string, deviceId: string, challengeB64: string): string {
@@ -69,8 +71,11 @@ export function registerDeviceRoutes(app: FastifyInstance, s: Services) {
           attestationChain: z.array(z.string().max(6000)).max(6).optional(),
           /** the challenge from /devices/challenge, base64 */
           challenge: z.string().max(100),
-          /** wallet ed25519 signature (base64) over deviceRegistrationMessage(wallet, deviceId, challenge) */
-          walletSignature: z.string().max(200),
+          /**
+           * wallet ed25519 signature (base64) over deviceRegistrationMessage(wallet, deviceId, challenge). Optional: left out, the registration is
+           * accepted only when the wallet signed in no more than 10 minutes ago (one wallet approval for sign-in AND registration)
+           */
+          walletSignature: z.string().max(200).optional(),
         }),
         response: {
           200: z.object({
@@ -92,11 +97,15 @@ export function registerDeviceRoutes(app: FastifyInstance, s: Services) {
         throw badRequest("bad_device_key", "device key must be an EC P-256 public key in SPKI DER form");
       }
 
-      // 1. the wallet vouches for this exact key and challenge
-      const msg = new TextEncoder().encode(deviceRegistrationMessage(wallet, deviceId, req.body.challenge));
-      const sig = decodeB64(req.body.walletSignature, 64);
-      if (sig.length !== 64 || !nacl.sign.detached.verify(msg, sig, new PublicKey(wallet).toBytes())) {
-        throw badRequest("bad_wallet_signature", "the wallet signature over the registration message is invalid");
+      // 1. the wallet vouches for this exact key and challenge: with its own signature, or through a sign-in that is only minutes old
+      if (req.body.walletSignature) {
+        const msg = new TextEncoder().encode(deviceRegistrationMessage(wallet, deviceId, req.body.challenge));
+        const sig = decodeB64(req.body.walletSignature, 64);
+        if (sig.length !== 64 || !nacl.sign.detached.verify(msg, sig, new PublicKey(wallet).toBytes())) {
+          throw badRequest("bad_wallet_signature", "the wallet signature over the registration message is invalid");
+        }
+      } else if (s.wallNow() - (req.sessionStart ?? 0) > FRESH_SIGNIN_SEC) {
+        throw badRequest("wallet_signature_required", "the wallet signed in a while ago: sign the registration message in the wallet, or sign in again");
       }
 
       // 2. the challenge is ours, for this wallet, unused and fresh

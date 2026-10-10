@@ -123,4 +123,22 @@ describe("device registration", () => {
     expect(trustCapFor({ ...base, level: "software", verifiedBoot: "verified" })).toBe("low");
     expect(trustCapFor({ ok: false, level: "none", verifiedBoot: "unknown", reason: "" })).toBe("low");
   });
+
+  it("registers a phone with NO second wallet signature while the sign-in is fresh, and asks for one when it is old", async () => {
+    const w = await makeWorld({ attestation: fakeAttestation() });
+    const kp = Keypair.generate();
+    const auth = await signIn(w, kp);
+    const reg = async (dev: ReturnType<typeof makeDevice>) => {
+      const { challenge } = (await w.app.inject({ method: "POST", url: "/v1/devices/challenge", headers: auth.headers })).json();
+      return w.app.inject({ method: "POST", url: "/v1/devices/register", headers: auth.headers, payload: { devicePublicKey: dev.spki.toString("base64"), attestationChain: ["Zm9v", "YmFy"], challenge } });
+    };
+    const dev = makeDevice();
+    const ok = await reg(dev);
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().deviceId).toBe(dev.id);
+    w.clock.wall += 601; // the sign-in is now older than ten minutes: the wallet has to vouch for the registration itself
+    const old = await reg(makeDevice());
+    expect(old.statusCode).toBe(400);
+    expect(old.json().error.code).toBe("wallet_signature_required");
+  });
 });

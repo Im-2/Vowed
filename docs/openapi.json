@@ -1001,6 +1001,29 @@
                   "poolId": {
                     "type": "string",
                     "pattern": "^\\d{1,20}$"
+                  },
+                  "join": {
+                    "type": "object",
+                    "properties": {
+                      "stake": {
+                        "type": "string",
+                        "pattern": "^\\d{1,20}$"
+                      },
+                      "tzOffsetMinutes": {
+                        "type": "integer",
+                        "minimum": -720,
+                        "maximum": 840
+                      },
+                      "deviceId": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      }
+                    },
+                    "required": [
+                      "stake",
+                      "tzOffsetMinutes",
+                      "deviceId"
+                    ]
                   }
                 },
                 "required": [
@@ -1408,8 +1431,7 @@
                 },
                 "required": [
                   "devicePublicKey",
-                  "challenge",
-                  "walletSignature"
+                  "challenge"
                 ]
               }
             }

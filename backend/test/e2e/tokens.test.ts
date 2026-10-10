@@ -90,3 +90,35 @@ describe.skipIf(!lib)("two stake tokens, one per pool (LiteSVM)", () => {
     expect(await balance(w, bob.token)).toBe(50n * UNIT); // nothing moved
   });
 });
+
+describe.skipIf(!lib)("create and stake in ONE transaction (LiteSVM)", () => {
+  it("one signature creates the pool and takes the creator's stake; the transaction holds exactly two instructions", async () => {
+    const w = (await makeChainWorld())!;
+    const alice = await makePlayer(w, 50n * UNIT);
+    const res = await createPool(w, alice, w.mint.publicKey, { join: { stake: "3000000", tzOffsetMinutes: 60, deviceId: alice.device.id } });
+    expect(res.statusCode, res.body).toBe(200);
+    const body = res.json();
+    expect(body.summary.action).toBe("create_and_join_pool");
+    expect(body.simulation).toMatchObject({ ok: true, skipped: false }); // the whole pair runs against the real program before the wallet sees it
+    const raw = Buffer.from(body.transaction, "base64");
+    const { Transaction } = await import("@solana/web3.js");
+    expect(Transaction.from(raw).instructions).toHaveLength(2);
+    await signAndSendB64(w, alice, body.transaction);
+    expect(await balance(w, body.summary.vault)).toBe(3_000_000n);
+    expect(await balance(w, alice.token)).toBe(50n * UNIT - 3_000_000n);
+    const view = (await get(w, alice, `/v1/challenges/${body.pool}`)).json();
+    expect(view.participants.find((p: { wallet: string }) => p.wallet === alice.wallet).stake).toBe("3000000");
+  });
+
+  it("keeps every join check: stake cap, unregistered device, not enough tokens", async () => {
+    const w = (await makeChainWorld())!;
+    const alice = await makePlayer(w, 2n * UNIT);
+    const over = await createPool(w, alice, w.mint.publicKey, { join: { stake: "999999999999", tzOffsetMinutes: 0, deviceId: alice.device.id } });
+    expect(over.statusCode).toBe(400);
+    expect(over.json().error.code).toBe("stake_over_cap");
+    const nodev = await createPool(w, alice, w.mint.publicKey, { join: { stake: "1000000", tzOffsetMinutes: 0, deviceId: "a".repeat(64) } });
+    expect(nodev.json().error.code).toBe("device_not_registered");
+    const poor = await createPool(w, alice, w.mint.publicKey, { join: { stake: "3000000", tzOffsetMinutes: 0, deviceId: alice.device.id } });
+    expect(poor.json().error.code).toBe("insufficient_funds");
+  });
+});

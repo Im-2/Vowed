@@ -49,7 +49,8 @@ export interface SiwsFields {
 
 /** Parses the text of a Sign-In With Solana message (the wallet builds it from our payload). */
 export function parseSiws(message: string): SiwsFields | null {
-  const lines = message.split("\n");
+  // a wallet may end its lines with CRLF; the text is otherwise taken exactly as the wallet signed it
+  const lines = message.split(/\r?\n/);
   const first = /^(\S+) wants you to sign in with your Solana account:$/.exec(lines[0] ?? "");
   if (!first || !lines[1]) return null;
   const field = (name: string) => {

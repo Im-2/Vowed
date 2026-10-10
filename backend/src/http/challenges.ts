@@ -289,6 +289,11 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           demo: z.object({ daySecs: z.number().int().min(DEMO_MIN_DAY_SECS).max(DEMO_MAX_DAY_SECS) }).optional(),
           plan: GoalPlanSchema,
           poolId: u64.optional(),
+          /**
+           * Stake in the new pool in the SAME transaction (one wallet approval instead of two): the transaction then holds create_pool followed by
+           * join_pool. The device must already be registered, the same checks as /tx/join apply.
+           */
+          join: z.object({ stake: u64, tzOffsetMinutes: z.number().int().min(-720).max(840), deviceId: z.string().regex(/^[0-9a-f]{64}$/) }).optional(),
         }),
         response: { 200: TxResponse },
       },
@@ -340,7 +345,24 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           demo_day_secs: b.demo?.daySecs ?? 0,
         });
         s.db.prepare("INSERT OR IGNORE INTO plans (goal_hash, creator, plan_json, created_at) VALUES (?,?,?,?)").run(goalHash, wallet, canonicalJson(plan), s.wallNow());
-        const tx = await buildTransaction(s.chain, creator, [ix]);
+        const instructions = [ix];
+        if (b.join) {
+          // create and stake in one transaction: the same limits and checks as /tx/join, against the pool this very transaction creates
+          const stake = BigInt(b.join.stake);
+          let cap = maxStakeForPlan(plan, cfg.max_stake);
+          if (b.demo && cfg.demo_max_stake < cap) cap = cfg.demo_max_stake;
+          if (stake <= 0n) throw badRequest("stake_zero", "stake must be greater than zero");
+          if (stake > cap) throw badRequest("stake_over_cap", `stake is capped at ${cap} for a ${planTrustTier(plan)}-trust goal`, { cap: cap.toString() });
+          const device = s.db.prepare("SELECT trust_cap FROM devices WHERE id = ? AND wallet = ?").get(b.join.deviceId, wallet);
+          if (!device) throw conflict("device_not_registered", "register this device before joining");
+          const mintKey = new PublicKey(b.mint);
+          const userToken = ataAddress(creator, mintKey);
+          const tokenAcc = await s.chain.getAccount(userToken.toBase58());
+          if (!tokenAcc || tokenAmount(tokenAcc.data) < stake) throw conflict("insufficient_funds", "your token account does not hold enough for this stake");
+          const poolKey = s.program.poolPda(creator, poolId);
+          instructions.push(s.program.ixJoinPool(creator, { key: poolKey, mint: mintKey, vault: s.program.vaultPda(poolKey) }, userToken, stake, b.join.tzOffsetMinutes, Buffer.from(b.join.deviceId, "hex")));
+        }
+        const tx = await buildTransaction(s.chain, creator, instructions);
         const simulation = await simulateOrThrow(s.chain, tx);
         const pool = s.program.poolPda(creator, poolId).toBase58();
         recordMeta(s, pool, wallet, b.visibility, plan.title, plan.category, plan.proofMethods[0]!.type);
@@ -351,7 +373,8 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           lastValidBlockHeight: tx.lastValidBlockHeight!,
           pool,
           summary: {
-            action: "create_pool",
+            action: b.join ? "create_and_join_pool" : "create_pool",
+            ...(b.join ? { joinStake: b.join.stake, joinTzOffsetMinutes: b.join.tzOffsetMinutes, joinDeviceId: b.join.deviceId } : {}),
             pool,
             vault: s.program.vaultPda(pool).toBase58(),
             poolId: poolId.toString(),
