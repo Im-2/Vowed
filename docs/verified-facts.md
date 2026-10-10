@@ -373,3 +373,13 @@ Source for the official column: https://docs.solanamobile.com/android-native/usi
 | Join a challenge | 1 | 1 transaction, 1 signature (a token account must already exist: the faucet creates it) | 1, 1 |
 | Claim | 1 | 1 | 1, 1 |
 - `join_pool` is a single instruction. `create_pool` + `join_pool` in one transaction was verified against the real program (LiteSVM, `backend/test/e2e/tokens.test.ts`): the pair simulates and executes, the vault holds the stake and the creator is a participant.
+
+### Emulator results with the signed RELEASE APK 0.1.0-rc1.4 (Mock MWA wallet, hosted backend, 2026-10-11)
+| Flow | Wallet screens counted (window focus polling) | Notes |
+|---|---|---|
+| First sign-in | **1** wallet sheet ("Vowed wants you to sign in with your Solana account ... Sign In") then Home | The Mock wallet handled the sign-in payload: connect and sign-in in one sheet. The first launch of the wallet after clearing its data failed once with "Your wallet app closed before it connected" (cold start); the person taps Try again (no automatic second launch). Phone registration: no wallet screen |
+| Returning launch (app killed and started again) | **0** | signed in from the encrypted saved session |
+| Join a challenge (hosted pool, 1 tUSDC) | **1** wallet sheet (Approve), one `sign_and_send_transactions` request | logcat trace "session 1: ok" |
+| Stale saved authorization (wallet data cleared) | wallet answers -1 to the reauthorize; the app discards the token and retries ONCE with a fresh authorize (Connect sheet, then Approve) | this is the behaviour the real Phantom may show; the retry is announced in the trace |
+| Create and stake in one transaction | not run on the emulator: the Mock wallet's devnet account holds 0.0023 SOL after the joins, a create-and-stake needs 0.0054 SOL (the app says so before opening the wallet). Verified against the real program in LiteSVM instead | needs about 0.004 devnet SOL sent to 2YePEWRp8aTfqQnJHK2EBt4YkXRXWetzdmL8dDG7UFZf to run live |
+- Mock wallet quirks seen: after a restart its Keystore key needs a fresh PIN (BiometricPrompt, test PIN 1234); without it the wallet crashes with `UserNotAuthenticatedException`, which Vowed reports as "wallet app closed" and not as a decline.

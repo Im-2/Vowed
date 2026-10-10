@@ -13,6 +13,8 @@ function Note-Wallet {
 "onboarding: " + (Has-Text "Get started" 60)
 Tap-Text "Get started" 10 | Out-Null; Start-Sleep 2
 "connect tap: " + (Tap-Text "Connect wallet" 30)
+Start-Sleep 2
+if (Find-Node "connect now" -Contains) { "  first-time wallet setup screen shown; tapping connect now"; Tap-Text "connect now" 5 -Contains | Out-Null }
 $end = (Get-Date).AddSeconds($TimeoutSec)
 $done = $false
 $taps = 0

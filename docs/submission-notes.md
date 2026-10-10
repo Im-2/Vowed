@@ -226,3 +226,7 @@ The status table in section 1 and the "Last updated" line date from the Phase 2 
 | Real wallets (Phantom, Solflare, Seed Vault Wallet) over MWA on devnet | **Not verified** | checklist in `docs/device-tests.md` |
 
 Do not claim: real-phone camera counting, Seeker support, push when the app is closed, real yield, mainnet, an audit, a privacy policy or in-app data deletion (not built), dark-theme polish.
+
+## Round 5 (2026-10-11): sign-in, approvals, create-and-stake
+- Built and verified: one wallet request for sign-in (sign-in payload, Mock wallet showed one sheet), wallet answer kept across server retries, step-named failures, phone registration without a wallet screen (server rule, threat model), create-and-stake as one transaction (real program, LiteSVM), one wallet request per transaction (unit tests), returning user zero wallet screens (emulator).
+- Not verified: anything on a real Phantom (whether it handles the sign-in payload, the exact cause of the earlier false "Testnet Mode" screen, the approval sheet of a transaction).
