@@ -150,3 +150,19 @@ Run on a **clean real phone** (not the development emulator), with the signed re
 | N6 | Turn Data Saver ON (Samsung: Settings, Connections, Data usage, Data saver) and remove Vowed from "Allow while Data saver on", then connect through Phantom | Sign-in works (the nonce is fetched before the wallet opens). If it fails, You > Check connection tells whether the phone can reach the server, with the reason under Details | |
 | N7 | Airplane mode, tap Connect wallet | "Vowed couldn't reach its server. Check your internet connection and try again. The server may take up to a minute to wake up." and a Details link with the raw text; Check connection shows FAIL | |
 | N8 | Update over the old rc1 APK (same signing key) | Installs as an update, keeps data | |
+
+## Phantom and Solflare checklist (round 3, run on a real phone)
+
+Setup for each wallet: a NEW throwaway wallet, then the wallet's own switch to the practice network. Phantom: Settings, Developer Settings, Testnet Mode on, Solana Devnet. Solflare: Settings, Network, Devnet. After a test, You > Copy diagnostics (under Details of an error) and paste the timeline into the Result column or an issue: it has no keys, signatures or tokens.
+
+| # | Wallet | Test | Expected | Result |
+|---|---|---|---|---|
+| P1 | Phantom (Testnet Mode, Solana Devnet) | Connect wallet, then "I've switched it, connect now" | Phantom shows "Connect" for Vowed (it may say the identity could not be verified: expected, see verified-facts). Approve | |
+| P2 | Phantom | After approving | Either Phantom returns to Vowed by itself, or Vowed shows "Approved in your wallet. Switch back to Vowed to continue." Switch back by hand | |
+| P3 | Phantom | Second wallet screen | A "Sign message" sheet appears (a second session) and, once approved, Vowed shows "Wallet connected" and opens Home. The connection may need one automatic retry the first time (see the timeline: "retry") | |
+| P4 | Phantom | Connect a second time after disconnecting | Goes straight to the two-session flow (remembered), no failed first try | |
+| P5 | Phantom | If it still fails | The message "The wallet closed the connection before it finished..." with Details and Copy diagnostics; paste the timeline. Check whether the timeline shows onPause/onResume or "restored from saved state" around the session | |
+| S1 | Solflare (Devnet) | Connect wallet | Solflare shows an approval prompt for Vowed. If it only shows the portfolio, return to Vowed and copy the diagnostics: note the wallet package and version in the first lines | |
+| S2 | Solflare | Approve | Same behaviour as P2 and P3 | |
+| I1 | both | Identity | Note exactly what the wallet shows for the app name, icon and any warning. If the icon is the Vowed V on a lavender square, the identity file and icon were read | |
+| T1 | both | Wait 60 s on the wallet's sheet before approving | The app keeps waiting (the wallet request timeout is 120 s) and still connects | |
