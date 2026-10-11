@@ -19,6 +19,7 @@ import type { Services } from "../services.js";
 import { ataAddress, ixCreateAtaIdempotent, tokenAmount } from "../util/token.js";
 import { authenticate, pubkeySchema } from "./auth.js";
 import { idempotent } from "./idempotency.js";
+import { recordBuilt } from "./txsubmit.js";
 import { enforce } from "./ratelimit.js";
 
 const u64 = z.string().regex(/^\d{1,20}$/);
@@ -368,6 +369,7 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         const tx = await buildTransaction(s.chain, creator, instructions);
         const simulation = await simulateOrThrow(s.chain, tx);
         const pool = s.program.poolPda(creator, poolId).toBase58();
+        recordBuilt(s, wallet, "create", pool, tx);
         recordMeta(s, pool, wallet, b.visibility, plan.title, plan.category, plan.proofMethods[0]!.type);
         return {
           simulation,
@@ -458,6 +460,7 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         const costs = await requireSol(s.chain, wallet, "join");
         const tx = await buildTransaction(s.chain, user, [ix]);
         const simulation = await simulateOrThrow(s.chain, tx);
+        recordBuilt(s, wallet, "join", c.pool, tx);
         return {
           simulation,
           costs,
@@ -516,6 +519,7 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         const costs = await requireSol(s.chain, wallet, "claim", { userTokenAccountMissing: !hasToken });
         const tx = await buildTransaction(s.chain, owner, ixs);
         const simulation = await simulateOrThrow(s.chain, tx);
+        recordBuilt(s, wallet, "claim", pool, tx);
         return {
           simulation,
           costs,

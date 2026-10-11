@@ -307,6 +307,17 @@ CREATE TABLE attestations (
 );
 CREATE INDEX sol_gift_events_wallet ON sol_gift_events (wallet);
 CREATE UNIQUE INDEX sol_gift_one_pending ON sol_gift_events (wallet) WHERE status = 'pending';`,
+  // 2026-10-11: the transactions this server built (by the hash of the message), so that a wallet that only SIGNS can hand the signed copy back to be sent, once
+  `CREATE TABLE built_txs (
+  message_hash TEXT PRIMARY KEY,
+  wallet TEXT NOT NULL,
+  kind TEXT NOT NULL,                   -- create | join | claim
+  pool TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  status TEXT NOT NULL,                 -- built | sending | sent | failed
+  signature TEXT,
+  error TEXT
+);`,
 ];
 
 export function openDb(path: string): Db {

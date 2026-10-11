@@ -3717,6 +3717,128 @@
         }
       }
     },
+    "/v1/tx/submit": {
+      "post": {
+        "summary": "Send a transaction the wallet only SIGNED (sign_transactions). Only a transaction this server built for this wallet is accepted; it is simulated again and sent at most once, and asking again returns the same signature",
+        "tags": [
+          "challenges"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "transaction": {
+                    "type": "string",
+                    "maxLength": 6000
+                  }
+                },
+                "required": [
+                  "transaction"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "signature": {
+                      "type": "string"
+                    },
+                    "alreadySubmitted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "signature",
+                    "alreadySubmitted"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/challenges/check": {
+      "post": {
+        "summary": "Did the create / join / claim the wallet was asked for land on chain? Used after a wallet closed or never answered, before another signature is requested",
+        "tags": [
+          "challenges"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pool": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "create",
+                      "join",
+                      "claim"
+                    ]
+                  }
+                },
+                "required": [
+                  "pool",
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "landed": {
+                      "type": "boolean"
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "signature": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "status": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "landed",
+                    "detail",
+                    "signature",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/providers/sample/register": {
       "post": {
         "summary": "Devnet demos only: the sample provider inside the app registers the public key it made on the phone, for this wallet",

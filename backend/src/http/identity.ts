@@ -27,6 +27,12 @@ export function registerIdentityRoutes(app: FastifyInstance, s: Services) {
     reply.header("cache-control", "public, max-age=3600");
     return assetLinks(s);
   });
+  // A squad invite link on the verified host: on a phone with Vowed installed Android opens the app; anywhere else this page says what to do.
+  app.get("/join/:code", { schema: { hide: true } }, async (req, reply) => {
+    const code = String((req.params as { code?: string }).code ?? "").replace(/[^A-Za-z0-9]/g, "").slice(0, 12);
+    reply.header("content-type", "text/html; charset=utf-8").header("cache-control", "public, max-age=300");
+    return reply.send(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Join a squad on Vowed</title><body style="font-family:sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem"><h1>Join a squad on Vowed</h1><p>Squad code: <b>${code}</b></p><p>Open this link on an Android phone that has Vowed installed, or open Vowed, go to Squads and type the code.</p><p>Vowed runs on Solana devnet with test tokens only.</p>`);
+  });
   const icon = async (_req: unknown, reply: import("fastify").FastifyReply) => {
     reply.header("content-type", "image/png").header("cache-control", "public, max-age=86400");
     return reply.send(ICON_PNG);
