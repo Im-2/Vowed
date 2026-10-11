@@ -108,8 +108,19 @@ export async function submitSigned(s: Services, wallet: string, signedBase64: st
     throw conflict("in_progress", "this transaction is being sent right now; ask again in a moment");
   }
   try {
-    await simulateOrThrow(s.chain, tx);
-    await s.chain.sendAndConfirm(tx);
+    // a blockhash the node does not know yet ("Blockhash not found") is common on the public devnet RPC for a blockhash another node (or the wallet's) handed out
+    // a few seconds ago: ask again a few times before saying it expired
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await simulateOrThrow(s.chain, tx);
+        await s.chain.sendAndConfirm(tx);
+        break;
+      } catch (e) {
+        const text = e instanceof Error ? e.message : String(e);
+        if (!/blockhash/i.test(text) || attempt >= 3) throw e;
+        await new Promise((r) => setTimeout(r, 1_500));
+      }
+    }
   } catch (e) {
     const text = e instanceof Error ? e.message : String(e);
     // a transaction that was already processed is a success for the person (an earlier send, or a wallet that also sent it)
@@ -120,7 +131,7 @@ export async function submitSigned(s: Services, wallet: string, signedBase64: st
     s.db.prepare("UPDATE built_txs SET status = 'failed', error = ? WHERE message_hash = ?").run(text.slice(0, 200), hash);
     if (e instanceof ApiError) throw e;
     if (e instanceof ChainError) {
-      if (/blockhash/i.test(text)) throw new ApiError(409, "blockhash_expired", "This transaction expired before it was sent. Go back and try again.");
+      if (/blockhash/i.test(text)) throw new ApiError(409, "blockhash_expired", `This transaction expired before it was sent. Go back and try again. (the network said: ${text.slice(0, 120)})`, { error: text.slice(0, 300), blockhash: tx.recentBlockhash });
       const f = explainSimulation(text, e.logs ?? []);
       throw new ApiError(422, f.code, f.message, { error: text.slice(0, 300) });
     }

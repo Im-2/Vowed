@@ -86,6 +86,7 @@ class WalletVisit(
     private val connectTimeoutMs: Long = CONNECT_TIMEOUT_MS,
     private val stallAfterMs: Long = STALL_AFTER_MS,
     private val answerTimeoutMs: Long = ANSWER_TIMEOUT_MS,
+    private val settleMs: Long = SETTLE_MS,
 ) {
     suspend fun run(tx: ByteArray, savedToken: String?, methodOverride: SignMethod? = null): VisitResult {
         val t0 = clock()
@@ -140,6 +141,13 @@ class WalletVisit(
                     hooks.saveToken(auth.token)
                     trace.add("authorize result", "$authMs ms" + if (authMs > 2_500) " (the wallet took long: it probably showed a screen)" else " (quick: no screen needed)")
 
+                    // Real Phantom 26.32 (emulator, 2026-10-11): when the transaction request arrives while its Connect sheet is still closing, it logs
+                    // "requestUserApproval initiated" and never draws the approval sheet (the person is left on its Home screen). So after a screen was
+                    // shown, the request is held back a moment, which is when the wallet's own screen has finished closing.
+                    if (authMs > SCREEN_SHOWN_AFTER_MS && settleMs > 0) {
+                        trace.add("waiting for the wallet's connect screen to close", "$settleMs ms before the transaction request is sent")
+                        delay(settleMs)
+                    }
                     arm("after the transaction request was sent")
                     requestSent = true
                     trace.add("request sent", "${method.wire}, ${since()}")
@@ -191,6 +199,12 @@ class WalletVisit(
 
         /** after this long without an answer to the transaction request the screen shows "Waiting for <wallet>" with Try again */
         const val STALL_AFTER_MS = 12_000L
+
+        /** an authorize that took longer than this showed a screen (Connect), so the wallet needs a moment before the next request */
+        const val SCREEN_SHOWN_AFTER_MS = 2_500L
+
+        /** how long the transaction request is held back after a Connect screen, so that the wallet's approval sheet can be drawn */
+        const val SETTLE_MS = 3_000L
 
         /** `get_capabilities` is only information: it never holds the visit up for longer than this */
         const val CAPS_TIMEOUT_MS = 8_000L

@@ -305,7 +305,14 @@ class WalletVisitTest {
             override suspend fun authorize(token: String?): WalletAuth { now += 8_000; return WalletAuth("T", ByteArray(32)) }
             override suspend fun signAndSend(tx: ByteArray): ByteArray { now += 1_000; return sig }
         }
-        runBlocking { WalletVisit(w, trace, clock = { now }).run(ByteArray(10), null) }
+        runBlocking { WalletVisit(w, trace, clock = { now }, settleMs = 1).run(ByteArray(10), null) }
         assertTrue(trace.render().contains("it probably showed a screen"))
+        assertTrue("the request waits for the connect screen to close", trace.render().contains("waiting for the wallet's connect screen to close"))
+    }
+
+    @Test fun noWaitIsAddedWhenTheWalletAnsweredWithoutAScreen() {
+        val trace = WalletTrace()
+        runBlocking { WalletVisit(FakeWallet(), trace).run(ByteArray(10), null) }
+        assertFalse(trace.render().contains("waiting for the wallet's connect screen to close"))
     }
 }
