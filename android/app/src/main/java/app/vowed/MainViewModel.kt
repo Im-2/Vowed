@@ -614,6 +614,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var lastVisitMethod: SignMethod? = null
     private var lastRequestSent = false
     private var walletName: String? = null
+    private var walletPackage: String? = null
 
     /** the method Try again asks for next (the OTHER one when the last request got no answer) */
     private var nextMethod: SignMethod? = null
@@ -652,7 +653,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 if (methodOverride == null) WalletDiagnostics.begin()
                 val hooks = VisitHooks(
-                    walletKnown = { _, label ->
+                    walletKnown = { pkg, label ->
+                        walletPackage = pkg
                         walletName = label
                         if (_state.value.flow is TxFlow.Working) setFlow(TxFlow.Working("Waiting for ${label ?: "your wallet"}…", signing = true, wallet = label))
                     },
@@ -753,12 +755,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val l = pollLanding(tx, 6_000)
                 if (l is Landing.Landed) { completeSuccess(tx, l.signature ?: ""); return@launch }
             }
-            nextMethod = if (lastRequestSent) lastVisitMethod?.other() else lastVisitMethod
-            nextMethod?.let { diag("next visit", "will ask the wallet in the other way: ${it.wire}") }
+            // the OTHER method only for a wallet that never answered with this one; a wallet that did answer with it before (Phantom: sign_transactions) is asked the same way again, in a fresh visit
+            val answeredBefore = walletPackage?.let { prefs.walletMemory.method(it) } == lastVisitMethod
+            nextMethod = if (lastRequestSent && !answeredBefore) lastVisitMethod?.other() else lastVisitMethod
+            nextMethod?.let { diag("next visit", "will ask the wallet: ${it.wire}") }
             val rebuild = tx?.rebuild
             if (rebuild != null) {
                 setFlow(TxFlow.Working("Preparing a fresh transaction…"))
-                if (lastRequestSent) _state.update { it.copy(notice = "${walletName ?: "The wallet"} did not answer, so this time Vowed asks in a different way (${nextMethod?.plain ?: "as before"}). Check it and tap Sign again.") }
+                if (lastRequestSent) _state.update { it.copy(notice = "${walletName ?: "The wallet"} did not answer, so Vowed opens it again with a fresh request (${nextMethod?.plain ?: "as before"}). Check it and tap Sign again.") }
                 rebuild()
             } else {
                 setFlow(TxFlow.Idle)

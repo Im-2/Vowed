@@ -513,3 +513,10 @@ Real Phantom (installed from Google Play, throwaway wallet imported from a local
 5. **Not solved:** Phantom still sometimes does not draw a sheet at all for a request it accepted (seen as `requestUserApproval initiated` with nothing on screen), mostly on this memory-starved emulator. A new wallet visit (Try again) has shown the pending sheet later.
 
 **What was NOT proven with real Phantom:** a create-and-stake that lands on chain. The server accepted Phantom's signed copy and tried to send it; the public devnet RPC answered with a blockhash error that is now retried and reported with the network's own words (needs one more run to confirm). Do not claim "works with Phantom" until that run passes.
+
+### RESULT: create-and-stake with real Phantom, confirmed on devnet (2026-10-11 22:24 WAT)
+- Phantom 26.32.0 (Google Play) on the emulator, Vowed 0.1.0-rc1.7 (build 8) release build, Testnet Mode on. Phantom showed Connect (once), then Confirm transaction; approved; Vowed returned and showed the challenge with the stake (tUSDC balance 20 to 19).
+- Transaction: `4h8b6oYKSpV8x8m2E18KbxFNmF9ZBkh5cFZy7npVwtNCqf36vpo9qamJwBya3Sr5xcfatjWE8zn4sHbUrvMTrXde` (devnet), fee payer `5R96f2BbLJtBEEaMk6EUyR7XU7W2oasKkDkQa4AKMmtS`, instructions `CreatePool` + `JoinPool` of program `BMTXJRZ4QxzCg4UCHKo6qGGiGXKW26ARPAtPaXA8k7EL`, no error, fee 80,000 lamports (Phantom added a priority fee; the server accepted it by content match).
+- Screenshot: `docs/ui/vowed-real-phantom-stake-landed.png`; sheets: `docs/ui/phantom-real-*.png`.
+- It took a retry: on two earlier runs Phantom logged the request but did not draw its sheet (see item 5 above). The first run after the fixes that tapped Connect only once its button was enabled (it is dimmed for the first seconds) and then Confirm went through. Not yet shown: the same on a physical Samsung phone or a Seeker.
+- Note: the recovery phrase file under ~/.vowed-testing/ does not derive this account (a typing slip when importing produced a different valid phrase); the wallet is throwaway devnet with no funds of value, so nothing is lost, but that file is not its backup.

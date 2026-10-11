@@ -1,4 +1,4 @@
-# One clean real-Phantom run on the emulator: reset Phantom, warm it, sign in to Vowed, then create-and-stake. Logs every step; screenshots of Phantom's sheets
+﻿# One clean real-Phantom run on the emulator: reset Phantom, warm it, sign in to Vowed, then create-and-stake. Logs every step; screenshots of Phantom's sheets
 # go to %TEMP%. Needs the emulator (vowed_play) with Phantom set up (docs/emulator-real-wallet-testing.md). Usage: powershell scripts/emu-phantom-e2e.ps1
 . "$PSScriptRoot\emu-lib.ps1"
 $adb = "C:\Users\hp\Android\Sdk\platform-tools\adb.exe"
@@ -38,3 +38,17 @@ Say "tap Sign with wallet"
 Approve 200 2 | ForEach-Object { Say $_ }
 for ($i = 0; $i -lt 25; $i++) { Start-Sleep 4; $t = (Screen-Texts) -join '|'; if ($t -notmatch 'Checking whether|Confirming|Sending your signed|Working') { break } }
 Say "result: $(($t -split '\|' | Select-Object -Last 3) -join ' | ')"
+
+# what a person does when Phantom skips a sheet: tap Try again, check the new review, tap Sign again (at most twice)
+for ($retry = 1; $retry -le 2 -and $t -match 'Try again'; $retry++) {
+    Say "retry ${retry}: Try again"
+    Tap-Text "Try again" 10 | Out-Null; Start-Sleep 6
+    Tap-Text "Review" 10 | Out-Null; Has-Text "Check before you sign" 40 | Out-Null; Start-Sleep 2
+    1..3 | ForEach-Object { & $adb shell input swipe 540 1900 540 500 300; Start-Sleep -Milliseconds 600 }
+    Say "tap Sign with wallet (retry $retry)"
+    & $adb shell input tap 540 2100
+    Approve 200 3 | ForEach-Object { Say $_ }
+    for ($i = 0; $i -lt 25; $i++) { Start-Sleep 4; $t = (Screen-Texts) -join '|'; if ($t -notmatch 'Checking whether|Confirming|Sending your signed|Working') { break } }
+    Say "result after retry ${retry}: $(($t -split '\|' | Select-Object -Last 3) -join ' | ')"
+}
+
