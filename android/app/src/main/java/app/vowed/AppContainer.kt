@@ -22,7 +22,7 @@ import app.vowed.wallet.WalletManager
 class AppContainer(val app: Application) {
     val prefs = Prefs(app)
     val api = BackendApi(baseUrl = { prefs.backendUrl })
-    val wallet = WalletManager(prefs, identityUri = BuildConfig.BACKEND_URL, bringToFront = { WalletEnvironment.bringToFront(app) })
+    val wallet = WalletManager(prefs, identityUriText = BuildConfig.BACKEND_URL, bringToFront = { WalletEnvironment.bringToFront(app) })
     val deviceKey: (String) -> DeviceKey = { DeviceKey(app, it) }
     val letters = LetterStore(java.io.File(app.filesDir, "letters.bin"), LetterCipher { LetterCipher.keystoreKey() })
     val sessions = SessionKeeper(

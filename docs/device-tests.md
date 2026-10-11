@@ -227,3 +227,15 @@ Phantom with Testnet Mode on and Solana Devnet selected. Install the new APK ove
 | J1 | Join a challenge | ONE Phantom approval sheet for ONE transaction. Note what it shows (simulation, fee) | |
 | J2 | New challenge and stake | ONE approval for the combined create-and-stake transaction (previously two) | |
 | J3 | Join with too little SOL | "Not sent to your wallet yet" card with the numbers, Phantom is not opened, Get test tokens works | |
+
+## Staking with Phantom (round 6)
+Phantom, Testnet Mode, Solana Devnet, a signed-in Vowed. After any failure: Details > Copy diagnostics and keep the text (it now has a timeline with times: association started, wallet launched, connection established, authorize sent, authorize result, sign request sent, wallet response, session closed with the reason, and the task top screen).
+
+| # | Test | Expected | Result |
+|---|---|---|---|
+| S1 | Join a challenge (Explore > Join with this stake > Sign with wallet) | Phantom opens once. Note whether it shows a Connect sheet again (the diagnostics line "authorize result ... quick / probably showed a screen" says it too), then ONE approval sheet for the transaction | |
+| S2 | If Phantom shows Connect | The button may be grey for 10 s or more: wait; Vowed waits (45 s to connect, 120 s for the answer). Tap Connect, then approve. The sheet must NOT vanish by itself | |
+| S3 | Leave Phantom open without approving for 10 s | Vowed (when you switch back) shows "Waiting for your wallet to ask you to approve ..." with Try again. The wallet is NOT relaunched by itself | |
+| S4 | Tap Try again | A fresh review screen appears; tap Sign with wallet again for a new visit | |
+| S5 | After approving or cancelling in Phantom | Vowed is on screen. Open recent apps: the Vowed card shows Vowed | |
+| S6 | Create a new challenge and stake | One visit, one approval | |

@@ -27,7 +27,7 @@ class TxSubmitter(
         status("Confirming on Solana…")
         val signature = Base58.encode(sig)
         // the transaction is already submitted; a token payment is not a Vowed program transaction, so there is nothing to mirror
-        var synced = tx.kind == "freeze"
+        var synced = tx.kind == "freeze" || tx.kind == "debug"
         repeat(6) { attempt ->
             if (!synced) {
                 try { sync(signature); synced = true } catch (e: ApiException) { if (e.code != "not_found") throw e; pause(2_000L + attempt * 500L) }

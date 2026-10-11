@@ -29,7 +29,7 @@ class SignInOutcome(val address: String, val signedMessage: ByteArray, val signa
  */
 class WalletManager(
     private val prefs: Prefs,
-    identityUri: String = "https://vowed-backend.onrender.com",
+    identityUriText: String = "https://vowed-backend.onrender.com",
     private val gate: WalletSessionGate = WalletSessionGate(),
     private val bringToFront: () -> String = { "not available" },
     private val trace: () -> WalletTrace = { WalletDiagnostics.current },
@@ -39,11 +39,14 @@ class WalletManager(
      * wallet's Connect button can stay disabled for a few seconds, a first wallet start can take up to a minute, and a new user reads the sheet
      * before approving. (The library also has fixed waits of 20 s to launch the wallet and 10 s to connect to it; those are not configurable.)
      */
+    private val identityUri: Uri = Uri.parse(identityUriText)
+    private val iconUri: Uri = Uri.parse("icon.png")
+    private val identityName = "Vowed"
     private val adapter = MobileWalletAdapter(
         connectionIdentity = ConnectionIdentity(
-            identityUri = Uri.parse(identityUri),
-            iconUri = Uri.parse("icon.png"),
-            identityName = "Vowed",
+            identityUri = identityUri,
+            iconUri = iconUri,
+            identityName = identityName,
         ),
         timeout = WALLET_REQUEST_TIMEOUT_MS,
     ).also { it.authToken = prefs.mwaAuthToken } // default blockchain is Solana devnet
@@ -146,46 +149,28 @@ class WalletManager(
         return result.unwrap("session 2").messages.first().signatures.first()
     }
 
+    /** The launcher of the current MainActivity (set in its onCreate); the wallet is opened through it. */
+    @Volatile var launcher: WalletLauncher? = null
+
     /**
-     * Signs and submits [tx] (an unsigned legacy transaction) with `sign_and_send_transactions`, in its own fresh wallet session (the library
-     * reauthorizes with the saved authorization first). Returns the 64-byte transaction signature.
-     *
-     * Like the sign-in: at most ONE retry, in another fresh session, after the wallet closed the session; the wait for the wallet answer is bounded
-     * (the library waits up to [WALLET_REQUEST_TIMEOUT_MS] for a request, so the whole attempt is allowed [WALLET_ATTEMPT_TIMEOUT_MS]) and a wallet
-     * that never answers ends in [WalletErrors.Kind.NoResponse] instead of waiting for ever. [kind] and [simulation] only describe the transaction in
-     * the diagnostics (no keys, no signatures).
+     * Signs and submits [tx] (an unsigned legacy transaction) with `sign_and_send_transactions` in ONE wallet visit: the wallet is opened once,
+     * authorizes (silently when it still knows the saved authorization), asks for the one approval and is closed again. See [WalletVisit] for the
+     * rules; nothing here retries by itself, a failure ends the visit and the person decides (Try again). [onStalled] is called when the wallet has
+     * not answered after a few seconds, so the screen can show the waiting hint. [kind] and [simulation] only describe the transaction in the trace.
      */
-    suspend fun signAndSend(sender: ActivityResultSender, tx: ByteArray, kind: String = "transaction", simulation: String? = null, waitForUser: suspend () -> Unit = {}): ByteArray {
+    suspend fun signAndSend(tx: ByteArray, kind: String = "transaction", simulation: String? = null, onStalled: () -> Unit = {}): ByteArray {
         val t = trace()
+        val l = launcher ?: throw WalletException("Vowed could not open the wallet right now. Close and reopen the app, then try again.")
         t.add("transaction", "kind=$kind, ${tx.size} bytes, wallet method sign_and_send_transactions, server simulation: ${simulation ?: "not reported"}")
-        suspend fun attempt(n: Int): ByteArray {
-            t.add("session $n opened", "saved authorization: ${if (adapter.authToken != null) "yes (reauthorize)" else "no (authorize)"}")
-            val result = kotlinx.coroutines.withTimeoutOrNull(WALLET_ATTEMPT_TIMEOUT_MS) {
-                sequential(retryConnection = false) {
-                    adapter.transact(sender) { auth ->
-                        t.add("authorized", "accounts=${auth.accounts.size}, address=${Base58.encode(auth.accounts.first().publicKey)}")
-                        t.add("request sent", "sign_and_send_transactions (1 transaction)")
-                        signAndSendTransactions(arrayOf(tx))
-                    }
-                }
-            }
-            if (result == null) {
-                t.add("no answer", "the wallet did not answer within ${WALLET_ATTEMPT_TIMEOUT_MS / 1000} s")
-                throw WalletException(WalletErrors.NO_RESPONSE, WalletErrors.Kind.NoResponse, raw = "no answer from the wallet within ${WALLET_ATTEMPT_TIMEOUT_MS / 1000} s")
-            }
-            try {
-                return result.unwrap("session $n").signatures.first()
-            } catch (e: WalletException) {
-                // ERROR_AUTHORIZATION_FAILED (-1) after a saved authorization was sent means the wallet no longer accepts it (MWA spec): discard it
-                // so the single retry in a fresh session authorizes from scratch
-                if (e.kind == WalletErrors.Kind.AuthorizationRefused && adapter.authToken != null) {
-                    t.add("saved authorization discarded", "the wallet answered -1; the next try authorizes again")
-                    forgetAuthorization()
-                }
-                throw e
+        val transport = MwaTransport(l, identityUri, iconUri, identityName, adapter.blockchain.fullName, WALLET_REQUEST_TIMEOUT_MS, t)
+        val visit = WalletVisit(transport, t, onStalled = onStalled)
+        return gate.run({ _: ByteArray -> false }) {
+            launches.incrementAndGet()
+            visit.signAndSend(tx, prefs.mwaAuthToken) { token ->
+                prefs.mwaAuthToken = token
+                adapter.authToken = token
             }
         }
-        return SessionRetry.run(t, first = { attempt(1) }, retry = { waitForUser(); attempt(2) })
     }
 
     /** Drops the saved wallet authorization (the next connect asks the wallet again). */

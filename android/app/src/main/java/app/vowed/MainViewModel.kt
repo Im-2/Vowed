@@ -76,13 +76,16 @@ class PendingTx(
     val pool: String,
     /** what the server's test run of this transaction found, for the diagnostics ("ok, 52000 units", "skipped") */
     val simulationNote: String? = null,
+    /** Builds this transaction again (a fresh one, because a transaction expires after about a minute): what "Try again" does. */
+    val rebuild: (() -> Unit)? = null,
     /** Run after the wallet has sent it (e.g. to build the next transaction). Last, so it can be written as a trailing lambda. */
     val after: (suspend (String) -> Unit)? = null,
 )
 
 sealed interface TxFlow {
     data object Idle : TxFlow
-    data class Working(val message: String) : TxFlow
+    /** [stalled]: the wallet has not answered for a few seconds; the screen shows the waiting hint with a Try again button. */
+    data class Working(val message: String, val stalled: Boolean = false) : TxFlow
     data class Review(val tx: PendingTx) : TxFlow
     data class Done(val pool: String, val message: String) : TxFlow
     /** Failed; [detail] is the raw text and the wallet timeline for the "Details" expander (no keys, signatures or tokens). */
@@ -496,7 +499,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 draft.appName?.let { c.prefs.setWatchedApp(pool, it) }
                 setFlow(
                     TxFlow.Review(
-                        PendingTx("create", review, txBytes, pool, simulationNote = simNote(resp.simulation)) {
+                        PendingTx("create", review, txBytes, pool, simulationNote = simNote(resp.simulation), rebuild = { startChallenge(draft) }) {
                             // a squad challenge is linked to its squad as soon as the pool exists; the creator's stake was in the same transaction
                             draft.squadId?.let { sid -> runCatching { c.api.linkPool(sid, pool) } }
                             setFlow(TxFlow.Done(pool, "You're in. Your challenge is created and your stake is held by the program."))
@@ -528,7 +531,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 txBytes,
                 JoinExpectation(Base58.decode(account.wallet), Base58.decode(pool), Base58.decode(mint), stakeBaseUnits, tz, hex(account.deviceId)),
             )
-            setFlow(TxFlow.Review(PendingTx("join", review, txBytes, pool, simulationNote = simNote(resp.simulation))))
+            setFlow(TxFlow.Review(PendingTx("join", review, txBytes, pool, simulationNote = simNote(resp.simulation), rebuild = { prepareJoin(pool, mint, stakeBaseUnits) })))
         } catch (e: Throwable) {
             setFlow(TxFlow.Failed(friendly(e)))
         }
@@ -544,7 +547,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val resp = c.api.claimTx(ClaimTxRequest(pool))
                 val txBytes = Base64.decode(resp.transaction, Base64.DEFAULT)
                 val review = TxChecker.checkClaim(txBytes, ClaimExpectation(Base58.decode(account.wallet), Base58.decode(pool), Base58.decode(mint)))
-                setFlow(TxFlow.Review(PendingTx("claim", review, txBytes, pool, simulationNote = simNote(resp.simulation))))
+                setFlow(TxFlow.Review(PendingTx("claim", review, txBytes, pool, simulationNote = simNote(resp.simulation), rebuild = { prepareClaim(pool, mint) })))
             } catch (e: Throwable) {
                 setFlow(TxFlow.Failed(friendly(e)))
             }
@@ -552,19 +555,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** The user pressed "Sign with wallet" on a reviewed transaction. */
-    fun confirm(sender: ActivityResultSender) {
+    /** The wallet request in flight, if any. One at a time: a second tap on Sign while it runs does nothing. */
+    private var signingJob: kotlinx.coroutines.Job? = null
+
+    fun confirm(@Suppress("UNUSED_PARAMETER") sender: ActivityResultSender) {
         val flow = _state.value.flow as? TxFlow.Review ?: return
+        if (signingJob?.isActive == true) return // single in-flight lock: the wallet is already open for this request
         val tx = flow.tx
+        lastReviewed = tx
         setFlow(TxFlow.Working("Waiting for your wallet…"))
-        viewModelScope.launch {
+        signingJob = viewModelScope.launch {
             try {
                 WalletDiagnostics.begin()
                 val submitter = TxSubmitter(
                     signAndSend = { bytes, kind, sim ->
-                        c.wallet.signAndSend(sender, bytes, kind, sim) {
-                            // a second try opens the wallet again: only from the foreground (Android refuses it from the background)
-                            AppForeground.ensureOnScreen(WalletDiagnostics.current, { c.wallet.tryBringToFront() }, { setFlow(TxFlow.Working("Switch back to Vowed to try again…")) })
-                            setFlow(TxFlow.Working("Waiting for your wallet…"))
+                        c.wallet.signAndSend(bytes, kind, sim) {
+                            // nothing has answered for a few seconds: say so, with Try again (never a silent second wallet launch)
+                            if (_state.value.flow is TxFlow.Working) setFlow(TxFlow.Working("Waiting for your wallet…", stalled = true))
                         }
                     },
                     // some wallets stay on their own screen afterwards; the network calls that follow must wait until Vowed is in front
@@ -584,10 +591,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     setFlow(TxFlow.Done(tx.pool, msg))
                     refreshList()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 setFlow(failure(e))
             }
         }
+    }
+
+    /**
+     * "Try again" while waiting for the wallet (a person's tap, never automatic): ends the wallet request in flight (its session is closed) and builds a
+     * fresh transaction, because the old one expires after about a minute. The person then taps Sign again.
+     */
+    fun retrySigning() {
+        val tx = lastReviewed
+        signingJob?.cancel()
+        signingJob = null
+        WalletDiagnostics.current.add("Try again tapped", "the wallet request was ended by the person")
+        val rebuild = tx?.rebuild
+        if (rebuild != null) { setFlow(TxFlow.Working("Preparing a fresh transaction…")); rebuild() } else setFlow(TxFlow.Idle)
+    }
+
+    private var lastReviewed: PendingTx? = null
+
+    /**
+     * Debug builds only: a wallet visit that costs nothing and moves nothing (a one-lamport transfer from the wallet to itself, with a made-up
+     * recent blockhash, so it can never be accepted by the network). It goes through the same review screen, the same wallet request and the same trace
+     * as a stake, which makes the wallet path testable on an emulator wallet that has no devnet SOL.
+     */
+    fun debugWalletTest() {
+        if (!BuildConfig.DEBUG) return
+        val account = _state.value.account ?: return
+        val me = Base58.decode(account.wallet)
+        val system = ByteArray(32)
+        val msg = java.io.ByteArrayOutputStream().apply {
+            write(byteArrayOf(1, 0, 1)) // 1 signature, 0 read-only signed, 1 read-only unsigned (the system program)
+            write(2); write(me); write(system) // two accounts
+            write(ByteArray(32) { 1 }) // a recent blockhash that does not exist on any network
+            write(1) // one instruction
+            write(1); write(2); write(0); write(0) // program index 1, two accounts (0 and 0)
+            write(12); write(byteArrayOf(2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0)) // system transfer of 1 lamport
+        }.toByteArray()
+        val tx = byteArrayOf(1) + ByteArray(64) + msg
+        val review = TxReview("DEBUG: wallet test (moves nothing)", listOf("What it does" to "asks the wallet to sign a self-transfer of 1 lamport that the network cannot accept", "Use" to "testing the wallet visit on an emulator"))
+        setFlow(TxFlow.Review(PendingTx("debug", review, tx, "none", simulationNote = "not simulated (debug)", rebuild = { debugWalletTest() })))
+        _state.update { it.copy(notice = "Debug wallet test ready: review it on the next screen.") }
     }
 
     fun cancelReview() = setFlow(TxFlow.Idle)

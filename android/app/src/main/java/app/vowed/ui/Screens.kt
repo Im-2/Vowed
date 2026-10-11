@@ -400,14 +400,28 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
 }
 
 /** The "Get test tokens" action, provided once at the top of the app so any screen can offer it (no wallet is opened for it). */
+/** "Try again" under the waiting hint: ends the wallet request in flight and builds a fresh transaction (a tap, never automatic). */
+val LocalRetryWallet = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
+
 val LocalGetTestTokens = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun FlowStatus(flow: TxFlow) {
     when (flow) {
-        is TxFlow.Working -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            app.vowed.ui.components.Spinner(size = 24.dp); Text(flow.message)
+        is TxFlow.Working -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                app.vowed.ui.components.Spinner(size = 24.dp); Text(flow.message)
+            }
+            if (flow.stalled) {
+                val retry = LocalRetryWallet.current
+                // no silent waiting: say what is going on, and let the person decide (Try again never happens by itself)
+                Text(
+                    "Waiting for your wallet to ask you to approve. If it does not show a prompt, open your wallet app, or tap Try again.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
+                )
+                app.vowed.ui.components.SoftButton("Try again", retry)
+            }
         }
         // A problem found BEFORE the wallet opens must not hide below the fold: it is a framed card that scrolls itself into view
         is TxFlow.Failed -> StatusCard(flow, "That did not go through") {
@@ -626,7 +640,7 @@ private fun AvatarPicker(wallet: String?) {
 fun SettingsScreen(
     state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit,
     onHideFromBoard: (Boolean) -> Unit = {}, onLoadBoard: () -> Unit = {}, onSampleProvider: () -> Unit = {},
-    onResetConnection: () -> Unit = {}, onWalletHelp: () -> Unit = {}, onHidePastPools: () -> Unit = {}, onShowHiddenPools: () -> Unit = {},
+    onResetConnection: () -> Unit = {}, onWalletHelp: () -> Unit = {}, onHidePastPools: () -> Unit = {}, onShowHiddenPools: () -> Unit = {}, onDebugWalletTest: () -> Unit = {},
     onWalletSetup: () -> Unit = {}, onCheckConnection: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
@@ -695,6 +709,7 @@ fun SettingsScreen(
                             app.vowed.ui.components.SoftButton("Hide past pools", onHidePastPools, Modifier.weight(1f))
                             app.vowed.ui.components.SoftButton("Show hidden", onShowHiddenPools, Modifier.weight(1f))
                         }
+                        app.vowed.ui.components.SoftButton("Wallet test visit (moves nothing)", onDebugWalletTest, Modifier.fillMaxWidth())
                     }
                 }
             }

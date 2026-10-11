@@ -27,11 +27,37 @@ object WalletEnvironment {
         "wallet apps that handle solana-wallet: links: ${wallets(ctx)}",
     )
 
-    /** Asks Android to bring Vowed's task to the front. Android may refuse from the background; the result goes into the trace. */
-    fun bringToFront(ctx: Context): String = try {
-        val task = ctx.getSystemService(ActivityManager::class.java).appTasks.firstOrNull()
-        if (task == null) "no task to move" else { task.moveToFront(); "moveToFront requested" }
+    /**
+     * Brings Vowed's screen back on top. A wallet started for a result runs INSIDE Vowed's task, and some wallets (Phantom) leave their own screen on
+     * top of Vowed's when they are done. Moving the whole task to the front would then show the wallet again, so the first step asks for Vowed's
+     * activity itself to be reordered to the top of its task. Android may refuse from the background; the result goes into the trace.
+     */
+    fun bringToFront(ctx: Context): String {
+        val out = ArrayList<String>()
+        try {
+            ctx.startActivity(
+                Intent(ctx, app.vowed.MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+            out.add("Vowed's screen reordered to the top of its task")
+        } catch (e: Exception) {
+            out.add("reorder failed (${e.javaClass.simpleName}: ${e.message})")
+        }
+        try {
+            val task = ctx.getSystemService(ActivityManager::class.java).appTasks.firstOrNull()
+            if (task == null) out.add("no task to move") else { task.moveToFront(); out.add("task moved to the front") }
+        } catch (e: Exception) {
+            out.add("moveToFront failed (${e.javaClass.simpleName}: ${e.message})")
+        }
+        return out.joinToString("; ")
+    }
+
+    /** Where the wallet's screen is while it is open: how many screens Vowed's task holds and which one is on top (own task only, no other app's data). */
+    fun taskSummary(ctx: Context): String = try {
+        val info = ctx.getSystemService(ActivityManager::class.java).appTasks.firstOrNull()?.taskInfo
+        if (info == null) "no task"
+        else if (Build.VERSION.SDK_INT < 29) "task info needs Android 10"
+        else "${info.numActivities} screens, top ${info.topActivity?.flattenToShortString() ?: "?"}, base ${info.baseActivity?.packageName ?: "?"}"
     } catch (e: Exception) {
-        "failed (${e.javaClass.simpleName}: ${e.message})"
+        "unreadable (${e.javaClass.simpleName})"
     }
 }

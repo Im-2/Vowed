@@ -49,8 +49,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Must be created before the activity is STARTED.
         val sender = ActivityResultSender(this)
+        // the wallet for staking is opened through this launcher (registered here, before the activity is started)
+        (application as VowedApp).container.wallet.launcher = app.vowed.wallet.WalletLauncher(this)
         handleLink(intent)
-        setContent { VowedTheme { Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { androidx.compose.runtime.CompositionLocalProvider(app.vowed.ui.LocalGetTestTokens provides { vm.claimTestTokens() }) { Root(vm, sender) } } } }
+        setContent { VowedTheme { Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { androidx.compose.runtime.CompositionLocalProvider(app.vowed.ui.LocalGetTestTokens provides { vm.claimTestTokens() }, app.vowed.ui.LocalRetryWallet provides { vm.retrySigning() }) { Root(vm, sender) } } } }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -239,7 +241,7 @@ private fun Root(vm: MainViewModel, sender: ActivityResultSender) {
         composable("wallet-help") { app.vowed.ui.WalletHelpScreen(onBack = { nav.popBackStack() }) }
         composable("practice") { app.vowed.ui.PracticeScreen(onBack = { nav.popBackStack() }) }
         composable("settings") {
-            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onResetConnection = vm::resetConnection, onWalletSetup = { vm.openWalletSetup() }, onCheckConnection = vm::checkConnection, onHidePastPools = { vm.hidePastPools(System.currentTimeMillis() / 1000) }, onShowHiddenPools = vm::showHiddenPools, onWalletHelp = { nav.navigate("wallet-help") }, onHideFromBoard = vm::setLeaderboardHidden, onLoadBoard = vm::loadRewards, onSampleProvider = vm::runSampleProvider, onDisconnect = {
+            SettingsScreen(state, vm.prefs.backendUrl, onBack = { nav.popBackStack() }, onPractice = { nav.navigate("practice") }, onCoach = { nav.navigate("coach") }, onRewards = { nav.navigate("rewards") }, onLetters = { nav.navigate("letters") }, onResetConnection = vm::resetConnection, onWalletSetup = { vm.openWalletSetup() }, onCheckConnection = vm::checkConnection, onHidePastPools = { vm.hidePastPools(System.currentTimeMillis() / 1000) }, onDebugWalletTest = { vm.debugWalletTest(); nav.navigate("review") }, onShowHiddenPools = vm::showHiddenPools, onWalletHelp = { nav.navigate("wallet-help") }, onHideFromBoard = vm::setLeaderboardHidden, onLoadBoard = vm::loadRewards, onSampleProvider = vm::runSampleProvider, onDisconnect = {
                 vm.disconnect(sender)
                 nav.navigate("onboarding") { popUpTo(0) }
             })
