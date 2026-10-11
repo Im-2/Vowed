@@ -8,7 +8,7 @@ import { z } from "zod";
 import { ChainError } from "../chain/types.js";
 import { explainSimulation, simulateOrThrow } from "../chain/simulate.js";
 import { getChallenge, getParticipant, syncParticipation, syncPool } from "../challenges/sync.js";
-import { ApiError, badRequest, conflict, notFound } from "../errors.js";
+import { ApiError, badRequest, conflict } from "../errors.js";
 import type { Services } from "../services.js";
 import { authenticate, decodeB64, pubkeySchema } from "./auth.js";
 import { enforce } from "./ratelimit.js";
@@ -22,11 +22,48 @@ import { enforce } from "./ratelimit.js";
  */
 export type BuiltKind = "create" | "join" | "claim";
 
-const hashOf = (messageBytes: Uint8Array) => createHash("sha256").update(messageBytes).digest("hex");
+const COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111";
+/** the most a wallet may add as a priority fee (SetComputeUnitPrice x SetComputeUnitLimit), in lamports: 0.001 SOL */
+export const MAX_PRIORITY_FEE_LAMPORTS = 1_000_000;
+
+/**
+ * What a transaction DOES, independent of how a wallet app packed it: the fee payer and every instruction except the Compute Budget ones (program,
+ * accounts with their signer/writable flags, data). Wallet apps such as Phantom add Compute Budget instructions (a priority fee) and may refresh the
+ * blockhash before signing, so the message bytes differ from what this server built while the staking instructions are identical.
+ */
+function semanticHash(tx: Transaction): string {
+  const m = tx.compileMessage();
+  const keys = m.accountKeys;
+  const h = createHash("sha256");
+  h.update(`payer:${keys[0].toBase58()}\n`);
+  for (const ix of m.instructions) {
+    const program = keys[ix.programIdIndex].toBase58();
+    if (program === COMPUTE_BUDGET) continue;
+    const accounts = ix.accounts.map((i) => `${keys[i].toBase58()}:${m.isAccountSigner(i) ? "s" : "-"}${m.isAccountWritable(i) ? "w" : "-"}`).join(",");
+    h.update(`${program}|${accounts}|${Buffer.from(bs58.decode(ix.data)).toString("hex")}\n`);
+  }
+  return h.digest("hex");
+}
+
+/** The priority fee the Compute Budget instructions of this transaction would cost, in lamports (0 when it has none). */
+function priorityFeeLamports(tx: Transaction): number {
+  const m = tx.compileMessage();
+  let limit = 200_000;
+  let price = 0n;
+  for (const ix of m.instructions) {
+    if (m.accountKeys[ix.programIdIndex].toBase58() !== COMPUTE_BUDGET) continue;
+    const d = Buffer.from(bs58.decode(ix.data));
+    if (d[0] === 2 && d.length >= 5) limit = d.readUInt32LE(1);
+    if (d[0] === 3 && d.length >= 9) price = d.readBigUInt64LE(1);
+  }
+  return Number((price * BigInt(limit)) / 1_000_000n);
+}
+
+const hashOf = semanticHash;
 
 /** Remembers a transaction this server built, so that its signed copy can be submitted later. */
 export function recordBuilt(s: Services, wallet: string, kind: BuiltKind, pool: string, tx: Transaction): string {
-  const h = hashOf(tx.serializeMessage());
+  const h = hashOf(tx);
   s.db.prepare("INSERT OR IGNORE INTO built_txs (message_hash, wallet, kind, pool, created_at, status) VALUES (?,?,?,?,?, 'built')").run(h, wallet, kind, pool, s.wallNow());
   return h;
 }
@@ -48,9 +85,15 @@ export async function submitSigned(s: Services, wallet: string, signedBase64: st
   } catch {
     throw badRequest("bad_transaction", "that is not a transaction");
   }
-  const hash = hashOf(tx.serializeMessage());
+  const hash = hashOf(tx);
   const row = s.db.prepare("SELECT message_hash, wallet, kind, pool, status, signature FROM built_txs WHERE message_hash = ?").get(hash) as BuiltRow | undefined;
-  if (!row || row.wallet !== wallet) throw notFound("transaction");
+  if (!row || row.wallet !== wallet) {
+    const m = tx.compileMessage();
+    const programs = [...new Set(m.instructions.map((ix) => m.accountKeys[ix.programIdIndex].toBase58().slice(0, 6)))];
+    throw new ApiError(404, "not_found", `transaction not found: Vowed did not build this one for your wallet (programs in it: ${programs.join(", ")})`);
+  }
+  const priority = priorityFeeLamports(tx);
+  if (priority > MAX_PRIORITY_FEE_LAMPORTS) throw badRequest("fee_too_high", "the wallet added a priority fee that is too high for a test transaction");
   if (!tx.feePayer || tx.feePayer.toBase58() !== wallet) throw badRequest("bad_fee_payer", "the fee payer must be your wallet");
   const sig = tx.signatures.find((x) => x.publicKey.toBase58() === wallet)?.signature;
   if (!sig || !nacl.sign.detached.verify(tx.serializeMessage(), sig, new PublicKey(wallet).toBytes())) throw badRequest("bad_signature", "your wallet's signature is missing or does not match this transaction");

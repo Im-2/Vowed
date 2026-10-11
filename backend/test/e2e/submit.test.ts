@@ -1,5 +1,5 @@
 /** The wallet-signs-only path and the landing check, against the REAL program (LiteSVM, WSL only). */
-import { Transaction } from "@solana/web3.js";
+import { ComputeBudgetProgram, Transaction } from "@solana/web3.js";
 import nacl from "tweetnacl";
 import { describe, expect, it } from "vitest";
 import { balance, get, makeChainWorld, makePlayer, post, UNIT, type ChainWorld, type Player } from "../helpers/e2e-world.js";
@@ -67,6 +67,29 @@ describe.skipIf(!lib)("sign-only path: the server sends what the wallet signed (
     const r = await submit(w, bob, signed);
     expect(r.statusCode, r.body).toBe(200);
     expect(r.json().alreadySubmitted).toBe(true);
+  });
+
+  it("accepts what Phantom does to a transaction before signing it: a priority fee (Compute Budget instructions) in front, nothing else changed", async () => {
+    const w = (await makeChainWorld())!;
+    const [alice, bob] = [await makePlayer(w, 50n * UNIT), await makePlayer(w, 50n * UNIT)];
+    const pool = await openPool(w, alice);
+    const j = await post(w, bob, "/v1/challenges/tx/join", { pool, stake: (2n * UNIT).toString(), tzOffsetMinutes: 0, deviceId: bob.device.id });
+    const phantomLike = (price: number) => {
+      const tx = Transaction.from(Buffer.from(j.json().transaction, "base64"));
+      tx.instructions.unshift(ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }), ComputeBudgetProgram.setComputeUnitPrice({ microLamports: price }));
+      tx.signatures = [];
+      tx.partialSign(bob.kp);
+      return tx.serialize().toString("base64");
+    };
+    // an absurd priority fee is refused
+    const greedy = await submit(w, bob, phantomLike(50_000_000));
+    expect(greedy.statusCode).toBe(400);
+    expect(greedy.json().error.code).toBe("fee_too_high");
+    // a normal one is sent, once
+    const ok = await submit(w, bob, phantomLike(100_000));
+    expect(ok.statusCode, ok.body).toBe(200);
+    const vault = (await get(w, bob, `/v1/challenges/${pool}`)).json().challenge.vault as string;
+    expect(await balance(w, vault)).toBe(2n * UNIT);
   });
 
   it("refuses anything the server did not build for this wallet, an unsigned copy, and a copy changed after the build", async () => {
