@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { solCost, type CostKind } from "../chain/costs.js";
+import { solCost, solText, type CostKind } from "../chain/costs.js";
 import { getChallenge } from "../challenges/sync.js";
 import { badRequest, notFound } from "../errors.js";
 import type { Services } from "../services.js";
@@ -57,7 +57,7 @@ export async function preflight(s: Services, wallet: string, kind: CostKind, inp
 
   const solOk = balance >= cost.total;
   if (!solOk) {
-    reasons.push({ code: "low_sol", message: "Your wallet needs a little devnet SOL for network fees. Tap Get test tokens to receive some." });
+    reasons.push({ code: "low_sol", message: `Your wallet needs about ${solText(cost.total)} SOL on devnet for fees and rent. You have ${solText(balance)} SOL. Tap Get test SOL.` });
   }
   let token: PreflightResult["token"] = null;
   if (mint && stake > 0n && kind !== "claim") {

@@ -91,12 +91,18 @@ const schema = z.object({
    */
   FAUCET_SOL_SECRET_KEY: secretKey.optional(),
   /** lamports per wallet (default 0.01 SOL) */
-  FAUCET_SOL_LAMPORTS: z.coerce.bigint().min(1n).default(10_000_000n),
+  FAUCET_SOL_LAMPORTS: z.coerce.bigint().min(1n).default(30_000_000n),
   FAUCET_SOL_DAILY_CAP: z.coerce.number().int().min(1).default(30),
   /** the most the faucet wallet may ever give out (default 0.5 SOL) */
   FAUCET_SOL_TOTAL_CAP_LAMPORTS: z.coerce.bigint().min(1n).default(500_000_000n),
   /** a wallet that already holds at least this much SOL does not need any (default 0.05 SOL) */
   FAUCET_SOL_SKIP_ABOVE_LAMPORTS: z.coerce.bigint().min(0n).default(50_000_000n),
+  /** the most one wallet can ever receive in gifts (a first gift and one top-up of 0.03 SOL each by default) */
+  FAUCET_SOL_PER_WALLET_MAX_LAMPORTS: z.coerce.bigint().min(1n).default(60_000_000n),
+  /** a wallet that already had a gift is topped up again only while it holds less than this */
+  FAUCET_SOL_TOPUP_BELOW_LAMPORTS: z.coerce.bigint().min(0n).default(10_000_000n),
+  /** the wait between two gifts to the same wallet */
+  FAUCET_SOL_TOPUP_WAIT_SECS: z.coerce.number().int().min(0).default(3_600),
   /**
    * Weekly SKR rewards and SKR-paid perks. The rewards wallet holds the (test) SKR that is paid out and receives perk payments. Off unless
    * its key, the SKR mint and the faucet mint settings are present.

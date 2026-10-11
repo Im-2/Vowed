@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { newMint, TokenChain } from "./helpers/token-chain.js";
 import { makeWorld, signIn, type World } from "./helpers/world.js";
 
-const LAMPORTS = 10_000_000n; // 0.01 SOL
+const LAMPORTS = 30_000_000n; // 0.03 SOL, the approved gift
 
 async function solWorld(extra: Record<string, string> = {}, bank = 1_000_000_000n) {
   const authority = Keypair.generate();
@@ -38,11 +38,11 @@ const claim = async (w: World, p: P) => w.app.inject({ method: "POST", url: "/v1
 const lamportsOf = (chain: TokenChain, wallet: string) => chain.accounts.get(wallet)?.lamports ?? 0n;
 
 describe("devnet SOL gift with the test-token claim", () => {
-  it("sends 0.01 SOL once with the first claim and says so", async () => {
+  it("sends 0.03 SOL with the first claim and says so", async () => {
     const { w, chain, solKey } = await solWorld();
     const p = await person(w);
     const st = (await w.app.inject({ method: "GET", url: "/v1/faucet", headers: p.headers })).json();
-    expect(st.sol).toEqual({ enabled: true, lamports: LAMPORTS.toString(), received: false });
+    expect(st.sol).toEqual({ enabled: true, lamports: LAMPORTS.toString(), received: false, receivedLamports: "0", canClaim: true });
     const r = await claim(w, p);
     expect(r.statusCode).toBe(200);
     expect(r.json().sol).toMatchObject({ status: "sent", lamports: LAMPORTS.toString() });
@@ -53,15 +53,54 @@ describe("devnet SOL gift with the test-token claim", () => {
     expect(after.balances.sol).toBe(LAMPORTS.toString());
   });
 
-  it("never sends a second gift to the same wallet, even after the token cooldown", async () => {
+  it("does not send a second gift to a wallet that still holds SOL, even after the token cooldown", async () => {
     const { w, chain } = await solWorld();
     const p = await person(w);
     await claim(w, p);
     w.clock.wall += 2 * 86_400;
     const again = await claim(w, p);
     expect(again.statusCode).toBe(200);
-    expect(again.json().sol).toMatchObject({ status: "skipped", reason: "already_received" });
+    expect(again.json().sol).toMatchObject({ status: "skipped", reason: "balance_ok" });
     expect(lamportsOf(chain, p.wallet)).toBe(LAMPORTS);
+  });
+
+  it("tops a wallet up when it is nearly empty again, after a wait, and never beyond 0.06 SOL in total", async () => {
+    const { w, chain, solKey } = await solWorld();
+    const p = await person(w);
+    const status = async () => (await w.app.inject({ method: "GET", url: "/v1/faucet", headers: p.headers })).json().sol;
+    await claim(w, p);
+    // the tester of the field test: 0.00158 SOL left. Straight after the first gift the wait has not passed
+    chain.accounts.get(p.wallet)!.lamports = 1_580_000n;
+    expect(await status()).toMatchObject({ canClaim: false, reason: "too_soon", received: true, receivedLamports: LAMPORTS.toString() });
+    const early = await claim(w, p); // the token cooldown is still running, so this is only a try for SOL
+    expect(early.statusCode).toBe(429);
+    expect(early.json().error.details.sol).toMatchObject({ status: "skipped", reason: "too_soon" });
+    w.clock.wall += 2 * 3_600;
+    expect(await status()).toMatchObject({ canClaim: true });
+    const top = await claim(w, p);
+    expect(top.json().sol).toMatchObject({ status: "sent", lamports: LAMPORTS.toString() });
+    expect(lamportsOf(chain, p.wallet)).toBe(1_580_000n + LAMPORTS);
+    expect(lamportsOf(chain, solKey.publicKey.toBase58())).toBe(1_000_000_000n - 2n * LAMPORTS);
+    // a third gift would take this wallet past 0.06 SOL in total
+    chain.accounts.get(p.wallet)!.lamports = 1_000_000n;
+    w.clock.wall += 2 * 86_400;
+    expect(await status()).toMatchObject({ canClaim: false, reason: "wallet_limit", receivedLamports: (2n * LAMPORTS).toString() });
+    expect((await claim(w, p)).json().sol).toMatchObject({ status: "skipped", reason: "already_received" });
+    expect(lamportsOf(chain, p.wallet)).toBe(1_000_000n);
+  });
+
+  it("never gives more than the approved limits, whatever the settings say", async () => {
+    const { w, chain } = await solWorld({ FAUCET_SOL_LAMPORTS: "1000000000", FAUCET_SOL_PER_WALLET_MAX_LAMPORTS: "1000000000" });
+    const p = await person(w);
+    const r = await claim(w, p);
+    expect(r.json().sol).toMatchObject({ status: "sent", lamports: "30000000" }); // 0.03 SOL at most per gift
+    expect(lamportsOf(chain, p.wallet)).toBe(30_000_000n);
+    chain.accounts.get(p.wallet)!.lamports = 1_000_000n;
+    w.clock.wall += 2 * 3_600;
+    expect((await claim(w, p)).json().sol.status).toBe("sent");
+    chain.accounts.get(p.wallet)!.lamports = 1_000_000n;
+    w.clock.wall += 2 * 86_400;
+    expect((await claim(w, p)).json().sol).toMatchObject({ status: "skipped" }); // 0.06 SOL at most per wallet
   });
 
   it("a wallet in its token cooldown that never got SOL can still get the gift", async () => {

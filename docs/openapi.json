@@ -1090,6 +1090,38 @@
                         "skipped"
                       ],
                       "additionalProperties": false
+                    },
+                    "costs": {
+                      "type": "object",
+                      "properties": {
+                        "fee": {
+                          "type": "string"
+                        },
+                        "rent": {
+                          "type": "string"
+                        },
+                        "keep": {
+                          "type": "string"
+                        },
+                        "total": {
+                          "type": "string"
+                        },
+                        "balance": {
+                          "type": "string"
+                        },
+                        "enough": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "fee",
+                        "rent",
+                        "keep",
+                        "total",
+                        "balance",
+                        "enough"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -1201,6 +1233,38 @@
                         "skipped"
                       ],
                       "additionalProperties": false
+                    },
+                    "costs": {
+                      "type": "object",
+                      "properties": {
+                        "fee": {
+                          "type": "string"
+                        },
+                        "rent": {
+                          "type": "string"
+                        },
+                        "keep": {
+                          "type": "string"
+                        },
+                        "total": {
+                          "type": "string"
+                        },
+                        "balance": {
+                          "type": "string"
+                        },
+                        "enough": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "fee",
+                        "rent",
+                        "keep",
+                        "total",
+                        "balance",
+                        "enough"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -1294,6 +1358,38 @@
                       "required": [
                         "ok",
                         "skipped"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "costs": {
+                      "type": "object",
+                      "properties": {
+                        "fee": {
+                          "type": "string"
+                        },
+                        "rent": {
+                          "type": "string"
+                        },
+                        "keep": {
+                          "type": "string"
+                        },
+                        "total": {
+                          "type": "string"
+                        },
+                        "balance": {
+                          "type": "string"
+                        },
+                        "enough": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "fee",
+                        "rent",
+                        "keep",
+                        "total",
+                        "balance",
+                        "enough"
                       ],
                       "additionalProperties": false
                     }
@@ -2867,12 +2963,23 @@
                         },
                         "received": {
                           "type": "boolean"
+                        },
+                        "receivedLamports": {
+                          "type": "string"
+                        },
+                        "canClaim": {
+                          "type": "boolean"
+                        },
+                        "reason": {
+                          "type": "string"
                         }
                       },
                       "required": [
                         "enabled",
                         "lamports",
-                        "received"
+                        "received",
+                        "receivedLamports",
+                        "canClaim"
                       ],
                       "additionalProperties": false
                     }

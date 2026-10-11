@@ -27,19 +27,19 @@ export interface SolCost {
 export interface CostOptions {
   /** the wallet has no token account for the stake token yet (a claim or freeze payment creates it) */
   userTokenAccountMissing?: boolean;
-  /** a create is followed at once by the creator own join */
+  /** the create also contains the creator own join (one transaction, one signature) */
   thenJoin?: boolean;
 }
 
 /** SOL needed for one kind of transaction. The pool vault token account is created together with the pool. */
 export async function solCost(chain: Chain, kind: CostKind, opts: CostOptions = {}): Promise<SolCost> {
   const rent = async (space: number) => BigInt(await chain.minimumBalanceForRentExemption(space));
-  let fee = FEE_PER_SIGNATURE_LAMPORTS;
+  const fee = FEE_PER_SIGNATURE_LAMPORTS;
   let accounts = 0n;
   if (kind === "create") {
     accounts += (await rent(ACCOUNT_SPACE.pool)) + (await rent(ACCOUNT_SPACE.tokenAccount));
     if (opts.thenJoin) {
-      fee += FEE_PER_SIGNATURE_LAMPORTS;
+      // create and join are ONE transaction with one signature: one fee, plus the rent of the participation record
       accounts += await rent(ACCOUNT_SPACE.participation);
     }
   } else if (kind === "join") {
@@ -49,4 +49,31 @@ export async function solCost(chain: Chain, kind: CostKind, opts: CostOptions = 
   }
   const keep = await rent(ACCOUNT_SPACE.systemAccount);
   return { fee, rent: accounts, keep, total: fee + accounts + keep };
+}
+
+/** What a transaction needs in SOL and what the wallet holds, for the review screen and for the server's own check. All amounts are lamports as text. */
+export interface SolQuote {
+  fee: string;
+  rent: string;
+  keep: string;
+  total: string;
+  /** the wallet's balance when the transaction was built */
+  balance: string;
+  enough: boolean;
+}
+
+export async function solQuote(chain: Chain, wallet: string, kind: CostKind, opts: CostOptions = {}): Promise<SolQuote> {
+  const cost = await solCost(chain, kind, opts);
+  const acc = await chain.getAccount(wallet);
+  const balance = acc?.lamports ?? 0n;
+  return { fee: cost.fee.toString(), rent: cost.rent.toString(), keep: cost.keep.toString(), total: cost.total.toString(), balance: balance.toString(), enough: balance >= cost.total };
+}
+
+/** lamports as "0.0054" (SOL, at most 4 decimals, rounded up so a short wallet never reads as enough) */
+export function solText(lamports: string | bigint): string {
+  const v = BigInt(lamports);
+  const tenThousandths = (v + 99_999n) / 100_000n; // round up to 0.0001 SOL
+  const whole = tenThousandths / 10_000n;
+  const frac = (tenThousandths % 10_000n).toString().padStart(4, "0").replace(/0+$/, "");
+  return frac ? `${whole}.${frac}` : `${whole}`;
 }

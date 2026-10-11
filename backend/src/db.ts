@@ -294,6 +294,19 @@ CREATE TABLE attestations (
   signature TEXT,
   error TEXT
 );`,
+  // 2026-10-11: more than one devnet SOL gift per wallet (a top-up while the wallet is nearly empty), up to a per-wallet limit; one ledger row per gift
+  `CREATE TABLE sol_gift_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  wallet TEXT NOT NULL,
+  lamports TEXT NOT NULL,
+  status TEXT NOT NULL,                 -- pending | sent | failed
+  day INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  signature TEXT,
+  error TEXT
+);
+CREATE INDEX sol_gift_events_wallet ON sol_gift_events (wallet);
+CREATE UNIQUE INDEX sol_gift_one_pending ON sol_gift_events (wallet) WHERE status = 'pending';`,
 ];
 
 export function openDb(path: string): Db {

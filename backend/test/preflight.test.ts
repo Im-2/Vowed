@@ -43,7 +43,7 @@ describe("explaining a failed simulation in plain words", () => {
     for (const f of [explainSimulation('"InsufficientFundsForRent"', []), odd]) {
       expect(f.message).not.toMatch(/InstructionError|Custom|\{|\}/);
     }
-    expect(explainSimulation('"InsufficientFundsForRent"', []).message).toContain("Get test tokens");
+    expect(explainSimulation('"InsufficientFundsForRent"', []).message).toContain("Get test SOL");
   });
 });
 
@@ -80,7 +80,7 @@ describe("what a transaction needs in SOL", () => {
     const create = await solCost(chain, "create");
     expect(create.rent).toBe(2n * RENT); // the pool and its vault token account
     const both = await solCost(chain, "create", { thenJoin: true });
-    expect(both.fee).toBe(10_000n);
+    expect(both.fee).toBe(5_000n); // one transaction, one signature
     expect(both.rent).toBe(3n * RENT);
     expect((await solCost(chain, "claim")).total).toBe(5_000n + RENT); // fee and the balance to keep, no new account
     expect((await solCost(chain, "claim", { userTokenAccountMissing: true })).rent).toBe(RENT);
@@ -99,7 +99,7 @@ describe("pre-flight check before the wallet is opened", () => {
     expect(r.ok).toBe(false);
     expect(r.sol).toMatchObject({ balance: "0", needed: String(5_000n + 2n * RENT), enough: false });
     expect(r.reasons.map((x: { code: string }) => x.code)).toEqual(["low_sol"]);
-    expect(r.reasons[0].message).toBe("Your wallet needs a little devnet SOL for network fees. Tap Get test tokens to receive some.");
+    expect(r.reasons[0].message).toBe("Your wallet needs about 0.0021 SOL on devnet for fees and rent. You have 0 SOL. Tap Get test SOL.");
     expect(r.token).toMatchObject({ balance: "50000000", needed: "2000000", enough: true, accountExists: true });
   });
 
@@ -156,11 +156,11 @@ describe("pre-flight check before the wallet is opened", () => {
     const { w, chain, me } = await world();
     const mint = newMint();
     tokenAccount(chain, me.wallet, mint, 10_000_000n);
-    chain.fund(me.wallet, 10_000n + 3n * RENT + RENT - 1n);
+    chain.fund(me.wallet, 5_000n + 3n * RENT + RENT - 1n);
     const short = (await pre(w, me, `kind=create&mint=${mint}&stake=2000000`)).json();
-    expect(short.sol.needed).toBe(String(10_000n + 3n * RENT + RENT));
+    expect(short.sol.needed).toBe(String(5_000n + 3n * RENT + RENT));
     expect(short.reasons.map((x: { code: string }) => x.code)).toEqual(["low_sol"]);
-    chain.fund(me.wallet, 10_000n + 3n * RENT + RENT);
+    chain.fund(me.wallet, 5_000n + 3n * RENT + RENT);
     expect((await pre(w, me, `kind=create&mint=${mint}&stake=2000000`)).json().ok).toBe(true);
   });
 

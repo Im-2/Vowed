@@ -30,7 +30,7 @@ export function registerFaucetRoutes(app: FastifyInstance, s: Services) {
             nextClaimAt: z.number(),
             claimsLeftToday: z.number(),
             balances: z.object({ tUSDC: z.string(), tSKR: z.string(), sol: z.string() }),
-            sol: z.object({ enabled: z.boolean(), lamports: z.string(), received: z.boolean() }),
+            sol: z.object({ enabled: z.boolean(), lamports: z.string(), received: z.boolean(), receivedLamports: z.string(), canClaim: z.boolean(), reason: z.string().optional() }),
           }),
         },
       },

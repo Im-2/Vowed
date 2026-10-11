@@ -1,5 +1,6 @@
 import type { Transaction } from "@solana/web3.js";
 import { ApiError } from "../errors.js";
+import { solQuote, solText, type CostKind, type CostOptions, type SolQuote } from "./costs.js";
 import { parseAnchorError, type Chain } from "./types.js";
 
 /**
@@ -19,7 +20,7 @@ export interface SimulationFailure {
   message: string;
 }
 
-const SOL_WORDS = "Your wallet needs a little devnet SOL for network fees and account rent. Tap Get test tokens to receive some.";
+const SOL_WORDS = "Your wallet needs more devnet SOL for network fees and account rent. Tap Get test SOL.";
 
 /** Turns the cluster's error and logs into one plain sentence and a stable code. */
 export function explainSimulation(err: string, logs: readonly string[]): SimulationFailure {
@@ -45,4 +46,22 @@ export async function simulateOrThrow(chain: Chain, tx: Transaction): Promise<Si
     throw new ApiError(422, f.code, f.message, { error: sim.err.slice(0, 300), logs: sim.logs.slice(-6) });
   }
   return { ok: true, skipped: false, unitsConsumed: sim.unitsConsumed };
+}
+
+/**
+ * The server's own SOL check, made BEFORE a transaction is built or simulated and independent of the app's pre-flight call: a wallet that cannot pay the
+ * fee and the rent of the accounts the transaction creates is refused with the numbers, so it is never sent to a wallet app for a transaction that must fail.
+ * Returns the quote (also sent to the app for the review screen).
+ */
+export async function requireSol(chain: Chain, wallet: string, kind: CostKind, opts: CostOptions = {}): Promise<SolQuote> {
+  const q = await solQuote(chain, wallet, kind, opts);
+  if (!q.enough) {
+    throw new ApiError(
+      422,
+      "insufficient_sol",
+      `Your wallet needs about ${solText(q.total)} SOL on devnet for the network fee and account rent. You have ${solText(q.balance)} SOL. Tap Get test SOL.`,
+      { needed: q.total, balance: q.balance, fee: q.fee, rent: q.rent, keep: q.keep },
+    );
+  }
+  return q;
 }

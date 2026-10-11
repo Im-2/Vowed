@@ -16,7 +16,7 @@ import { signAndSend } from "../chain/tx.js";
 import { ApiError } from "../errors.js";
 import type { Services } from "../services.js";
 import { ataAddress, ixCreateAtaIdempotent, ixMintTo, tokenAmount } from "../util/token.js";
-import { dripSol, solAlreadyGiven, solFaucetAddress, solFaucetEnabled, type SolDrip } from "./sol.js";
+import { dripSol, giftLamports, solAlreadyGiven, solEligibility, solFaucetAddress, solFaucetEnabled, solReceived, type SolDrip } from "./sol.js";
 
 export const FAUCET_DECIMALS = 6;
 /** The authority wallet must keep at least this much SOL for fees and token-account rent (about two new accounts per claim). */
@@ -45,7 +45,7 @@ export interface FaucetStatus {
   claimsLeftToday: number;
   balances: { tUSDC: string; tSKR: string; /** lamports */ sol: string };
   /** the small gift of devnet SOL for fees: once per wallet, sent together with the first token claim */
-  sol: { enabled: boolean; lamports: string; received: boolean };
+  sol: { enabled: boolean; lamports: string; received: boolean; /** lamports this wallet has had in gifts so far */ receivedLamports: string; /** may this wallet get a gift right now (a first gift, or a top-up while nearly empty) */ canClaim: boolean; /** why not, when it may not */ reason?: string };
 }
 
 export const FAUCET_LABEL = "TEST TOKENS: tUSDC and tSKR exist only on Solana devnet and have no real value.";
@@ -92,7 +92,7 @@ function claimsToday(s: Services): number {
 export async function faucetStatus(s: Services, wallet: string): Promise<FaucetStatus> {
   const enabled = faucetEnabled(s.config);
   if (!enabled) {
-    return { enabled: false, network: s.config.NETWORK, label: FAUCET_LABEL, tokens: [], canClaim: false, nextClaimAt: 0, claimsLeftToday: 0, balances: { tUSDC: "0", tSKR: "0", sol: "0" }, sol: { enabled: false, lamports: "0", received: false } };
+    return { enabled: false, network: s.config.NETWORK, label: FAUCET_LABEL, tokens: [], canClaim: false, nextClaimAt: 0, claimsLeftToday: 0, balances: { tUSDC: "0", tSKR: "0", sol: "0" }, sol: { enabled: false, lamports: "0", received: false, receivedLamports: "0", canClaim: false } };
   }
   const next = nextClaimAtFor(s, wallet);
   const left = Math.max(0, s.config.FAUCET_GLOBAL_DAILY_CLAIMS - claimsToday(s));
@@ -103,16 +103,17 @@ export async function faucetStatus(s: Services, wallet: string): Promise<FaucetS
   ]);
   const solOn = solFaucetEnabled(s);
   const solGiven = solAlreadyGiven(s, wallet);
+  const why = solOn ? solEligibility(s, wallet, BigInt(lam)) : "off";
   return {
     enabled: true,
     network: s.config.NETWORK,
     label: FAUCET_LABEL,
     tokens: tokens(s),
-    canClaim: (next === 0 && left > 0) || (solOn && !solGiven),
+    canClaim: (next === 0 && left > 0) || (solOn && why === null),
     nextClaimAt: next,
     claimsLeftToday: left,
     balances: { tUSDC: a, tSKR: b, sol: lam },
-    sol: { enabled: solOn, lamports: s.config.FAUCET_SOL_LAMPORTS.toString(), received: solGiven },
+    sol: { enabled: solOn, lamports: giftLamports(s).toString(), received: solGiven, receivedLamports: solReceived(s, wallet).lamports.toString(), canClaim: why === null, ...(why ? { reason: why } : {}) },
   };
 }
 
@@ -137,12 +138,13 @@ export async function claimTestTokens(s: Services, wallet: string): Promise<Clai
   const now = s.wallNow();
   const next = nextClaimAtFor(s, wallet);
   if (next > 0) {
-    // the token cooldown is running, but a wallet that never got its one-time SOL can still get it now
-    if (solFaucetEnabled(s) && !solAlreadyGiven(s, wallet)) {
-      const sol = await dripSol(s, wallet);
+    // the token cooldown is running, but a wallet that is short of SOL can still get its SOL gift (a first gift or a top-up) now
+    let sol: SolDrip | null = null;
+    if (solFaucetEnabled(s)) {
+      sol = await dripSol(s, wallet);
       if (sol.status === "sent") return { signature: sol.signature!, minted: { tUSDC: "0", tSKR: "0" }, nextClaimAt: next, label: FAUCET_LABEL, sol };
     }
-    throw new ApiError(429, "faucet_cooldown", `you already claimed test tokens; you can claim again in ${Math.ceil((next - now) / 60)} minute(s)`, { nextClaimAt: next, retryAfterSec: next - now });
+    throw new ApiError(429, "faucet_cooldown", `you already claimed test tokens; you can claim again in ${Math.ceil((next - now) / 60)} minute(s)`, { nextClaimAt: next, retryAfterSec: next - now, ...(sol ? { sol } : {}) });
   }
   if (claimsToday(s) >= c.FAUCET_GLOBAL_DAILY_CLAIMS) {
     const reset = nextUtcMidnight(now);

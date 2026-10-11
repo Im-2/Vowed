@@ -6,7 +6,7 @@ import { PublicKey } from "@solana/web3.js";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { simulateOrThrow } from "../chain/simulate.js";
+import { requireSol, simulateOrThrow } from "../chain/simulate.js";
 import { buildTransaction } from "../chain/tx.js";
 import { getChallenge, getParticipant, syncParticipation, syncPool, type ChallengeRow, type ParticipantRow } from "../challenges/sync.js";
 import { claimable } from "../domain/payout.js";
@@ -32,6 +32,8 @@ export const TxResponse = z.object({
   summary: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
   /** the backend ran the transaction on the cluster without sending it; a failing one is refused instead of being handed out */
   simulation: z.object({ ok: z.boolean(), skipped: z.boolean(), unitsConsumed: z.number().optional() }).optional(),
+  /** what this transaction costs the wallet in SOL (lamports as text) and what the wallet held; shown on the review screen */
+  costs: z.object({ fee: z.string(), rent: z.string(), keep: z.string(), total: z.string(), balance: z.string(), enough: z.boolean() }).optional(),
 });
 
 const configCache = new WeakMap<Services, { at: number; cfg: ConfigAccount }>();
@@ -362,12 +364,14 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           const poolKey = s.program.poolPda(creator, poolId);
           instructions.push(s.program.ixJoinPool(creator, { key: poolKey, mint: mintKey, vault: s.program.vaultPda(poolKey) }, userToken, stake, b.join.tzOffsetMinutes, Buffer.from(b.join.deviceId, "hex")));
         }
+        const costs = await requireSol(s.chain, wallet, "create", { thenJoin: Boolean(b.join) });
         const tx = await buildTransaction(s.chain, creator, instructions);
         const simulation = await simulateOrThrow(s.chain, tx);
         const pool = s.program.poolPda(creator, poolId).toBase58();
         recordMeta(s, pool, wallet, b.visibility, plan.title, plan.category, plan.proofMethods[0]!.type);
         return {
           simulation,
+          costs,
           transaction: serializeTx(tx),
           blockhash: tx.recentBlockhash!,
           lastValidBlockHeight: tx.lastValidBlockHeight!,
@@ -451,10 +455,12 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
         if (!tokenAcc || tokenAmount(tokenAcc.data) < stake) throw conflict("insufficient_funds", "your token account does not hold enough for this stake");
 
         const ix = s.program.ixJoinPool(user, { key: new PublicKey(c.pool), mint, vault: new PublicKey(c.vault) }, userToken, stake, b.tzOffsetMinutes, Buffer.from(b.deviceId, "hex"));
+        const costs = await requireSol(s.chain, wallet, "join");
         const tx = await buildTransaction(s.chain, user, [ix]);
         const simulation = await simulateOrThrow(s.chain, tx);
         return {
           simulation,
+          costs,
           transaction: serializeTx(tx),
           blockhash: tx.recentBlockhash!,
           lastValidBlockHeight: tx.lastValidBlockHeight!,
@@ -506,10 +512,13 @@ export function registerChallengeRoutes(app: FastifyInstance, s: Services) {
           ixCreateAtaIdempotent(owner, owner, mint),
           s.program.ixClaim(owner, { key: new PublicKey(c.pool), mint, vault: new PublicKey(c.vault) }, ownerToken),
         ];
+        const hasToken = Boolean(await s.chain.getAccount(ownerToken.toBase58()));
+        const costs = await requireSol(s.chain, wallet, "claim", { userTokenAccountMissing: !hasToken });
         const tx = await buildTransaction(s.chain, owner, ixs);
         const simulation = await simulateOrThrow(s.chain, tx);
         return {
           simulation,
+          costs,
           transaction: serializeTx(tx),
           blockhash: tx.recentBlockhash!,
           lastValidBlockHeight: tx.lastValidBlockHeight!,
