@@ -52,7 +52,9 @@ fun FaucetPanel(faucet: FaucetUi, wallet: String?, onLoad: () -> Unit, onClaim: 
         )
         if (st != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("You have: ${fmt(st.balances.tUSDC)} tUSDC ·", style = MaterialTheme.typography.titleSmall)
+                Text("You have:", style = MaterialTheme.typography.titleSmall)
+                app.vowed.ui.components.UsdcIcon(20.dp)
+                Text("${fmt(st.balances.tUSDC)} tUSDC ·", style = MaterialTheme.typography.titleSmall)
                 app.vowed.ui.components.SkrIcon(20.dp)
                 Text("${fmt(st.balances.tSKR)} tSKR", style = MaterialTheme.typography.titleSmall)
             }

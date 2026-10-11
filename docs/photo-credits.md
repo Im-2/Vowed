@@ -18,3 +18,11 @@ Notes
 * The file names differ slightly from the ones first agreed (`fitness.png`, `steps.png`, `sleep.png` are PNG; `screen time.jpg` has a space); the script accepts all of them. After changing a photo, run `python scripts/gen-photos.py` and rebuild.
 * The originals are not bundled in the APK, only the compressed WebP copies. If a license requires attribution inside the app, say so and an "Image credits" line can be added to You.
 * The SKR token icon (`design/brand/skr-logo.png`) and the owner's logo are not photos; see `docs/verified-facts.md`.
+
+## Token and brand logos
+| logo | file supplied | where it is used | source | licence |
+|---|---|---|---|---|
+| USDC logo (circle, blue with white dollar sign and brackets) | `design/brand/usdc-logo.webp` (the owner said `usdc-logo.png`; the file in the folder is a valid 300 x 300 WebP with transparent corners, so that is the file used). `scripts/gen-photos.py` resizes it to 256 px, without recolouring or cropping, into `android/app/src/main/res/drawable-nodpi/usdc_logo.png` | the stake token selector (new challenge), the pot and token lines of Explore, Home and challenge cards, the balance pill on Home, the test-token card in You, and the stake token line of "Check before you sign" | supplied by the project owner as "the official USDC logo"; the source page and author are **to be confirmed by the user** | **to be confirmed by the user** |
+| SKR token icon | `design/brand/skr-logo.png` | same places, for test SKR | supplied by the project owner | to be confirmed by the user |
+
+**Rule for the USDC logo:** tUSDC is our own TEST token on Solana devnet, not real USDC, and not issued or endorsed by Circle. The logo is never shown without a small "t" test badge (an amber circle with a white t at the logo's lower right), and the words TEST TOKENS stay on the token selector, the balance pill, the test-token card and the review screen. The logo is drawn as supplied: no tint, no shadow, no distortion.

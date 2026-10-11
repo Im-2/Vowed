@@ -476,6 +476,12 @@ fun ReviewScreen(tx: PendingTx, onSign: () -> Unit, onCancel: () -> Unit, canGet
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(tx.review.title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                     Text("This app decoded the transaction itself and re-derived every address. It matches what you chose.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    tx.tokenSymbol?.let { sym ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            app.vowed.ui.components.TokenIcon(sym, 24.dp)
+                            Text("Stake token: $sym" + if (sym == "tUSDC" || sym == "tSKR") " (a TEST token, not real ${sym.drop(1)})" else "", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
                     tx.review.lines.forEach { (k, v) ->
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

@@ -189,4 +189,24 @@ class WalletVisitTest {
         runBlocking { WalletVisit(w, trace, clock = { now }).signAndSend(ByteArray(10), null) { } }
         assertTrue(trace.render().contains("it probably showed a screen"))
     }
+
+    @Test fun aWalletThatNeverAnswersEndsTheVisitWithTheActionableMessageAndNothingIsRelaunched() {
+        val w = FakeWallet(signDelayMs = 60_000)
+        val trace = WalletTrace()
+        val v = WalletVisit(w, trace, answerTimeoutMs = 150)
+        val e = runCatching { runBlocking { v.signAndSend(ByteArray(10), "TOKEN") { } } }.exceptionOrNull()
+        assertTrue(e is WalletException)
+        e as WalletException
+        assertEquals(WalletErrors.Kind.NoResponse, e.kind)
+        assertEquals(WalletErrors.NO_RESPONSE, e.message)
+        assertTrue(e.message!!.startsWith("Your wallet did not ask you to approve. Open your wallet app, or tap Try again."))
+        assertEquals(1, w.launches)
+        assertEquals(1, w.closed.size)
+        assertTrue(trace.render().contains("the wallet did not answer within"))
+    }
+
+    @Test fun aSlowConnectScreenIsNotCutOffBeforeTheAnswerTimeout() {
+        val w = FakeWallet(authDelayMs = 200)
+        assertEquals(64, runBlocking { WalletVisit(w, WalletTrace(), answerTimeoutMs = 5_000).signAndSend(ByteArray(10), null) { } }.size)
+    }
 }

@@ -47,3 +47,11 @@ skr = os.path.join(ROOT, "design", "brand", "skr-logo.png")
 if os.path.exists(skr):
     Image.open(skr).convert("RGBA").resize((256, 256), Image.LANCZOS).save(os.path.join(OUT, "skr_logo.png"), optimize=True)
     print("skr_logo.png written")
+
+# the USDC logo (design/brand/usdc-logo.png or .webp, the owner's file) into res/drawable-nodpi/usdc_logo.png, resized to 256 px, never recoloured
+for _name in ("usdc-logo.png", "usdc-logo.webp"):
+    _usdc = os.path.join(ROOT, "design", "brand", _name)
+    if os.path.exists(_usdc):
+        Image.open(_usdc).convert("RGBA").resize((256, 256), Image.LANCZOS).save(os.path.join(OUT, "usdc_logo.png"), optimize=True)
+        print("usdc_logo.png written")
+        break

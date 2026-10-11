@@ -80,6 +80,10 @@ class PendingTx(
     val simulationNote: String? = null,
     /** what this transaction costs in SOL and what the wallet held when it was built (from the server); shown on the review screen and checked before signing */
     val costs: SolCosts? = null,
+    /** when this transaction was built (a recent blockhash only lives about a minute) */
+    val builtAtMs: Long = System.currentTimeMillis(),
+    /** the stake token's symbol (tUSDC, tSKR) for the review screen */
+    val tokenSymbol: String? = null,
     /** Builds this transaction again (a fresh one, because a transaction expires after about a minute): what "Try again" does. */
     val rebuild: (() -> Unit)? = null,
     /** Run after the wallet has sent it (e.g. to build the next transaction). Last, so it can be written as a trailing lambda. */
@@ -522,7 +526,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 draft.appName?.let { c.prefs.setWatchedApp(pool, it) }
                 setFlow(
                     TxFlow.Review(
-                        PendingTx("create", review, txBytes, pool, simulationNote = simNote(resp.simulation), costs = resp.costs, rebuild = { startChallenge(draft) }) {
+                        PendingTx("create", review, txBytes, pool, simulationNote = simNote(resp.simulation), costs = resp.costs, tokenSymbol = app.vowed.data.StakeTokens.symbolFor(mint, _state.value.faucet.status?.tokens.orEmpty()), rebuild = { startChallenge(draft) }) {
                             // a squad challenge is linked to its squad as soon as the pool exists; the creator's stake was in the same transaction
                             draft.squadId?.let { sid -> runCatching { c.api.linkPool(sid, pool) } }
                             setFlow(TxFlow.Done(pool, "You're in. Your challenge is created and your stake is held by the program."))
@@ -555,7 +559,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 txBytes,
                 JoinExpectation(Base58.decode(account.wallet), Base58.decode(pool), Base58.decode(mint), stakeBaseUnits, tz, hex(account.deviceId)),
             )
-            setFlow(TxFlow.Review(PendingTx("join", review, txBytes, pool, simulationNote = simNote(resp.simulation), costs = resp.costs, rebuild = { prepareJoin(pool, mint, stakeBaseUnits) })))
+            setFlow(TxFlow.Review(PendingTx("join", review, txBytes, pool, simulationNote = simNote(resp.simulation), costs = resp.costs, tokenSymbol = app.vowed.data.StakeTokens.symbolFor(mint, _state.value.faucet.status?.tokens.orEmpty()), rebuild = { prepareJoin(pool, mint, stakeBaseUnits) })))
         } catch (e: Throwable) {
             setFlow(TxFlow.Failed(friendly(e)))
         }
@@ -588,6 +592,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (signingJob?.isActive == true) return // single in-flight lock: the wallet is already open for this request
         val tx = flow.tx
         lastReviewed = tx
+        // a review that stayed open for a while holds a transaction the network may no longer accept: build it again, the person checks it and taps Sign again
+        val rebuild = tx.rebuild
+        if (rebuild != null && app.vowed.data.ReviewFreshness.isStale(tx.builtAtMs, System.currentTimeMillis())) {
+            WalletDiagnostics.begin().add("review refreshed", "the transaction was ${(System.currentTimeMillis() - tx.builtAtMs) / 1000} s old")
+            setFlow(TxFlow.Working("Refreshing the transaction (it was open for a while)…"))
+            _state.update { it.copy(notice = "The transaction was refreshed because the screen had been open for a while. Check it and tap Sign again.") }
+            rebuild()
+            return
+        }
         // the last guard before the wallet opens: the server's numbers for this very transaction say the wallet cannot pay for it
         val short = tx.costs?.let { SolText.shortMessage(it, _state.value.faucet.status?.sol?.canClaim) }
         if (short != null) {

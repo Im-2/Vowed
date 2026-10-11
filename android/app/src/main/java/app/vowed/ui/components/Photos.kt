@@ -1,5 +1,7 @@
 package app.vowed.ui.components
 
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.Alignment
 import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -72,4 +74,23 @@ fun CategoryThumb(category: String, size: Dp = 48.dp, modifier: Modifier = Modif
 @Composable
 fun SkrIcon(size: Dp = 20.dp, modifier: Modifier = Modifier) {
     Image(painterResource(R.drawable.skr_logo), contentDescription = "SKR", modifier = modifier.size(size))
+}
+
+
+/**
+ * The USDC logo (the owner's file, design/brand/usdc-logo) as a circle, with a small "t" badge: our tUSDC is a TEST token, not real USDC, and the logo never
+ * appears without that mark. The logo itself is drawn as it is: no tint, no effect, no crop beyond its own circle.
+ */
+@Composable
+fun UsdcIcon(size: Dp = 20.dp, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.layout.Box(modifier.size(size)) {
+        Image(painterResource(R.drawable.usdc_logo), contentDescription = "Test USDC (tUSDC), not real USDC", contentScale = ContentScale.Fit, modifier = Modifier.size(size))
+        val badge = size * 0.42f
+        androidx.compose.foundation.layout.Box(
+            Modifier.align(Alignment.BottomEnd).size(badge).clip(androidx.compose.foundation.shape.CircleShape)
+                .background(Color.White).padding(androidx.compose.foundation.layout.PaddingValues(0.8.dp))
+                .clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFFB7791F)),
+            contentAlignment = Alignment.Center,
+        ) { androidx.compose.material3.Text("t", color = Color.White, fontSize = (badge.value * 0.78f).sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, lineHeight = (badge.value * 0.78f).sp) }
+    }
 }

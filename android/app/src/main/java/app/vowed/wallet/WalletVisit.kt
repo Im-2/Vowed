@@ -47,6 +47,7 @@ class WalletVisit(
     private val connectTimeoutMs: Long = CONNECT_TIMEOUT_MS,
     private val stallAfterMs: Long = STALL_AFTER_MS,
     private val onStalled: () -> Unit = {},
+    private val answerTimeoutMs: Long = ANSWER_TIMEOUT_MS,
 ) {
     suspend fun signAndSend(tx: ByteArray, savedToken: String?, saveToken: (String?) -> Unit): ByteArray {
         val t0 = clock()
@@ -66,13 +67,13 @@ class WalletVisit(
                     val tAuth = clock()
                     trace.add("authorize sent", "saved authorization: ${if (savedToken != null) "yes (the wallet should answer without a screen)" else "no (the wallet will ask to connect)"}")
                     val auth = try {
-                        transport.authorize(savedToken)
+                        bounded("authorize") { transport.authorize(savedToken) }
                     } catch (e: WalletException) {
                         if (savedToken == null || e.code != WalletErrors.CODE_AUTHORIZATION_FAILED) throw e
                         // MWA spec: a token the wallet no longer accepts must be discarded; authorize again in the same session (no new launch)
                         trace.add("wallet refused the saved authorization", "code -1 after ${clock() - tAuth} ms; discarded; authorizing again in the same session")
                         saveToken(null)
-                        transport.authorize(null)
+                        bounded("authorize") { transport.authorize(null) }
                     }
                     val authMs = clock() - tAuth
                     saveToken(auth.token)
@@ -83,7 +84,7 @@ class WalletVisit(
 
                     trace.add("sign request sent", "sign_and_send_transactions, ${since()}")
                     val tSign = clock()
-                    val sig = transport.signAndSend(tx)
+                    val sig = bounded("sign_and_send_transactions") { transport.signAndSend(tx) }
                     trace.add("wallet response", "signature received after ${clock() - tSign} ms of waiting for the approval")
                     closeReason = "finished: the wallet answered"
                     sig
@@ -102,7 +103,24 @@ class WalletVisit(
         }
     }
 
+    /**
+     * The wallet must answer within [answerTimeoutMs]. The library has its own wait, but a wallet that died or never showed its screen can leave a
+     * request pending without that wait ever firing, and the person must not be left looking at "Waiting" for ever: after this the visit ends with
+     * the actionable "did not ask you to approve" message (Try again is the person's tap, never automatic).
+     */
+    private suspend fun <T> bounded(step: String, block: suspend () -> T): T {
+        val r = kotlinx.coroutines.withTimeoutOrNull(answerTimeoutMs) { block() }
+        if (r == null) {
+            trace.add("$step: no answer", "the wallet did not answer within ${answerTimeoutMs / 1000} s")
+            throw WalletException(WalletErrors.NO_RESPONSE, WalletErrors.Kind.NoResponse, raw = "no answer from the wallet to $step within ${answerTimeoutMs / 1000} s")
+        }
+        return r
+    }
+
     companion object {
+        /** how long the wallet has to answer one request (a Connect screen and an approval each take a person a few seconds to a minute) */
+        const val ANSWER_TIMEOUT_MS = 90_000L
+
         /** the wallet must connect within this long after it was opened (the library's own fixed wait is 10 s; a first Phantom start can take longer) */
         const val CONNECT_TIMEOUT_MS = 45_000L
 

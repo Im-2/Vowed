@@ -29,18 +29,16 @@ import app.vowed.data.FaucetBalances
 import app.vowed.data.StakeToken
 import app.vowed.data.StakeTokens
 
-/** The icon of a token: the supplied SKR icon for test SKR, an original blue dollar coin for test USDC (not Circle's artwork), a grey coin for others. */
+/** The icon of a token: the supplied SKR icon for test SKR, the supplied USDC logo (always with the "t" test badge) for test USDC and devnet USDC, a grey coin for others. */
 @Composable
 fun TokenIcon(symbol: String, size: Dp = 32.dp, modifier: Modifier = Modifier) {
-    when (symbol) {
-        StakeTokens.TSKR -> SkrIcon(size, modifier)
-        else -> {
-            val blue = symbol == StakeTokens.TUSDC || symbol.startsWith("USDC")
-            Box(
-                modifier.size(size).clip(CircleShape).background(Brush.linearGradient(if (blue) listOf(Color(0xFF5BC8FF), Color(0xFF3566D6)) else listOf(Color(0xFFB9A8FF), Color(0xFF7C6CF0)))),
-                contentAlignment = Alignment.Center,
-            ) { Text("$", color = Color.White, fontSize = (size.value * 0.55f).sp, fontWeight = FontWeight.Bold) }
-        }
+    when {
+        symbol == StakeTokens.TSKR -> SkrIcon(size, modifier)
+        symbol == StakeTokens.TUSDC || symbol.startsWith("USDC") -> UsdcIcon(size, modifier)
+        else -> Box(
+            modifier.size(size).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFFB9A8FF), Color(0xFF7C6CF0)))),
+            contentAlignment = Alignment.Center,
+        ) { Text("$", color = Color.White, fontSize = (size.value * 0.55f).sp, fontWeight = FontWeight.Bold) }
     }
 }
 

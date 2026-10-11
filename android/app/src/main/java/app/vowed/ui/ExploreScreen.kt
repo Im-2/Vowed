@@ -201,9 +201,12 @@ fun ExploreScreen(
 }
 
 @Composable
-private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
+private fun Stat(label: String, value: String, modifier: Modifier = Modifier, token: String? = null) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(value, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (token != null) app.vowed.ui.components.TokenIcon(token, 14.dp)
+            Text(value, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+        }
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
@@ -242,7 +245,7 @@ private fun ExploreCard(p: ExploreItem, now: Long, onOpen: (String) -> Unit, onR
                 )
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Stat("Pot (${if (p.tokenIsTest) "test " else ""}${p.tokenSymbol})", fmt(p.totalDeposits), Modifier.weight(1f))
+                Stat("Pot (${if (p.tokenIsTest) "test " else ""}${p.tokenSymbol})", fmt(p.totalDeposits), Modifier.weight(1f), token = p.tokenSymbol)
                 Stat("Joined", "${p.participantCount} of ${p.maxParticipants}", Modifier.weight(1f))
                 Stat("Join within", timeLeft(p.joinDeadlineTs - now), Modifier.weight(1f))
             }

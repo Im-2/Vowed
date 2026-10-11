@@ -97,6 +97,7 @@ fun HomeTopBar(state: UiState, onPill: () -> Unit) {
         ) {
             LabelChip("TEST", ChipKind.Test)
             if (b != null) {
+                app.vowed.ui.components.UsdcIcon(16.dp)
                 Text("${compactAmount(b.tUSDC)} tUSDC", style = MaterialTheme.typography.labelMedium)
                 app.vowed.ui.components.SkrIcon(16.dp)
                 Text("${compactAmount(b.tSKR)} tSKR", style = MaterialTheme.typography.labelMedium)
@@ -315,6 +316,7 @@ private fun ChallengeRow(c: Challenge, tokens: List<app.vowed.data.FaucetToken>,
                 Text(planTitle(c), style = MaterialTheme.typography.titleSmall, maxLines = 1)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (c.isDemo) LabelChip("DEMO", ChipKind.Demo, moreTitle = "Demo pool", more = c.demoLabel ?: "DEMO POOL: minutes-long days, test money only")
+                    app.vowed.ui.components.TokenIcon(app.vowed.data.StakeTokens.symbolFor(c.mint, tokens), 16.dp)
                     Text("${c.status} · pot ${app.vowed.data.StakeTokens.amountText(c.totalDeposits, c.mint, tokens)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
