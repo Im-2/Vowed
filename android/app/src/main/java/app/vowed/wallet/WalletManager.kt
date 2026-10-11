@@ -164,7 +164,7 @@ class WalletManager(
      * signs and Vowed's server sends) and is closed again. See [WalletVisit] for the rules; nothing here retries by itself, a failure ends the visit and the
      * person decides (Try again, which uses [methodOverride] = the other method). [kind] and [simulation] only describe the transaction in the trace.
      */
-    suspend fun sign(tx: ByteArray, kind: String = "transaction", simulation: String? = null, methodOverride: SignMethod? = null, hooks: VisitHooks = VisitHooks()): VisitResult {
+    suspend fun sign(tx: ByteArray, kind: String = "transaction", simulation: String? = null, methodOverride: SignMethod? = null, hooks: VisitHooks = VisitHooks(), refresh: (suspend (ByteArray) -> ByteArray?)? = null): VisitResult {
         val t = trace()
         val l = launcher ?: throw WalletException("Vowed could not open the wallet right now. Close and reopen the app, then try again.")
         t.add("transaction", "kind=$kind, ${tx.size} bytes, server simulation: ${simulation ?: "not reported"}${if (methodOverride != null) ", method asked for: ${methodOverride.wire}" else ""}")
@@ -178,7 +178,7 @@ class WalletManager(
         if (forced != null) t.add("debug", "method forced to ${forced.wire}")
         return gate.run({ _: VisitResult -> false }) {
             launches.incrementAndGet()
-            visit.run(tx, prefs.mwaAuthToken, methodOverride ?: forced)
+            visit.run(tx, prefs.mwaAuthToken, methodOverride ?: forced, refresh)
         }
     }
 

@@ -621,6 +621,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val PendingTx.landable: Boolean get() = kind == "create" || kind == "join" || kind == "claim"
 
+    /**
+     * The same transaction with a fresh blockhash, asked of the server right before the wallet is asked to sign (a wallet can take longer than a blockhash lives).
+     * It is used only when it is identical to the reviewed one in everything but the blockhash; otherwise null and the reviewed copy is used.
+     */
+    private suspend fun refreshedCopy(old: ByteArray): ByteArray? {
+        val fresh = Base64.decode(c.api.refreshTx(Base64.encodeToString(old, Base64.NO_WRAP)).transaction, Base64.DEFAULT)
+        return if (app.vowed.data.TxFreshness.sameExceptBlockhash(old, fresh)) fresh else null
+    }
+
     private fun diag(text: String, detail: String? = null) = WalletDiagnostics.current.add(text, detail)
 
     fun confirm(@Suppress("UNUSED_PARAMETER") sender: ActivityResultSender) {
@@ -674,7 +683,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     },
                 )
                 val submitter = TxSubmitter(
-                    sign = { bytes, kind, sim -> c.wallet.sign(bytes, kind, sim, methodOverride, hooks) },
+                    sign = { bytes, kind, sim ->
+                        c.wallet.sign(bytes, kind, sim, methodOverride, hooks, refresh = if (tx.landable) { old -> refreshedCopy(old) } else null)
+                    },
                     submitSigned = { signed ->
                         submitAttempted = true
                         c.api.submitSigned(Base64.encodeToString(signed, Base64.NO_WRAP)).signature

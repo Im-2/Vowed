@@ -3717,6 +3717,54 @@
         }
       }
     },
+    "/v1/tx/refresh": {
+      "post": {
+        "summary": "The same transaction the server built, with a fresh blockhash (a wallet app may take longer than a blockhash lives). Only the blockhash changes",
+        "tags": [
+          "challenges"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "transaction": {
+                    "type": "string",
+                    "maxLength": 6000
+                  }
+                },
+                "required": [
+                  "transaction"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "transaction": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "transaction"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/tx/submit": {
       "post": {
         "summary": "Send a transaction the wallet only SIGNED (sign_transactions). Only a transaction this server built for this wallet is accepted; it is simulated again and sent at most once, and asking again returns the same signature",

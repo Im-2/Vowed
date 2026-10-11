@@ -171,9 +171,49 @@ export async function checkLanded(s: Services, wallet: string, kind: BuiltKind, 
   return { landed, detail, signature, status: c?.status ?? null };
 }
 
+/**
+ * The same transaction with a fresh blockhash. A wallet app can take over a minute (a cold start, its Connect screen, its approval screen), which is longer than a
+ * blockhash lives, so the app asks for a fresh one right before it sends the signing request. Only a transaction this server built for this wallet and that has not been
+ * sent is re-issued, and only the blockhash changes (the staking instructions, accounts and fee payer are untouched, so the match by content still holds).
+ */
+export async function refreshBlockhash(s: Services, wallet: string, unsignedBase64: string): Promise<{ transaction: string }> {
+  const raw = decodeB64(unsignedBase64, 4_000);
+  let tx: Transaction;
+  try {
+    tx = Transaction.from(raw);
+  } catch {
+    throw badRequest("bad_transaction", "that is not a transaction");
+  }
+  const row = s.db.prepare("SELECT message_hash, wallet, status FROM built_txs WHERE message_hash = ?").get(hashOf(tx)) as { wallet: string; status: string } | undefined;
+  if (!row || row.wallet !== wallet) throw new ApiError(404, "not_found", "transaction not found: Vowed did not build this one for your wallet");
+  if (row.status === "sent" || row.status === "sending") throw conflict("already_sent", "this transaction was already sent");
+  const { blockhash, lastValidBlockHeight } = await s.chain.latestBlockhash();
+  tx.recentBlockhash = blockhash;
+  tx.lastValidBlockHeight = lastValidBlockHeight;
+  tx.signatures = tx.signatures.map((x) => ({ publicKey: x.publicKey, signature: null }));
+  return { transaction: tx.serialize({ requireAllSignatures: false, verifySignatures: false }).toString("base64") };
+}
+
 export function registerTxSubmitRoutes(app: FastifyInstance, s: Services) {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const auth = authenticate(s);
+
+  r.post(
+    "/v1/tx/refresh",
+    {
+      preHandler: auth,
+      schema: {
+        tags: ["challenges"],
+        summary: "The same transaction the server built, with a fresh blockhash (a wallet app may take longer than a blockhash lives). Only the blockhash changes",
+        body: z.object({ transaction: z.string().max(6_000) }),
+        response: { 200: z.object({ transaction: z.string() }) },
+      },
+    },
+    async (req) => {
+      enforce(s, `wallet:${req.wallet}:refresh`, 30, 60);
+      return refreshBlockhash(s, req.wallet!, req.body.transaction);
+    },
+  );
 
   r.post(
     "/v1/tx/submit",

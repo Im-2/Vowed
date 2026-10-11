@@ -92,6 +92,31 @@ describe.skipIf(!lib)("sign-only path: the server sends what the wallet signed (
     expect(await balance(w, vault)).toBe(2n * UNIT);
   });
 
+  it("re-issues a transaction it built with a fresh blockhash (only the blockhash changes), and the refreshed copy is accepted once signed", async () => {
+    const w = (await makeChainWorld())!;
+    const [alice, bob, mallory] = [await makePlayer(w, 50n * UNIT), await makePlayer(w, 50n * UNIT), await makePlayer(w, 50n * UNIT)];
+    const pool = await openPool(w, alice);
+    const j = await post(w, bob, "/v1/challenges/tx/join", { pool, stake: (2n * UNIT).toString(), tzOffsetMinutes: 0, deviceId: bob.device.id });
+    const built = j.json().transaction as string;
+    const fresh = await post(w, bob, "/v1/tx/refresh", { transaction: built });
+    expect(fresh.statusCode, fresh.body).toBe(200);
+    const a = Transaction.from(Buffer.from(built, "base64"));
+    const b = Transaction.from(Buffer.from(fresh.json().transaction, "base64"));
+    expect(b.feePayer!.toBase58()).toBe(a.feePayer!.toBase58());
+    expect(b.instructions.length).toBe(a.instructions.length);
+    expect(Buffer.from(b.instructions[0]!.data).equals(Buffer.from(a.instructions[0]!.data))).toBe(true);
+    // another wallet cannot get bob's transaction re-issued; garbage is refused
+    expect((await post(w, mallory, "/v1/tx/refresh", { transaction: built })).statusCode).toBe(404);
+    expect((await post(w, bob, "/v1/tx/refresh", { transaction: "AAAA" })).statusCode).toBe(400);
+    // the refreshed copy, signed, is sent and the stake lands
+    const ok = await submit(w, bob, signOnly(bob, fresh.json().transaction));
+    expect(ok.statusCode, ok.body).toBe(200);
+    const vault = (await get(w, bob, `/v1/challenges/${pool}`)).json().challenge.vault as string;
+    expect(await balance(w, vault)).toBe(2n * UNIT);
+    // once sent, it is not re-issued
+    expect((await post(w, bob, "/v1/tx/refresh", { transaction: built })).statusCode).toBe(409);
+  });
+
   it("refuses anything the server did not build for this wallet, an unsigned copy, and a copy changed after the build", async () => {
     const w = (await makeChainWorld())!;
     const [alice, bob, mallory] = [await makePlayer(w, 50n * UNIT), await makePlayer(w, 50n * UNIT), await makePlayer(w, 50n * UNIT)];

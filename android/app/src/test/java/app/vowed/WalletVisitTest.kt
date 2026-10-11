@@ -60,6 +60,7 @@ class WalletVisitTest {
         var signOnlyCalls = 0
         val closed = mutableListOf<String>()
         var signPending = false
+        var lastTx: ByteArray? = null
 
         override suspend fun launch() { launches++ }
         override suspend fun connect(timeoutMs: Long): String { connectFails?.let { throw it }; return "protocol V1" }
@@ -72,6 +73,7 @@ class WalletVisitTest {
             return WalletAuth("TOKEN", ByteArray(32))
         }
         override suspend fun signAndSend(tx: ByteArray): ByteArray {
+            lastTx = tx
             sendCalls++
             approvalScreens++
             signPending = true
@@ -83,6 +85,7 @@ class WalletVisitTest {
             } finally { signPending = false }
         }
         override suspend fun signOnly(tx: ByteArray): ByteArray {
+            lastTx = tx
             signOnlyCalls++
             approvalScreens++
             if (signDelayMs > 0) delay(signDelayMs)
@@ -308,6 +311,23 @@ class WalletVisitTest {
         runBlocking { WalletVisit(w, trace, clock = { now }, settleMs = 1).run(ByteArray(10), null) }
         assertTrue(trace.render().contains("it probably showed a screen"))
         assertTrue("the request waits for the connect screen to close", trace.render().contains("waiting for the wallet's connect screen to close"))
+    }
+
+    @Test fun theWalletIsAskedToSignAFreshCopyOfTheTransactionWhenTheAppCanProvideOne() {
+        val w = FakeWallet(caps = WalletCaps(false, 10, "legacy,0", ""))
+        val fresh = ByteArray(300) { 5 }
+        runBlocking { visit(w).run(ByteArray(300) { 1 }, null, null) { fresh } }
+        assertTrue("the wallet got the fresh copy", w.lastTx!!.contentEquals(fresh))
+    }
+
+    @Test fun theOriginalTransactionIsUsedWhenNoFreshCopyComes() {
+        val w = FakeWallet(caps = WalletCaps(false, 10, "legacy,0", ""))
+        val original = ByteArray(300) { 1 }
+        runBlocking { visit(w).run(original, null, null) { null } }
+        assertTrue(w.lastTx!!.contentEquals(original))
+        val w2 = FakeWallet(caps = WalletCaps(false, 10, "legacy,0", ""))
+        runBlocking { visit(w2).run(original, null, null) { throw java.io.IOException("server down") } }
+        assertTrue("a failing refresh never blocks the signing request", w2.lastTx!!.contentEquals(original))
     }
 
     @Test fun noWaitIsAddedWhenTheWalletAnsweredWithoutAScreen() {

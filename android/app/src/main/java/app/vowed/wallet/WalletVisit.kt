@@ -88,7 +88,7 @@ class WalletVisit(
     private val answerTimeoutMs: Long = ANSWER_TIMEOUT_MS,
     private val settleMs: Long = SETTLE_MS,
 ) {
-    suspend fun run(tx: ByteArray, savedToken: String?, methodOverride: SignMethod? = null): VisitResult {
+    suspend fun run(tx: ByteArray, savedToken: String?, methodOverride: SignMethod? = null, refresh: (suspend (ByteArray) -> ByteArray?)? = null): VisitResult {
         val t0 = clock()
         fun since() = "${clock() - t0} ms after the visit started"
         var closeReason = "visit ended"
@@ -148,13 +148,26 @@ class WalletVisit(
                         trace.add("waiting for the wallet's connect screen to close", "$settleMs ms before the transaction request is sent")
                         delay(settleMs)
                     }
+                    // The transaction was built before the wallet was opened, and a wallet can take over a minute (cold start, Connect, approval), which is longer
+                    // than a blockhash lives: on a real Samsung phone with Phantom both stakes failed with "Blockhash not found". So ask for the same transaction
+                    // with a fresh blockhash now, right before the signing request.
+                    var toSign = tx
+                    if (refresh != null) {
+                        val fresh = withTimeoutOrNull(REFRESH_TIMEOUT_MS) { runCatching { refresh(tx) }.getOrNull() }
+                        if (fresh != null) {
+                            toSign = fresh
+                            trace.add("transaction refreshed", "a fresh blockhash was fetched ${since()}")
+                        } else {
+                            trace.add("transaction not refreshed", "the server did not answer in time or the copy did not match; the transaction built earlier is used")
+                        }
+                    }
                     arm("after the transaction request was sent")
                     requestSent = true
                     trace.add("request sent", "${method.wire}, ${since()}")
                     val tSign = clock()
                     val result: VisitResult = when (method) {
-                        SignMethod.SendBySelf -> VisitResult.Sent(bounded(method.wire) { transport.signAndSend(tx) }, method, pkg)
-                        SignMethod.SignOnly -> VisitResult.Signed(bounded(method.wire) { transport.signOnly(tx) }, method, pkg)
+                        SignMethod.SendBySelf -> VisitResult.Sent(bounded(method.wire) { transport.signAndSend(toSign) }, method, pkg)
+                        SignMethod.SignOnly -> VisitResult.Signed(bounded(method.wire) { transport.signOnly(toSign) }, method, pkg)
                     }
                     trace.add("wallet response", "${method.wire} answered after ${clock() - tSign} ms of waiting for the approval")
                     pkg?.let { memory?.rememberMethod(it, method) }
@@ -202,6 +215,9 @@ class WalletVisit(
 
         /** an authorize that took longer than this showed a screen (Connect), so the wallet needs a moment before the next request */
         const val SCREEN_SHOWN_AFTER_MS = 2_500L
+
+        /** the server is asked for a fresh blockhash for at most this long; after it the transaction built earlier is used */
+        const val REFRESH_TIMEOUT_MS = 8_000L
 
         /** how long the transaction request is held back after a Connect screen, so that the wallet's approval sheet can be drawn */
         const val SETTLE_MS = 3_000L
