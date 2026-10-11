@@ -188,7 +188,7 @@ class WalletManager(
     }
 
     companion object {
-        const val WALLET_REQUEST_TIMEOUT_MS = 120_000
+        const val WALLET_REQUEST_TIMEOUT_MS = 90_000
 
         /** one whole wallet attempt: launching the wallet (20 s), connecting to it (10 s) and one request (120 s), plus a little room */
         const val WALLET_ATTEMPT_TIMEOUT_MS = 160_000L

@@ -43,7 +43,7 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
                         val err = runCatching { AppJson.decodeFromString<ApiErrorBody>(text).error }.getOrNull()
                         if (err?.code == DEVICE_NOT_REGISTERED) onDeviceUnknown?.invoke()
                         if (res.code == 401 && token != null) onUnauthorized?.invoke()
-                        throw ApiException(res.code, err?.code ?: "http_${res.code}", err?.message ?: "The server answered ${res.code}.")
+                        throw ApiException(res.code, err?.code ?: "http_${res.code}", err?.message ?: "The server answered ${res.code}.", err?.details?.toString()?.take(600))
                     }
                     parse(text)
                 }

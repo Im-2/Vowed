@@ -45,12 +45,14 @@ class WalletTrace(
     private val lifecycle: () -> List<LifecycleEvent> = { LifecycleLog.snapshot() },
 ) {
     private val echoToLogcat: Boolean = WalletDiagnostics.echoToLogcat
+    private val persistHook: ((WalletTrace) -> Unit)? = WalletDiagnostics.persist
     private val startedAt = clock()
     private val entries = ArrayList<LifecycleEvent>()
 
     @Synchronized fun add(event: String, detail: String? = null) {
         val line = scrub(if (detail.isNullOrBlank()) event else "$event: $detail")
         entries.add(LifecycleEvent(clock(), line))
+        persistHook?.invoke(this)
         // also to logcat on development builds, so a run on the emulator can be followed live (the line is already scrubbed)
         if (echoToLogcat) try { android.util.Log.i("VowedWallet", line) } catch (_: Throwable) { }
     }
@@ -99,6 +101,9 @@ class WalletTrace(
 
 /** Holds the trace of the connection attempt in progress (or the last one) so the error screen can show it. */
 object WalletDiagnostics {
+    /** Called after every line of a trace, so the last attempt can be read again after returning from the wallet (set by the app). */
+    @Volatile var persist: ((WalletTrace) -> Unit)? = null
+
     /** Set by the app in debug builds only. */
     @Volatile var echoToLogcat: Boolean = false
 

@@ -11,13 +11,24 @@ object FaucetText {
         return TxChecker.formatUnits(v, 9).let { s -> if (s.contains('.') && s.substringAfter('.').length > 4) s.substringBefore('.') + "." + s.substringAfter('.').take(4).trimEnd('0').trimEnd('.') else s }
     }
 
+    /** Why a SOL gift was not sent, in plain words (null when there is nothing to say). */
+    fun solReason(reason: String?): String? = when (reason) {
+        "balance_ok" -> "Your wallet already holds enough devnet SOL, so none was sent."
+        "too_soon" -> "A top-up of devnet SOL is possible one hour after the last one."
+        "wallet_limit", "already_received" -> "This wallet already received the most devnet SOL the faucet gives out. Use Solana's devnet faucet (faucet.solana.com) or ask the project team."
+        "already_has_sol" -> "Your wallet already has devnet SOL, so none was sent."
+        "daily_cap", "total_cap" -> "The devnet SOL gift is used up for now."
+        "sol_faucet_empty" -> "The devnet SOL faucet is empty right now. Please tell the project team."
+        else -> null
+    }
+
     fun solLine(g: SolGift?): String = when (g?.status) {
         "sent" -> " Plus ${sol(g.lamports)} SOL (devnet) for network fees."
         "failed" -> " The devnet SOL for network fees could not be sent right now; tap again later."
         "skipped" -> when (g.reason) {
             "already_has_sol" -> " Your wallet already has devnet SOL, so none was sent."
             "daily_cap", "total_cap" -> " The devnet SOL gift is used up for now."
-            else -> ""
+            else -> solReason(g.reason)?.let { " $it" } ?: ""
         }
         else -> ""
     }

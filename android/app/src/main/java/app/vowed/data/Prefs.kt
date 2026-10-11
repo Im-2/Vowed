@@ -50,6 +50,11 @@ class Prefs(context: Context) {
     fun deviceTrustCap(wallet: String): String? = sp.getString("trust_$wallet", null)
     fun setDeviceTrustCap(wallet: String, cap: String?) = sp.edit().apply { if (cap == null) remove("trust_$wallet") else putString("trust_$wallet", cap) }.apply()
 
+    /** The timeline of the last wallet attempt (scrubbed: no keys, signatures or tokens), kept so it can be read after returning from the wallet. */
+    var lastDiagnostics: String?
+        get() = sp.getString("last_diagnostics", null)
+        set(v) = sp.edit().apply { if (v == null) remove("last_diagnostics") else putString("last_diagnostics", v.takeLast(24_000)) }.apply()
+
     /** Debug builds can point the app at another backend; release builds ignore this and use the built-in URL. */
     var backendUrl: String
         get() = if (BuildConfig.DEBUG) sp.getString("backend_url", null) ?: BuildConfig.BACKEND_URL else BuildConfig.BACKEND_URL

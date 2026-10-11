@@ -3,6 +3,8 @@ package app.vowed
 import app.vowed.data.AppJson
 import app.vowed.data.Preflight
 import app.vowed.data.PreflightText
+import app.vowed.data.SolCosts
+import app.vowed.data.SolText
 import app.vowed.data.TxResponse
 import app.vowed.wallet.SessionRetry
 import app.vowed.wallet.WalletErrors
@@ -35,25 +37,37 @@ class PreflightTest {
         assertEquals(null, old.simulation)
     }
 
-    @Test fun lowSolBeforeTheGiftIsReceivedPointsToGetTestTokens() {
+    @Test fun lowSolSaysHowMuchIsNeededAndHowMuchTheWalletHasAndPointsToGetTestSol() {
         val p = preflight(lowSol)
-        assertEquals("Your wallet needs a little devnet SOL for network fees. Tap Get test tokens to receive some.", PreflightText.message(p, false))
-        assertEquals(PreflightText.message(p, false), PreflightText.message(p, null))
+        val msg = PreflightText.message(p, true)
+        assertEquals("Your wallet needs about 0.0021 SOL on devnet for fees and rent. You have 0.0025 SOL. Tap Get test SOL.", msg)
+        assertEquals(PreflightText.message(p, true), PreflightText.message(p, null))
         assertTrue(PreflightText.offersFaucet(p))
+        assertEquals("Get test SOL", PreflightText.buttonLabel(p))
     }
 
-    @Test fun afterTheOneTimeGiftTheMessageDoesNotPromiseMoreSol() {
-        val msg = PreflightText.message(preflight(lowSol), true)
-        assertTrue(msg.contains("it has 0.0025 SOL"))
-        assertTrue(msg.contains("about 0.002 SOL"))
-        assertTrue(msg.contains("sent once per wallet and was already sent"))
-        assertFalse(msg.contains("Tap Get test tokens to receive some"))
+    @Test fun whenTheFaucetCannotSendMoreSolTheMessageDoesNotPromiseIt() {
+        val msg = PreflightText.message(preflight(lowSol), false)
+        assertTrue(msg.contains("You have 0.0025 SOL"))
+        assertTrue(msg.contains("about 0.0021 SOL"))
+        assertTrue(msg.contains("faucet.solana.com"))
+        assertFalse(msg.contains("Tap Get test SOL"))
+    }
+
+    @Test fun theSolNumbersAreRoundedUpSoAShortWalletNeverReadsAsEnough() {
+        assertEquals("0.0054", SolText.sol("5399960"))
+        assertEquals("0.0016", SolText.sol("1575000"))
+        assertEquals("0.0016", SolText.sol("1580000"))
+        assertEquals("0.03", SolText.sol("30000000"))
+        assertEquals("0", SolText.sol("0"))
+        assertEquals("0.0001", SolText.sol("1"))
     }
 
     @Test fun missingTokensAreNamedAndEveryReasonIsListed() {
         val p = preflight("""[{"code":"low_sol","message":"A."},{"code":"no_token_account","message":"Your wallet has no test tokens yet. Tap Get test tokens to receive some."}]""")
-        val msg = PreflightText.message(p, false)
-        assertTrue(msg.startsWith("A. Your wallet has no test tokens yet"))
+        val msg = PreflightText.message(p, true)
+        assertTrue(msg.endsWith("Your wallet has no test tokens yet. Tap Get test tokens to receive some."))
+        assertEquals("Get test tokens", PreflightText.buttonLabel(p))
         assertTrue(PreflightText.offersFaucet(p))
     }
 
@@ -74,7 +88,7 @@ class PreflightTest {
         assertEquals(WalletErrors.DECLINED, WalletErrors.explain("User did not authorize signing"))
         assertEquals(WalletErrors.EXPIRED, WalletErrors.explain("Transaction payloads invalid"))
         assertEquals(WalletErrors.NO_FEE_FUNDS, WalletErrors.explain("Attempt to debit an account but found no record of a prior credit."))
-        assertTrue(WalletErrors.NO_RESPONSE.startsWith("Your wallet did not answer."))
+        assertTrue(WalletErrors.NO_RESPONSE.startsWith("Your wallet did not ask you to approve. Open your wallet app, or tap Try again."))
         assertTrue("a missing answer is not blamed on the network setting", !WalletErrors.NO_RESPONSE.contains("Testnet Mode"))
         for (m in listOf(WalletErrors.NO_RESPONSE, WalletErrors.SESSION_CLOSED, WalletErrors.DECLINED)) assertFalse(m.contains("Exception"))
     }
@@ -115,5 +129,41 @@ class PreflightTest {
         assertTrue(text.contains("2YeP…UFZf"))
         assertFalse(text.contains("2YePEWRp8aTfqQnJHK2EBt4YkXRXWetzdmL8dDG7UFZf"))
         assertTrue(text.contains("Cannot send in CLOSED"))
+    }
+
+    // ---------------------------------------------------------------- the review screen: what it costs, and the last guard before the wallet
+
+    private val create = SolCosts(fee = "5000", rent = "4744720", keep = "650240", total = "5399960", balance = "1580000", enough = false)
+
+    @Test fun theServersCostsAreReadFromATransactionResponse() {
+        val tx = AppJson.decodeFromString<TxResponse>("""{"transaction":"AA==","blockhash":"b","lastValidBlockHeight":1,"pool":"p","summary":{},"costs":{"fee":"5000","rent":"4744720","keep":"650240","total":"5399960","balance":"1580000","enough":false}}""")
+        assertEquals(create, tx.costs)
+        assertEquals(null, AppJson.decodeFromString<TxResponse>("""{"transaction":"AA==","blockhash":"b","lastValidBlockHeight":1,"pool":"p","summary":{}}""").costs)
+    }
+
+    @Test fun theReviewScreenSaysFeeRentAndTotalInPlainWords() {
+        val lines = SolText.lines(create).toMap()
+        assertEquals("about 0.0001 SOL", lines["Network fee"])
+        assertTrue(lines["Account rent"]!!.startsWith("about 0.0048 SOL"))
+        assertTrue(lines["Account rent"]!!.contains("not refunded"))
+        assertEquals("about 0.0007 SOL", lines["Your wallet must keep"])
+        assertEquals("about 0.0054 SOL (your wallet has 0.0016)", lines["Total SOL needed"])
+        assertEquals("none", SolText.lines(create.copy(rent = "0")).toMap()["Account rent"])
+    }
+
+    @Test fun aWalletThatCannotPayIsNeverSentToTheWalletApp() {
+        // the tester's wallet: 0.00158 SOL against a create-and-stake that needs 0.0054
+        val msg = SolText.shortMessage(create, canGetSol = true)!!
+        assertEquals("Your wallet needs about 0.0054 SOL on devnet for fees and rent. You have 0.0016 SOL. Tap Get test SOL.", msg)
+        assertTrue(SolText.shortMessage(create, canGetSol = false)!!.contains("faucet.solana.com"))
+        // a wallet that can pay passes, so the wallet app opens
+        assertEquals(null, SolText.shortMessage(create.copy(balance = "9000000", enough = true), canGetSol = true))
+    }
+
+    @Test fun theSolReasonsOfAGiftThatWasNotSentAreInPlainWords() {
+        assertTrue(app.vowed.data.FaucetText.solReason("balance_ok")!!.contains("already holds enough"))
+        assertTrue(app.vowed.data.FaucetText.solReason("too_soon")!!.contains("one hour"))
+        assertTrue(app.vowed.data.FaucetText.solReason("wallet_limit")!!.contains("most devnet SOL"))
+        assertEquals(null, app.vowed.data.FaucetText.solReason("something_new"))
     }
 }

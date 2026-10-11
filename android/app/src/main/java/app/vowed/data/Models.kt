@@ -44,7 +44,9 @@ data class CreateTxRequest(
 @Serializable data class SyncRequest(val signature: String)
 /** What the server found when it ran the transaction on the cluster without sending it. */
 @Serializable data class SimulationInfo(val ok: Boolean, val skipped: Boolean, val unitsConsumed: Long? = null)
-@Serializable data class TxResponse(val transaction: String, val blockhash: String, val lastValidBlockHeight: Long, val pool: String, val summary: JsonObject, val simulation: SimulationInfo? = null)
+/** What a transaction costs the wallet in SOL (lamports as text) and what the wallet held when it was built. */
+@Serializable data class SolCosts(val fee: String, val rent: String, val keep: String, val total: String, val balance: String, val enough: Boolean)
+@Serializable data class TxResponse(val transaction: String, val blockhash: String, val lastValidBlockHeight: Long, val pool: String, val summary: JsonObject, val simulation: SimulationInfo? = null, val costs: SolCosts? = null)
 
 /** Can this wallet afford the transaction it is about to sign? Asked BEFORE the wallet is opened. */
 @Serializable data class PreflightSol(val balance: String, val needed: String, val enough: Boolean, val fee: String, val rent: String, val keep: String)
@@ -127,7 +129,7 @@ data class ProofSession(
 @Serializable data class FaucetToken(val symbol: String, val name: String, val mint: String, val amount: String, val decimals: Int)
 @Serializable data class FaucetBalances(val tUSDC: String = "0", val tSKR: String = "0", /** lamports of devnet SOL */ val sol: String = "0")
 /** The small one-time gift of devnet SOL for network fees. */
-@Serializable data class FaucetSol(val enabled: Boolean = false, val lamports: String = "0", val received: Boolean = false)
+@Serializable data class FaucetSol(val enabled: Boolean = false, val lamports: String = "0", val received: Boolean = false, val receivedLamports: String = "0", /** may this wallet get a gift right now */ val canClaim: Boolean = false, val reason: String? = null)
 @Serializable data class SolGift(val status: String, val lamports: String = "0", val reason: String? = null, val signature: String? = null)
 @Serializable
 data class FaucetStatus(
@@ -224,7 +226,7 @@ data class ExploreItem(
 @Serializable data class Notes(val now: Long, val items: List<NoteItem>)
 
 @Serializable data class ApiErrorBody(val error: ApiErrorInfo)
-@Serializable data class ApiErrorInfo(val code: String, val message: String)
+@Serializable data class ApiErrorInfo(val code: String, val message: String, val details: kotlinx.serialization.json.JsonElement? = null)
 
 /** A failed API call with the backend's stable error code (see docs/openapi.json). */
 class ApiException(val status: Int, val code: String, override val message: String, /** raw technical text, shown only under "Details" */ val detail: String? = null) : Exception(message)

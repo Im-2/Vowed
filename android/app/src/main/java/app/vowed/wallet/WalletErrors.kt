@@ -64,7 +64,7 @@ object WalletErrors {
     const val SESSION_CLOSED =
         "The wallet closed the connection before it finished. Open Vowed, tap Connect again, and approve in your wallet right away. If the wallet stays on its home screen, return to Vowed manually."
     const val NO_RESPONSE =
-        "Your wallet did not answer. Open your wallet, check it is unlocked, then return to Vowed and tap Sign again. If the wallet shows nothing, the request may not have reached it."
+        "Your wallet did not ask you to approve. Open your wallet app, or tap Try again. If the wallet shows nothing, the request may not have reached it."
     const val LOCKED = "Open your wallet and unlock it, then try again. Nothing was signed."
     const val SLOW =
         "The wallet took too long to answer. Open your wallet and unlock it, give it a moment to start (the first start can take up to a minute), then try again."

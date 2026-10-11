@@ -22,7 +22,7 @@ object WalletEnvironment {
     }
 
     fun header(ctx: Context): List<String> = listOf(
-        "app ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE}), backend ${BuildConfig.BACKEND_URL}",
+        "app ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE}), built ${BuildConfig.BUILD_TIME}, backend ${BuildConfig.BACKEND_URL}",
         "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.MANUFACTURER} ${Build.MODEL}",
         "wallet apps that handle solana-wallet: links: ${wallets(ctx)}",
     )

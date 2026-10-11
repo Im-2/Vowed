@@ -401,6 +401,9 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
 
 /** The "Get test tokens" action, provided once at the top of the app so any screen can offer it (no wallet is opened for it). */
 /** "Try again" under the waiting hint: ends the wallet request in flight and builds a fresh transaction (a tap, never automatic). */
+/** "Cancel" on the waiting screen: ends the wallet request in flight and goes back to the review screen. */
+val LocalCancelSigning = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
+
 val LocalRetryWallet = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
 
 val LocalGetTestTokens = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
@@ -422,17 +425,25 @@ fun FlowStatus(flow: TxFlow) {
                 )
                 app.vowed.ui.components.SoftButton("Try again", retry)
             }
+            if (flow.signing) {
+                app.vowed.ui.components.SoftButton("Cancel", LocalCancelSigning.current)
+            }
+            if (flow.slow) {
+                // the tester cannot see Copy diagnostics after returning from the wallet unless it is here
+                ErrorDetails(app.vowed.wallet.WalletDiagnostics.render())
+            }
         }
         // A problem found BEFORE the wallet opens must not hide below the fold: it is a framed card that scrolls itself into view
         is TxFlow.Failed -> StatusCard(flow, "That did not go through") {
             Text(flow.message, color = MaterialTheme.colorScheme.onSurface)
+            if (flow.canRetry) app.vowed.ui.components.SoftButton("Try again", LocalRetryWallet.current)
             ErrorDetails(flow.detail)
         }
         is TxFlow.Blocked -> {
             val getTokens = LocalGetTestTokens.current
             StatusCard(flow, "Not sent to your wallet yet") {
                 Text(flow.message, color = MaterialTheme.colorScheme.onSurface)
-                if (flow.canGetTokens) app.vowed.ui.components.PrimaryButton("Get test tokens", getTokens)
+                if (flow.canGetTokens) app.vowed.ui.components.PrimaryButton(flow.buttonLabel, getTokens)
             }
         }
         is TxFlow.Done -> Text(flow.message, color = MaterialTheme.colorScheme.primary)
@@ -456,7 +467,9 @@ private fun StatusCard(key: Any, title: String, content: @Composable () -> Unit)
 // ---------------------------------------------------------------- review
 
 @Composable
-fun ReviewScreen(tx: PendingTx, onSign: () -> Unit, onCancel: () -> Unit) {
+fun ReviewScreen(tx: PendingTx, onSign: () -> Unit, onCancel: () -> Unit, canGetSol: Boolean? = null) {
+    val costs = tx.costs
+    val short = costs?.let { app.vowed.data.SolText.shortMessage(it, canGetSol) }
     Page("Check before you sign") {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             AppCard(Modifier.fillMaxWidth()) {
@@ -470,9 +483,29 @@ fun ReviewScreen(tx: PendingTx, onSign: () -> Unit, onCancel: () -> Unit) {
                             Text(v, Modifier.weight(0.6f), fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End)
                         }
                     }
+                    if (costs != null) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Text("What it costs in devnet SOL", style = MaterialTheme.typography.titleSmall)
+                        app.vowed.data.SolText.lines(costs).forEach { (k, v) ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text(k, Modifier.weight(0.4f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(v, Modifier.weight(0.6f), fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                            }
+                        }
+                    }
                 }
             }
-            app.vowed.ui.components.PrimaryButton("Sign with wallet", onSign)
+            if (short != null) {
+                // the wallet is not opened for a step it cannot pay for
+                AppCard(Modifier.fillMaxWidth(), container = VowedTheme.extra.demoTint) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Your wallet is short of SOL", style = MaterialTheme.typography.titleSmall, color = VowedTheme.extra.demo)
+                        Text(short, color = MaterialTheme.colorScheme.onSurface)
+                        if (canGetSol != false) app.vowed.ui.components.PrimaryButton("Get test SOL", LocalGetTestTokens.current)
+                    }
+                }
+            }
+            app.vowed.ui.components.PrimaryButton("Sign with wallet", onSign, enabled = short == null)
             app.vowed.ui.components.SoftButton("Cancel", onCancel)
         }
     }
@@ -640,7 +673,7 @@ private fun AvatarPicker(wallet: String?) {
 fun SettingsScreen(
     state: UiState, backendUrl: String, onBack: () -> Unit, onPractice: () -> Unit, onCoach: () -> Unit, onRewards: () -> Unit, onLetters: () -> Unit, onDisconnect: () -> Unit,
     onHideFromBoard: (Boolean) -> Unit = {}, onLoadBoard: () -> Unit = {}, onSampleProvider: () -> Unit = {},
-    onResetConnection: () -> Unit = {}, onWalletHelp: () -> Unit = {}, onHidePastPools: () -> Unit = {}, onShowHiddenPools: () -> Unit = {}, onDebugWalletTest: () -> Unit = {},
+    onResetConnection: () -> Unit = {}, onWalletHelp: () -> Unit = {}, onHidePastPools: () -> Unit = {}, onShowHiddenPools: () -> Unit = {}, onDebugWalletTest: () -> Unit = {}, onDiagnostics: () -> Unit = {},
     onWalletSetup: () -> Unit = {}, onCheckConnection: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
@@ -691,7 +724,12 @@ fun SettingsScreen(
             HubRow("Wallet setup help", "Switch your wallet to the practice network", app.vowed.ui.art.Glyph.Home, app.vowed.ui.components.CategoryStyle.colors("detox"), onWalletSetup)
             HubRow("Using a real wallet", "Throwaway wallet, devnet, never share a seed phrase", app.vowed.ui.art.Glyph.User, app.vowed.ui.components.CategoryStyle.colors("sleep"), onWalletHelp)
             LabsSection(onSampleProvider)
+            HubRow("Wallet diagnostics", "The timeline of the last wallet attempt, to copy and send", app.vowed.ui.art.Glyph.Home, app.vowed.ui.components.CategoryStyle.colors("detox"), onDiagnostics)
             Text("Backend: $backendUrl", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Vowed ${app.vowed.BuildConfig.VERSION_NAME} (build ${app.vowed.BuildConfig.VERSION_CODE}), built ${app.vowed.BuildConfig.BUILD_TIME}",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             if (app.vowed.BuildConfig.DEBUG) {
                 // debug builds only: the release app always uses its built-in address
                 val prefs = remember { app.vowed.data.Prefs(ctx) }

@@ -1,3 +1,5 @@
+import java.time.Instant
+
 import java.util.Properties
 
 plugins {
@@ -13,10 +15,12 @@ android {
         applicationId = "app.vowed"
         minSdk = 26
         targetSdk = 37
-        versionCode = 6
-        versionName = "0.1.0-rc1.5"
+        versionCode = 7
+        versionName = "0.1.0-rc1.6"
         // Backend base URL. 10.0.2.2 is the emulator's alias for the development machine. No secrets live here.
         // The hosted devnet backend (a public URL, not a secret). Pass -PbackendUrl=http://10.0.2.2:8787 for a local backend; debug builds can also switch in You (settings).
+        // when this APK was built (UTC), shown in You and in the diagnostics so a tester can say exactly which build they have
+        buildConfigField("String", "BUILD_TIME", "\"${Instant.now().toString().take(16)}Z\"")
         buildConfigField("String", "BACKEND_URL", "\"${providers.gradleProperty("backendUrl").getOrElse("https://vowed-backend.onrender.com")}\"")
     }
     // Release signing: the keystore and its passwords live OUTSIDE the repository (default ~/.vowed-signing/signing.properties, or the file named by

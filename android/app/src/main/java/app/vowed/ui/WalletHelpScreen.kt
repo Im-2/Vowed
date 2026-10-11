@@ -135,3 +135,22 @@ fun ConnectionCheckCard(check: app.vowed.ConnectionCheckUi, onCheck: () -> Unit)
         }
     }
 }
+
+
+/** The timeline of the last wallet attempt (kept on the phone, no keys, signatures or tokens) with a button that copies it. */
+@Composable
+fun WalletDiagnosticsScreen(text: String?, onBack: () -> Unit) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    Page("Wallet diagnostics", onBack = onBack) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (text.isNullOrBlank()) {
+                Text("No wallet attempt yet. After a sign-in or a stake, the timeline of the last attempt is kept here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text("The timeline of the last wallet attempt. It contains no keys, signatures or tokens, only steps and times. Copy it and send it to the project team.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                app.vowed.ui.components.PrimaryButton(if (copied) "Copied" else "Copy diagnostics", { clipboard.setText(androidx.compose.ui.text.AnnotatedString(text)); copied = true })
+                Text(text, style = MaterialTheme.typography.bodySmall, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+            }
+        }
+    }
+}

@@ -19,6 +19,8 @@ import app.vowed.data.CreateJoin
 import app.vowed.ui.HomeFilter
 import app.vowed.data.FaucetText
 import app.vowed.data.SessionKeeper
+import app.vowed.data.SolCosts
+import app.vowed.data.SolText
 import app.vowed.data.TxSubmitter
 import app.vowed.data.Challenge
 import app.vowed.data.ChallengeDetail
@@ -76,6 +78,8 @@ class PendingTx(
     val pool: String,
     /** what the server's test run of this transaction found, for the diagnostics ("ok, 52000 units", "skipped") */
     val simulationNote: String? = null,
+    /** what this transaction costs in SOL and what the wallet held when it was built (from the server); shown on the review screen and checked before signing */
+    val costs: SolCosts? = null,
     /** Builds this transaction again (a fresh one, because a transaction expires after about a minute): what "Try again" does. */
     val rebuild: (() -> Unit)? = null,
     /** Run after the wallet has sent it (e.g. to build the next transaction). Last, so it can be written as a trailing lambda. */
@@ -85,13 +89,13 @@ class PendingTx(
 sealed interface TxFlow {
     data object Idle : TxFlow
     /** [stalled]: the wallet has not answered for a few seconds; the screen shows the waiting hint with a Try again button. */
-    data class Working(val message: String, val stalled: Boolean = false) : TxFlow
+    data class Working(val message: String, val stalled: Boolean = false, /** the wallet has been waiting a while: show Details and Copy diagnostics */ val slow: Boolean = false, /** a wallet request is in flight: show Cancel */ val signing: Boolean = false) : TxFlow
     data class Review(val tx: PendingTx) : TxFlow
     data class Done(val pool: String, val message: String) : TxFlow
     /** Failed; [detail] is the raw text and the wallet timeline for the "Details" expander (no keys, signatures or tokens). */
-    data class Failed(val message: String, val detail: String? = null) : TxFlow
+    data class Failed(val message: String, val detail: String? = null, /** offer Try again (a fresh transaction, then Sign again) */ val canRetry: Boolean = false) : TxFlow
     /** Known to fail BEFORE the wallet was opened (not enough SOL or tokens); [canGetTokens] shows the "Get test tokens" button. */
-    data class Blocked(val message: String, val canGetTokens: Boolean) : TxFlow
+    data class Blocked(val message: String, val canGetTokens: Boolean, val buttonLabel: String = "Get test tokens") : TxFlow
 }
 
 /** State of the goal text box and the plan preview. */
@@ -430,18 +434,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * If the check itself cannot be made (offline, older server) the person is not blocked: the server's test run of the transaction still guards it.
      */
     private suspend fun affordable(kind: String, pool: String? = null, mint: String? = null, stake: String? = null): Boolean {
-        val p = try { c.api.preflight(kind, pool, mint, stake) } catch (e: Throwable) { return true }
+        preflightUnknown = false
+        val p = try {
+            c.api.preflight(kind, pool, mint, stake)
+        } catch (e: Throwable) {
+            // The check could not be made (server asleep, offline). It is recorded, and the step goes on ONLY if the server's own SOL check (sent back with
+            // the transaction) can vouch for it: see [needCosts]. Never a silent pass.
+            preflightUnknown = true
+            WalletDiagnostics.current.add("pre-flight check unavailable", "${e.javaClass.simpleName}: ${e.message}".take(160))
+            return true
+        }
         if (p.ok) return true
-        val gift = _state.value.faucet.status?.sol?.received
-        setFlow(TxFlow.Blocked(app.vowed.data.PreflightText.message(p, gift), app.vowed.data.PreflightText.offersFaucet(p)))
+        val fs = runCatching { c.api.faucet() }.getOrNull()
+        val canGetSol = fs?.let { it.enabled && it.sol.enabled && it.sol.canClaim }
+        setFlow(TxFlow.Blocked(app.vowed.data.PreflightText.message(p, canGetSol), app.vowed.data.PreflightText.offersFaucet(p) && canGetSol != false || p.reasons.any { it.code != "low_sol" }, app.vowed.data.PreflightText.buttonLabel(p)))
         return false
+    }
+
+    /** True when the pre-flight check could not be made for the step now being prepared. */
+    private var preflightUnknown = false
+
+    /** The transaction must come with the server's SOL numbers when the pre-flight check could not be made, or the wallet is not opened. */
+    private fun needCosts(costs: SolCosts?) {
+        if (preflightUnknown && costs == null) throw TxRejected("Vowed could not check that your wallet has enough SOL right now. Try again in a moment.")
     }
 
     /** The error shown for a failed step, with the raw text and the wallet timeline under "Details". */
     private fun failure(e: Throwable): TxFlow.Failed {
         val raw = when (e) { is ApiException -> e.detail; is WalletException -> e.raw; is SignInException -> e.detail; else -> null }
         val detail = if (e is WalletException) listOfNotNull(raw, WalletDiagnostics.render()).joinToString("\n\n") else raw
-        return TxFlow.Failed(friendly(e), detail)
+        return TxFlow.Failed(friendly(e), detail, canRetry = lastReviewed?.rebuild != null)
     }
 
     private fun requireAccount(): Account = _state.value.account ?: throw WalletException("Connect a wallet first.")
@@ -481,6 +503,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         demo = if (draft.demo) DemoRequest(daySecs) else null,
                     ),
                 )
+                needCosts(resp.costs)
                 val txBytes = Base64.decode(resp.transaction, Base64.DEFAULT)
                 val poolId = resp.summary["poolId"]?.let { (it as kotlinx.serialization.json.JsonPrimitive).content }
                     ?: throw TxRejected("the server did not say which pool this is")
@@ -499,7 +522,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 draft.appName?.let { c.prefs.setWatchedApp(pool, it) }
                 setFlow(
                     TxFlow.Review(
-                        PendingTx("create", review, txBytes, pool, simulationNote = simNote(resp.simulation), rebuild = { startChallenge(draft) }) {
+                        PendingTx("create", review, txBytes, pool, simulationNote = simNote(resp.simulation), costs = resp.costs, rebuild = { startChallenge(draft) }) {
                             // a squad challenge is linked to its squad as soon as the pool exists; the creator's stake was in the same transaction
                             draft.squadId?.let { sid -> runCatching { c.api.linkPool(sid, pool) } }
                             setFlow(TxFlow.Done(pool, "You're in. Your challenge is created and your stake is held by the program."))
@@ -526,12 +549,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             setFlow(TxFlow.Working("Preparing your stake…"))
             val tz = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60_000
             val resp = c.api.joinTx(JoinTxRequest(pool, stakeBaseUnits, tz, account.deviceId))
+            needCosts(resp.costs)
             val txBytes = Base64.decode(resp.transaction, Base64.DEFAULT)
             val review = TxChecker.checkJoin(
                 txBytes,
                 JoinExpectation(Base58.decode(account.wallet), Base58.decode(pool), Base58.decode(mint), stakeBaseUnits, tz, hex(account.deviceId)),
             )
-            setFlow(TxFlow.Review(PendingTx("join", review, txBytes, pool, simulationNote = simNote(resp.simulation), rebuild = { prepareJoin(pool, mint, stakeBaseUnits) })))
+            setFlow(TxFlow.Review(PendingTx("join", review, txBytes, pool, simulationNote = simNote(resp.simulation), costs = resp.costs, rebuild = { prepareJoin(pool, mint, stakeBaseUnits) })))
         } catch (e: Throwable) {
             setFlow(TxFlow.Failed(friendly(e)))
         }
@@ -545,9 +569,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (!affordable("claim", pool = pool)) return@launch
                 setFlow(TxFlow.Working("Preparing your claim…"))
                 val resp = c.api.claimTx(ClaimTxRequest(pool))
+                needCosts(resp.costs)
                 val txBytes = Base64.decode(resp.transaction, Base64.DEFAULT)
                 val review = TxChecker.checkClaim(txBytes, ClaimExpectation(Base58.decode(account.wallet), Base58.decode(pool), Base58.decode(mint)))
-                setFlow(TxFlow.Review(PendingTx("claim", review, txBytes, pool, simulationNote = simNote(resp.simulation), rebuild = { prepareClaim(pool, mint) })))
+                setFlow(TxFlow.Review(PendingTx("claim", review, txBytes, pool, simulationNote = simNote(resp.simulation), costs = resp.costs, rebuild = { prepareClaim(pool, mint) })))
             } catch (e: Throwable) {
                 setFlow(TxFlow.Failed(friendly(e)))
             }
@@ -563,7 +588,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (signingJob?.isActive == true) return // single in-flight lock: the wallet is already open for this request
         val tx = flow.tx
         lastReviewed = tx
-        setFlow(TxFlow.Working("Waiting for your wallet…"))
+        // the last guard before the wallet opens: the server's numbers for this very transaction say the wallet cannot pay for it
+        val short = tx.costs?.let { SolText.shortMessage(it, _state.value.faucet.status?.sol?.canClaim) }
+        if (short != null) {
+            WalletDiagnostics.begin().add("wallet not opened", "not enough SOL: needs ${tx.costs?.total}, has ${tx.costs?.balance} (lamports)")
+            setFlow(TxFlow.Blocked(short, _state.value.faucet.status?.sol?.canClaim != false, "Get test SOL"))
+            return
+        }
+        setFlow(TxFlow.Working("Waiting for your wallet…", signing = true))
         signingJob = viewModelScope.launch {
             try {
                 WalletDiagnostics.begin()
@@ -571,7 +603,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     signAndSend = { bytes, kind, sim ->
                         c.wallet.signAndSend(bytes, kind, sim) {
                             // nothing has answered for a few seconds: say so, with Try again (never a silent second wallet launch)
-                            if (_state.value.flow is TxFlow.Working) setFlow(TxFlow.Working("Waiting for your wallet…", stalled = true))
+                            if (_state.value.flow is TxFlow.Working) {
+                                setFlow(TxFlow.Working("Waiting for your wallet…", stalled = true, signing = true))
+                                // a few seconds later the screen also offers Details and Copy diagnostics
+                                viewModelScope.launch {
+                                    delay(7_000)
+                                    val f = _state.value.flow
+                                    if (f is TxFlow.Working && f.stalled) setFlow(f.copy(slow = true))
+                                }
+                            }
                         }
                     },
                     // some wallets stay on their own screen afterwards; the network calls that follow must wait until Vowed is in front
@@ -613,6 +653,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private var lastReviewed: PendingTx? = null
+
+    /** "Cancel" while the wallet is open: ends the request (the session is closed) and goes back to the review screen. Never automatic. */
+    fun cancelSigning() {
+        val tx = lastReviewed
+        signingJob?.cancel()
+        signingJob = null
+        WalletDiagnostics.current.add("Cancel tapped", "the wallet request was ended by the person")
+        if (tx != null) setFlow(TxFlow.Review(tx)) else setFlow(TxFlow.Idle)
+    }
 
     /**
      * Debug builds only: a wallet visit that costs nothing and moves nothing (a one-lamport transfer from the wallet to itself, with a made-up
@@ -751,8 +800,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (fromBlocked) setFlow(TxFlow.Blocked("$msg Go back and tap the button again.", false))
             } catch (e: Throwable) {
                 val st = runCatching { c.api.faucet() }.getOrNull()
-                _state.update { it.copy(faucet = it.faucet.copy(claiming = false, status = st ?: it.faucet.status, error = friendly(e))) }
-                if (fromBlocked) setFlow(TxFlow.Blocked(friendly(e), true))
+                // a claim inside the token cooldown can still say why no SOL came (a wallet that holds enough, the limit, the wait)
+                val solWhy = (e as? ApiException)?.detail?.let { Regex("\"reason\":\"(\\w+)\"").find(it)?.groupValues?.get(1) }?.let { FaucetText.solReason(it) }
+                val text = listOfNotNull(friendly(e), solWhy).joinToString(" ")
+                _state.update { it.copy(faucet = it.faucet.copy(claiming = false, status = st ?: it.faucet.status, error = text)) }
+                if (fromBlocked) setFlow(TxFlow.Blocked(text, false))
             }
         }
     }
