@@ -14,6 +14,8 @@ while ((Get-Date) -lt $end -and $taps -lt $MaxTaps) {
         $t = (Screen-Texts) -join "|"
         $kind = if ($t -match "Sign message") { "sign-message" } elseif ($t -match "Sign transaction|Confirm transaction|Approve transaction|Transaction request") { "transaction" } elseif ($t -match "Only connect") { "connect" } elseif ($t -match "Only confirm|Only approve") { "confirm" } else { $null }
         if ($kind) {
+            # a person reads the sheet first; Phantom's button is dimmed and the sheet is still sliding in for the first seconds
+            Start-Sleep 4
             $stamp = (Get-Date).ToString("HH:mm:ss")
             cmd /c "$adb exec-out screencap -p > $env:TEMP\phantom-$kind-$taps.png"
             "$stamp phantom screen: $kind -> tap $Button"

@@ -130,6 +130,10 @@ class WalletManager(
                     SignInOutcome(address, sir.signedMessage, sir.signature, viaPayload = true, validUntilMs = validUntil(nonce))
                 } else {
                     val message = payloadFor(nonce, addressBytes).prepareMessage(addressBytes).encodeToByteArray()
+                    // Real Phantom 26.32: a request that arrives 0.04 s after its Connect sheet was approved is logged ("requestUserApproval initiated") and its
+                    // sheet is never drawn. Wait for the Connect sheet to close first (same fix as WalletVisit.SETTLE_MS).
+                    t.add("waiting for the wallet's connect screen to close", "${WalletVisit.SETTLE_MS} ms before the signature request is sent")
+                    kotlinx.coroutines.delay(WalletVisit.SETTLE_MS)
                     t.add("request sent", "sign_messages in the same session (the wallet ignored the sign-in payload)")
                     val signature = signMessagesDetached(arrayOf(message), arrayOf(addressBytes)).messages.first().signatures.first()
                     t.add("sign_messages result", "1 signature received")
