@@ -40,7 +40,7 @@ class WalletSessionTest {
         assertEquals(WalletErrors.SESSION_CLOSED, WalletErrors.explain("IO error | java.io.IOException: Cannot send in CLOSED"))
         val s = WalletErrors.SESSION_CLOSED
         assertTrue(s.startsWith("The wallet closed the connection before it finished."))
-        assertTrue(s.contains("Open Vowed, tap Connect again"))
+        assertTrue(s.contains("Tap Try again"))
         assertTrue(s.contains("If the wallet stays on its home screen, return to Vowed manually."))
         assertFalse(s.contains("CLOSED"))
     }

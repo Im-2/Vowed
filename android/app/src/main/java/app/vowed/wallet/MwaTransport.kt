@@ -12,7 +12,11 @@ import com.solana.mobilewalletadapter.clientlib.scenario.LocalAssociationIntentC
 import com.solana.mobilewalletadapter.clientlib.scenario.LocalAssociationScenario
 import com.solana.mobilewalletadapter.common.protocol.SessionProperties
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.async
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import com.solana.mobilewalletadapter.common.util.NotifyOnCompleteFuture
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
@@ -63,6 +67,17 @@ class MwaTransport(
     private val requestTimeoutMs: Int,
     private val trace: WalletTrace,
 ) : WalletTransport {
+    private suspend fun <T> await(f: NotifyOnCompleteFuture<T>): T = awaitFuture(f)
+
+    /**
+     * Starts a library call on a background thread and waits for it WITHOUT being tied to it. Some of these calls (starting the association, writing a request
+     * to the socket) block for as long as the wallet is slow or has died, and a blocking call cannot be interrupted by a coroutine time-out or by Cancel.
+     * The call therefore runs in its own detached scope: the caller can stop waiting at any time (the time-out, Cancel, Try again) and the stuck call is
+     * simply left behind until the session is closed, instead of freezing the screen or holding the main thread.
+     */
+    private val ioScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+    private suspend fun <T> onIo(block: () -> T): T = ioScope.async { block() }.await()
+
     private var scenario: LocalAssociationScenario? = null
     private var client: MobileWalletAdapterClient? = null
     private var protocol: SessionProperties.ProtocolVersion? = null
@@ -110,10 +125,12 @@ class MwaTransport(
     override suspend fun connect(timeoutMs: Long): String {
         val sc = scenario ?: error("launch first")
         try {
-            val c = runInterruptible(Dispatchers.IO) { sc.start().get(timeoutMs, TimeUnit.MILLISECONDS) }
+            val c = kotlinx.coroutines.withTimeout(timeoutMs) { await(onIo { sc.start() }) }
             client = c
             protocol = sc.session.sessionProperties.protocolVersion
             return "protocol ${protocol}"
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            throw failure("connect", TimeoutException("the wallet did not connect within ${timeoutMs / 1000} s"))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             throw failure("connect", e)
@@ -123,14 +140,12 @@ class MwaTransport(
     override suspend fun authorize(token: String?): WalletAuth {
         val c = client ?: error("connect first")
         try {
-            val result = runInterruptible(Dispatchers.IO) {
-                if (protocol == SessionProperties.ProtocolVersion.LEGACY) {
-                    // a wallet that speaks the first protocol version: reauthorize with a token, otherwise authorize for the cluster
-                    (if (token != null) c.reauthorize(identityUri, iconUri, identityName, token) else c.authorize(identityUri, iconUri, identityName, "devnet")).get()
-                } else {
-                    // the current protocol: ONE method, `authorize`, which a wallet should answer without a screen when it still knows the token
-                    c.authorize(identityUri, iconUri, identityName, chain, token, null, null, null).get()
-                }
+            val result = if (protocol == SessionProperties.ProtocolVersion.LEGACY) {
+                // a wallet that speaks the first protocol version: reauthorize with a token, otherwise authorize for the cluster
+                await(onIo { if (token != null) c.reauthorize(identityUri, iconUri, identityName, token) else c.authorize(identityUri, iconUri, identityName, "devnet") })
+            } else {
+                // the current protocol: ONE method, `authorize`, which a wallet should answer without a screen when it still knows the token
+                await(onIo { c.authorize(identityUri, iconUri, identityName, chain, token, null, null, null) })
             }
             val address = result.accounts.firstOrNull()?.publicKey ?: result.publicKey
             return WalletAuth(result.authToken, address)
@@ -143,7 +158,7 @@ class MwaTransport(
     override suspend fun signAndSend(tx: ByteArray): ByteArray {
         val c = client ?: error("connect first")
         try {
-            return runInterruptible(Dispatchers.IO) { c.signAndSendTransactions(arrayOf(tx), null).get().signatures.first() }
+            return await(onIo { c.signAndSendTransactions(arrayOf(tx), null) }).signatures.first()
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             throw failure("sign_and_send_transactions", e)
@@ -154,6 +169,7 @@ class MwaTransport(
         val sc = scenario ?: return
         scenario = null
         client = null
-        runCatching { runInterruptible(Dispatchers.IO) { sc.close().get(10, TimeUnit.SECONDS) } }
+        runCatching { kotlinx.coroutines.withTimeoutOrNull(10_000) { await(onIo { sc.close() }) } }
+        ioScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
 }
