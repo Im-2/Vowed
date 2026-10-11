@@ -35,6 +35,18 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!--
+                The app's identity for wallets: the identity URI Vowed gives a wallet is https://vowed-backend.onrender.com, which publishes
+                /.well-known/assetlinks.json naming this package and the release signing certificate. The Mobile Wallet Adapter spec says a wallet checks that file
+                AND that the calling app's intent filters use App Links for that host; this filter (android:autoVerify) is what makes the host a verified App Link of
+                this app. Without it a wallet shows "This app's identity could not be verified".
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="vowed-backend.onrender.com" android:pathPrefix="/join/" />
+            </intent-filter>
             <!-- squad invite links: https://vowed.app/join/CODE (opens the app and offers to join; the code can also be typed) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

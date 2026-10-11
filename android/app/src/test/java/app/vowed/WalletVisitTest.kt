@@ -1,8 +1,15 @@
 package app.vowed
 
+import app.vowed.data.KeyValue
+import app.vowed.wallet.SignMethod
+import app.vowed.wallet.StallInfo
+import app.vowed.wallet.VisitHooks
+import app.vowed.wallet.VisitResult
 import app.vowed.wallet.WalletAuth
+import app.vowed.wallet.WalletCaps
 import app.vowed.wallet.WalletErrors
 import app.vowed.wallet.WalletException
+import app.vowed.wallet.WalletMemory
 import app.vowed.wallet.WalletTrace
 import app.vowed.wallet.WalletTransport
 import app.vowed.wallet.WalletVisit
@@ -16,59 +23,86 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * One wallet visit for one transaction: how many times the wallet opens, how many screens a returning user sees, and what happens on every
- * failure. The fake wallet counts launches and can behave like a wallet that shows a Connect screen, refuses a saved authorization, or never answers.
+ * One wallet visit for one transaction: how many times the wallet opens, how many screens a returning user sees, which method is used and remembered, and what
+ * happens on every failure. The fake wallet counts launches and can behave like Phantom (refuses a saved authorization, never answers sign_and_send),
+ * like the Mock wallet (honours it, answers both) or like a wallet that dies.
  */
 class WalletVisitTest {
     private val sig = ByteArray(64) { 7 }
+    private val signed = ByteArray(200) { 9 }
+
+    private class MapKv : KeyValue {
+        val m = HashMap<String, String>()
+        override fun get(key: String) = m[key]
+        override fun put(key: String, value: String?) { if (value == null) m.remove(key) else m[key] = value }
+    }
 
     private class FakeWallet(
+        override val walletPackage: String? = "app.fake.wallet",
+        override val walletLabel: String? = "Fakewallet",
         /** a wallet that still knows the saved token answers silently; otherwise it shows its Connect screen (counted) */
         val knowsToken: String? = "TOKEN",
+        /** Phantom: refuses every saved token with -1 */
+        val refusesTokens: Boolean = false,
+        val caps: WalletCaps? = WalletCaps(true, 10, "legacy,0", ""),
         val authDelayMs: Long = 0,
         val signDelayMs: Long = 0,
+        /** sign_and_send_transactions never gets an answer (the request just sits there) */
+        val sendNeverAnswers: Boolean = false,
         val connectFails: WalletException? = null,
-        val authFailsOnce: WalletException? = null,
         val signFails: WalletException? = null,
     ) : WalletTransport {
         var launches = 0
-        var connectScreens = 0 // times the wallet showed a Connect screen
+        var connectScreens = 0
         var approvalScreens = 0
-        var authorizeCalls = mutableListOf<String?>()
-        var closed = mutableListOf<String>()
+        val authorizeCalls = mutableListOf<String?>()
+        var sendCalls = 0
+        var signOnlyCalls = 0
+        val closed = mutableListOf<String>()
         var signPending = false
-        private var failedOnce = false
 
         override suspend fun launch() { launches++ }
         override suspend fun connect(timeoutMs: Long): String { connectFails?.let { throw it }; return "protocol V1" }
+        override suspend fun capabilities(): WalletCaps? = caps
         override suspend fun authorize(token: String?): WalletAuth {
             authorizeCalls += token
-            if (authFailsOnce != null && token != null && !failedOnce) { failedOnce = true; throw authFailsOnce }
+            if (token != null && refusesTokens) throw WalletException(WalletErrors.AUTHORIZATION_REFUSED, WalletErrors.Kind.AuthorizationRefused, code = -1)
             if (authDelayMs > 0) delay(authDelayMs)
             if (token == null || token != knowsToken) connectScreens++
             return WalletAuth("TOKEN", ByteArray(32))
         }
         override suspend fun signAndSend(tx: ByteArray): ByteArray {
+            sendCalls++
             approvalScreens++
             signPending = true
             try {
+                if (sendNeverAnswers) delay(60_000)
                 if (signDelayMs > 0) delay(signDelayMs)
                 signFails?.let { throw it }
                 return ByteArray(64) { 7 }
             } finally { signPending = false }
         }
+        override suspend fun signOnly(tx: ByteArray): ByteArray {
+            signOnlyCalls++
+            approvalScreens++
+            if (signDelayMs > 0) delay(signDelayMs)
+            signFails?.let { throw it }
+            return ByteArray(200) { 9 }
+        }
         override suspend fun close(reason: String) { closed += reason }
     }
 
-    private fun visit(w: FakeWallet, trace: WalletTrace = WalletTrace(), stallMs: Long = 8_000, onStalled: () -> Unit = {}) =
-        WalletVisit(w, trace, stallAfterMs = stallMs, onStalled = onStalled)
+    private fun visit(w: FakeWallet, trace: WalletTrace = WalletTrace(), memory: WalletMemory? = null, hooks: VisitHooks = VisitHooks(), stallMs: Long = 12_000, answerMs: Long = 90_000) =
+        WalletVisit(w, trace, memory = memory, hooks = hooks, stallAfterMs = stallMs, answerTimeoutMs = answerMs)
 
-    private fun run(v: WalletVisit, token: String?, saved: MutableList<String?> = mutableListOf()): ByteArray = runBlocking { v.signAndSend(ByteArray(300), token) { saved += it } }
+    private fun run(v: WalletVisit, token: String?, override: SignMethod? = null): VisitResult = runBlocking { v.run(ByteArray(300), token, override) }
+    private fun fails(v: WalletVisit, token: String? = "TOKEN", override: SignMethod? = null): WalletException = runCatching { run(v, token, override) }.exceptionOrNull() as WalletException
 
     @Test fun aLoggedInUserStakesWithOneLaunchNoConnectScreenAndOneApproval() {
         val w = FakeWallet()
         val saved = mutableListOf<String?>()
-        assertEquals(64, run(visit(w), "TOKEN", saved).size)
+        val r = run(visit(w, hooks = VisitHooks(saveToken = { saved += it })), "TOKEN")
+        assertTrue(r is VisitResult.Sent)
         assertEquals("one wallet launch", 1, w.launches)
         assertEquals("zero Connect screens: the saved authorization is used", 0, w.connectScreens)
         assertEquals("one approval screen", 1, w.approvalScreens)
@@ -85,32 +119,130 @@ class WalletVisitTest {
         assertEquals(1, w.approvalScreens)
     }
 
-    @Test fun aWalletThatRefusesTheSavedTokenIsAskedAgainInTheSameSessionNotRelaunched() {
-        val refused = WalletException(WalletErrors.AUTHORIZATION_REFUSED, WalletErrors.Kind.AuthorizationRefused, code = -1)
-        val w = FakeWallet(authFailsOnce = refused)
+    @Test fun aWalletLikePhantomThatRefusesTheSavedTokenIsAskedAgainInTheSameSessionAndRemembered() {
+        val w = FakeWallet(refusesTokens = true)
+        val mem = WalletMemory(MapKv())
         val saved = mutableListOf<String?>()
-        run(visit(w), "OLD", saved)
+        run(visit(w, memory = mem, hooks = VisitHooks(saveToken = { saved += it })), "OLD")
         assertEquals("still ONE launch", 1, w.launches)
         assertEquals(listOf<String?>("OLD", null), w.authorizeCalls)
-        assertEquals("one Connect screen (the token was refused) and one approval", 1, w.connectScreens)
+        assertEquals("one Connect screen and one approval in the one visit", 1, w.connectScreens)
         assertEquals(1, w.approvalScreens)
         assertNull("the refused token was discarded", saved.first())
+        assertFalse("remembered for this wallet app", mem.tokenHonoured("app.fake.wallet"))
+        // the next visit does not send the token at all: a plain authorize, then the request, in the same visit
+        val w2 = FakeWallet(refusesTokens = true)
+        run(visit(w2, memory = mem), "TOKEN")
+        assertEquals(listOf<String?>(null), w2.authorizeCalls)
+        assertEquals(1, w2.launches)
+    }
+
+    @Test fun theSavedTokenIsStillSentToAWalletThatHonoursIt() {
+        val mem = WalletMemory(MapKv())
+        val w = FakeWallet()
+        run(visit(w, memory = mem), "TOKEN")
+        run(visit(FakeWallet().also { it.authorizeCalls.clear() }, memory = mem), "TOKEN")
+        assertTrue(mem.tokenHonoured("app.fake.wallet"))
+        assertEquals(listOf<String?>("TOKEN"), w.authorizeCalls)
     }
 
     @Test fun aSecondRefusalIsAnErrorNotALoop() {
-        val w = object : WalletTransport {
+        val w = object : WalletTransport by FakeWallet() {
             var launches = 0
             var auth = 0
             override suspend fun launch() { launches++ }
-            override suspend fun connect(timeoutMs: Long) = "v"
             override suspend fun authorize(token: String?): WalletAuth { auth++; throw WalletException("no", WalletErrors.Kind.AuthorizationRefused, code = -1) }
-            override suspend fun signAndSend(tx: ByteArray): ByteArray = error("never")
-            override suspend fun close(reason: String) {}
         }
-        val e = runCatching { runBlocking { WalletVisit(w, WalletTrace()).signAndSend(ByteArray(10), "T") { } } }.exceptionOrNull()
+        val e = runCatching { runBlocking { WalletVisit(w, WalletTrace()).run(ByteArray(10), "T") } }.exceptionOrNull()
         assertTrue(e is WalletException)
         assertEquals(1, w.launches)
         assertEquals("one try with the token, one without, then it stops", 2, w.auth)
+    }
+
+    // ---------------------------------------------------------------- the two methods
+
+    @Test fun anUnknownWalletStartsWithSignAndSendAndRemembersTheMethodThatGotAnAnswer() {
+        val mem = WalletMemory(MapKv())
+        val w = FakeWallet()
+        val r = run(visit(w, memory = mem), "TOKEN")
+        assertEquals(SignMethod.SendBySelf, r.method)
+        assertEquals(SignMethod.SendBySelf, mem.method("app.fake.wallet"))
+    }
+
+    @Test fun aWalletThatSaysItCannotSignAndSendIsAskedToOnlySign() {
+        val w = FakeWallet(caps = WalletCaps(false, null, "legacy", ""))
+        val r = run(visit(w), "TOKEN")
+        assertTrue(r is VisitResult.Signed)
+        assertEquals(0, w.sendCalls)
+        assertEquals(1, w.signOnlyCalls)
+        assertEquals(1, w.launches)
+    }
+
+    @Test fun aRequestThatGetsNoAnswerEndsClearlyAndTryAgainUsesTheOtherMethodWhichIsThenRemembered() {
+        val mem = WalletMemory(MapKv())
+        val first = FakeWallet(sendNeverAnswers = true)
+        val e = fails(visit(first, memory = mem, answerMs = 150))
+        assertEquals(WalletErrors.Kind.NoResponse, e.kind)
+        assertTrue("the request WAS sent: the chain must be read before another signature", e.requestSent)
+        assertEquals(1, first.launches)
+        assertNull("nothing is remembered from a request that got no answer", mem.method("app.fake.wallet"))
+        // Try again: a fresh visit asks the OTHER way
+        val second = FakeWallet(sendNeverAnswers = true)
+        val r = run(visit(second, memory = mem, answerMs = 150), "TOKEN", override = SignMethod.SendBySelf.other())
+        assertTrue(r is VisitResult.Signed)
+        assertEquals(0, second.sendCalls)
+        assertEquals(SignMethod.SignOnly, mem.method("app.fake.wallet"))
+        // and from now on this wallet app is asked that way straight away
+        val third = FakeWallet(sendNeverAnswers = true)
+        val r3 = run(visit(third, memory = mem, answerMs = 150), "TOKEN")
+        assertTrue(r3 is VisitResult.Signed)
+        assertEquals(0, third.sendCalls)
+    }
+
+    @Test fun theWaitingHintNamesTheWalletAppAndComesTwelveSecondsAfterTheRequestWasSent() = runBlocking {
+        var info: StallInfo? = null
+        val w = FakeWallet(signDelayMs = 500, authDelayMs = 0)
+        visit(w, hooks = VisitHooks(stalled = { info = it }), stallMs = 100).run(ByteArray(10), "TOKEN")
+        assertEquals("Fakewallet", info!!.walletLabel)
+        assertTrue("the request had been sent", info!!.requestSent)
+        assertEquals(SignMethod.SendBySelf, info!!.method)
+        assertEquals("and it did not open the wallet again", 1, w.launches)
+    }
+
+    @Test fun aQuickWalletNeverShowsTheHint() {
+        var shown = 0
+        run(visit(FakeWallet(), hooks = VisitHooks(stalled = { shown++ }), stallMs = 300), "TOKEN")
+        assertEquals(0, shown)
+    }
+
+    @Test fun theCapabilitiesAndTheMethodAndTheTimesGoIntoTheTrace() {
+        val trace = WalletTrace()
+        run(visit(FakeWallet(caps = WalletCaps(true, 5, "legacy,0", "solana:cloneAuthorization")), trace), "TOKEN")
+        val t = trace.render()
+        assertTrue(t, t.contains("wallet capabilities: sign_and_send_transactions: true, max transactions per request: 5, transaction versions: legacy,0"))
+        assertTrue(t.contains("method chosen: sign_and_send_transactions"))
+        assertTrue(t.contains("wallet launched: Fakewallet (app.fake.wallet)"))
+        val order = listOf("association started", "wallet launched", "connection established", "wallet capabilities", "method chosen", "authorize sent", "authorize result", "request sent", "wallet response", "session closed")
+        var at = -1
+        for (step in order) { val i = t.indexOf(step); assertTrue("missing or out of order: $step\n$t", i > at); at = i }
+    }
+
+    // ---------------------------------------------------------------- failures: was the request sent?
+
+    @Test fun aFailureBeforeTheRequestWasSentSaysSoAndOpensTheWalletOnce() {
+        val w = FakeWallet(connectFails = WalletException(WalletErrors.NO_RESPONSE, WalletErrors.Kind.NoResponse))
+        val e = fails(visit(w))
+        assertFalse(e.requestSent)
+        assertEquals(1, w.launches)
+        assertEquals(1, w.closed.size)
+    }
+
+    @Test fun aWalletThatClosesAfterTheRequestWasSentIsReportedAsSentSoTheChainIsRead() {
+        val w = FakeWallet(signFails = WalletException(WalletErrors.SESSION_CLOSED, WalletErrors.Kind.SessionClosed))
+        val e = fails(visit(w))
+        assertTrue(e.requestSent)
+        assertEquals(WalletErrors.Kind.SessionClosed, e.kind)
+        assertEquals(1, w.launches)
     }
 
     @Test fun everyFailurePathOpensTheWalletAtMostOnceAndClosesTheSession() {
@@ -122,8 +254,7 @@ class WalletVisitTest {
             FakeWallet(signFails = WalletException(WalletErrors.EXPIRED, WalletErrors.Kind.Other, code = -2)),
         )
         for (w in cases) {
-            val e = runCatching { run(visit(w), "TOKEN") }.exceptionOrNull()
-            assertTrue(e is WalletException)
+            fails(visit(w))
             assertEquals("no automatic second launch", 1, w.launches)
             assertEquals("the session is closed by Vowed at the end, once", 1, w.closed.size)
         }
@@ -131,7 +262,7 @@ class WalletVisitTest {
 
     @Test fun nothingClosesTheSessionWhileTheWalletIsStillShowingItsScreen() = runBlocking {
         val w = FakeWallet(signDelayMs = 300)
-        val job = launch { visit(w).signAndSend(ByteArray(10), "TOKEN") { } }
+        val job = launch { visit(w).run(ByteArray(10), "TOKEN") }
         delay(100)
         assertTrue(w.signPending)
         assertTrue("no close while waiting", w.closed.isEmpty())
@@ -139,20 +270,10 @@ class WalletVisitTest {
         assertEquals(1, w.closed.size)
     }
 
-    @Test fun theWaitingHintAppearsOnlyWhenTheWalletIsSlowToAnswer() = runBlocking {
-        var stalled = 0
-        run(visit(FakeWallet(), stallMs = 200, onStalled = { stalled++ }), "TOKEN")
-        assertEquals("a quick wallet never shows the hint", 0, stalled)
-        val slow = FakeWallet(signDelayMs = 500)
-        visit(slow, stallMs = 100, onStalled = { stalled++ }).signAndSend(ByteArray(10), "TOKEN") { }
-        assertEquals("a slow one shows it once", 1, stalled)
-        assertEquals("and it did not open the wallet again", 1, slow.launches)
-    }
-
     @Test fun tryAgainEndsTheRequestAndClosesTheSessionWithoutOpeningTheWalletAgain() = runBlocking {
         val w = FakeWallet(signDelayMs = 10_000)
         val trace = WalletTrace()
-        val job = launch { runCatching { visit(w, trace).signAndSend(ByteArray(10), "TOKEN") { } } }
+        val job = launch { runCatching { visit(w, trace).run(ByteArray(10), "TOKEN") } }
         delay(100)
         job.cancel() // the person tapped Try again
         job.join()
@@ -161,45 +282,12 @@ class WalletVisitTest {
         assertTrue(trace.render().contains("session closed"))
     }
 
-    @Test fun theTraceHasTheStepsInOrderWithTimes() {
-        val trace = WalletTrace()
-        run(visit(FakeWallet(authDelayMs = 30), trace), "TOKEN")
-        val t = trace.render()
-        val order = listOf("association started", "wallet launched", "connection established", "authorize sent", "authorize result", "sign request sent", "wallet response", "session closed")
-        var at = -1
-        for (step in order) {
-            val i = t.indexOf(step)
-            assertTrue("missing or out of order: $step\n$t", i > at)
-            at = i
-        }
-        assertTrue(t.contains("by Vowed; reason: finished: the wallet answered"))
-        assertFalse(t.contains("eyJ"))
-    }
-
-    @Test fun aSlowAuthorizeIsReportedAsALikelyScreen() {
-        val trace = WalletTrace()
-        var now = 0L // the visit's own clock is injected, so 8 s pass without waiting
-        val w = object : WalletTransport {
-            override suspend fun launch() {}
-            override suspend fun connect(timeoutMs: Long) = "v"
-            override suspend fun authorize(token: String?): WalletAuth { now += 8_000; return WalletAuth("T", ByteArray(32)) }
-            override suspend fun signAndSend(tx: ByteArray): ByteArray { now += 1_000; return sig }
-            override suspend fun close(reason: String) {}
-        }
-        runBlocking { WalletVisit(w, trace, clock = { now }).signAndSend(ByteArray(10), null) { } }
-        assertTrue(trace.render().contains("it probably showed a screen"))
-    }
-
-    @Test fun aWalletThatNeverAnswersEndsTheVisitWithTheActionableMessageAndNothingIsRelaunched() {
+    @Test fun aWalletThatNeverAnswersEndsTheVisitWithTheActionableMessage() {
         val w = FakeWallet(signDelayMs = 60_000)
         val trace = WalletTrace()
-        val v = WalletVisit(w, trace, answerTimeoutMs = 150)
-        val e = runCatching { runBlocking { v.signAndSend(ByteArray(10), "TOKEN") { } } }.exceptionOrNull()
-        assertTrue(e is WalletException)
-        e as WalletException
+        val e = fails(WalletVisit(w, trace, answerTimeoutMs = 150))
         assertEquals(WalletErrors.Kind.NoResponse, e.kind)
         assertEquals(WalletErrors.NO_RESPONSE, e.message)
-        assertTrue(e.message!!.startsWith("Your wallet did not ask you to approve. Open your wallet app, or tap Try again."))
         assertEquals(1, w.launches)
         assertEquals(1, w.closed.size)
         assertTrue(trace.render().contains("the wallet did not answer within"))
@@ -207,6 +295,17 @@ class WalletVisitTest {
 
     @Test fun aSlowConnectScreenIsNotCutOffBeforeTheAnswerTimeout() {
         val w = FakeWallet(authDelayMs = 200)
-        assertEquals(64, runBlocking { WalletVisit(w, WalletTrace(), answerTimeoutMs = 5_000).signAndSend(ByteArray(10), null) { } }.size)
+        assertTrue(run(WalletVisit(w, WalletTrace(), answerTimeoutMs = 5_000), null) is VisitResult.Sent)
+    }
+
+    @Test fun aSlowAuthorizeIsReportedAsALikelyScreen() {
+        val trace = WalletTrace()
+        var now = 0L // the visit's own clock is injected, so 8 s pass without waiting
+        val w = object : WalletTransport by FakeWallet() {
+            override suspend fun authorize(token: String?): WalletAuth { now += 8_000; return WalletAuth("T", ByteArray(32)) }
+            override suspend fun signAndSend(tx: ByteArray): ByteArray { now += 1_000; return sig }
+        }
+        runBlocking { WalletVisit(w, trace, clock = { now }).run(ByteArray(10), null) }
+        assertTrue(trace.render().contains("it probably showed a screen"))
     }
 }

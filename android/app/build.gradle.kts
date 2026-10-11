@@ -15,8 +15,8 @@ android {
         applicationId = "app.vowed"
         minSdk = 26
         targetSdk = 37
-        versionCode = 7
-        versionName = "0.1.0-rc1.6"
+        versionCode = 8
+        versionName = "0.1.0-rc1.7"
         // Backend base URL. 10.0.2.2 is the emulator's alias for the development machine. No secrets live here.
         // The hosted devnet backend (a public URL, not a secret). Pass -PbackendUrl=http://10.0.2.2:8787 for a local backend; debug builds can also switch in You (settings).
         // when this APK was built (UTC), shown in You and in the diagnostics so a tester can say exactly which build they have

@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
         // the wallet for staking is opened through this launcher (registered here, before the activity is started)
         (application as VowedApp).container.wallet.launcher = app.vowed.wallet.WalletLauncher(this)
         handleLink(intent)
-        setContent { VowedTheme { Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { androidx.compose.runtime.CompositionLocalProvider(app.vowed.ui.LocalGetTestTokens provides { vm.claimTestTokens() }, app.vowed.ui.LocalRetryWallet provides { vm.retrySigning() }, app.vowed.ui.LocalCancelSigning provides { vm.cancelSigning() }) { Root(vm, sender) } } } }
+        setContent { VowedTheme { Surface(Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) { androidx.compose.runtime.CompositionLocalProvider(app.vowed.ui.LocalGetTestTokens provides { vm.claimTestTokens() }, app.vowed.ui.LocalRetryWallet provides { vm.retrySigning() }, app.vowed.ui.LocalCancelSigning provides { vm.cancelSigning() }, app.vowed.ui.LocalCheckAttempt provides { vm.checkLastAttempt() }) { Root(vm, sender) } } } }
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
     /** https://vowed.app/join/CODE: remember the code; the Squads screen offers to join once the user is signed in. */
     private fun handleLink(i: android.content.Intent?) {
         val d = i?.data ?: return
-        if (d.host == "vowed.app" && d.pathSegments.firstOrNull() == "join") d.pathSegments.getOrNull(1)?.let { code -> vm.setPendingJoinCode(code.uppercase().take(12)) }
+        if ((d.host == "vowed.app" || d.host == "vowed-backend.onrender.com") && d.pathSegments.firstOrNull() == "join") d.pathSegments.getOrNull(1)?.let { code -> vm.setPendingJoinCode(code.uppercase().take(12)) }
     }
 }
 

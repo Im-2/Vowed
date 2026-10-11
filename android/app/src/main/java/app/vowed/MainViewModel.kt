@@ -18,6 +18,11 @@ import app.vowed.data.ConnectionResult
 import app.vowed.data.CreateJoin
 import app.vowed.ui.HomeFilter
 import app.vowed.data.FaucetText
+import app.vowed.data.Landing
+import app.vowed.data.LandingCheck
+import app.vowed.wallet.SignMethod
+import app.vowed.wallet.VisitHooks
+import app.vowed.wallet.VisitResult
 import app.vowed.data.SessionKeeper
 import app.vowed.data.SolCosts
 import app.vowed.data.SolText
@@ -93,11 +98,28 @@ class PendingTx(
 sealed interface TxFlow {
     data object Idle : TxFlow
     /** [stalled]: the wallet has not answered for a few seconds; the screen shows the waiting hint with a Try again button. */
-    data class Working(val message: String, val stalled: Boolean = false, /** the wallet has been waiting a while: show Details and Copy diagnostics */ val slow: Boolean = false, /** a wallet request is in flight: show Cancel */ val signing: Boolean = false) : TxFlow
+    data class Working(
+        val message: String,
+        val stalled: Boolean = false,
+        /** the wallet has been waiting a while: show Details and Copy diagnostics */
+        val slow: Boolean = false,
+        /** a wallet request is in flight: show Cancel */
+        val signing: Boolean = false,
+        /** the wallet app Vowed is waiting on (Phantom, Solflare ...) and how it was asked, for the waiting hint */
+        val wallet: String? = null,
+        val method: String? = null,
+    ) : TxFlow
     data class Review(val tx: PendingTx) : TxFlow
     data class Done(val pool: String, val message: String) : TxFlow
     /** Failed; [detail] is the raw text and the wallet timeline for the "Details" expander (no keys, signatures or tokens). */
-    data class Failed(val message: String, val detail: String? = null, /** offer Try again (a fresh transaction, then Sign again) */ val canRetry: Boolean = false) : TxFlow
+    data class Failed(
+        val message: String,
+        val detail: String? = null,
+        /** offer Try again (a fresh transaction, then Sign again) */
+        val canRetry: Boolean = false,
+        /** offer "Check my last attempt": the outcome is unknown or not on chain, and the chain can be read again */
+        val canCheck: Boolean = false,
+    ) : TxFlow
     /** Known to fail BEFORE the wallet was opened (not enough SOL or tokens); [canGetTokens] shows the "Get test tokens" button. */
     data class Blocked(val message: String, val canGetTokens: Boolean, val buttonLabel: String = "Get test tokens") : TxFlow
 }
@@ -464,10 +486,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** The error shown for a failed step, with the raw text and the wallet timeline under "Details". */
-    private fun failure(e: Throwable): TxFlow.Failed {
+    private fun failure(e: Throwable, canCheck: Boolean = false, note: String? = null): TxFlow.Failed {
         val raw = when (e) { is ApiException -> e.detail; is WalletException -> e.raw; is SignInException -> e.detail; else -> null }
-        val detail = if (e is WalletException) listOfNotNull(raw, WalletDiagnostics.render()).joinToString("\n\n") else raw
-        return TxFlow.Failed(friendly(e), detail, canRetry = lastReviewed?.rebuild != null)
+        val detail = if (e is WalletException || canCheck) listOfNotNull(raw, WalletDiagnostics.render()).joinToString("\n\n") else raw
+        val message = listOfNotNull(friendly(e), note).joinToString(" ")
+        return TxFlow.Failed(message, detail, canRetry = lastReviewed?.rebuild != null, canCheck = canCheck)
     }
 
     private fun requireAccount(): Account = _state.value.account ?: throw WalletException("Connect a wallet first.")
@@ -587,6 +610,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** The wallet request in flight, if any. One at a time: a second tap on Sign while it runs does nothing. */
     private var signingJob: kotlinx.coroutines.Job? = null
 
+    /** how a wallet visit ended up, remembered for Try again: the method used, the wallet app and whether the transaction request had been sent */
+    private var lastVisitMethod: SignMethod? = null
+    private var lastRequestSent = false
+    private var walletName: String? = null
+
+    /** the method Try again asks for next (the OTHER one when the last request got no answer) */
+    private var nextMethod: SignMethod? = null
+
+    private val PendingTx.landable: Boolean get() = kind == "create" || kind == "join" || kind == "claim"
+
+    private fun diag(text: String, detail: String? = null) = WalletDiagnostics.current.add(text, detail)
+
     fun confirm(@Suppress("UNUSED_PARAMETER") sender: ActivityResultSender) {
         val flow = _state.value.flow as? TxFlow.Review ?: return
         if (signingJob?.isActive == true) return // single in-flight lock: the wallet is already open for this request
@@ -608,72 +643,154 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             setFlow(TxFlow.Blocked(short, _state.value.faucet.status?.sol?.canClaim != false, "Get test SOL"))
             return
         }
+        val methodOverride = nextMethod
+        nextMethod = null
+        lastRequestSent = false
         setFlow(TxFlow.Working("Waiting for your wallet…", signing = true))
         signingJob = viewModelScope.launch {
+            var submitAttempted = false
             try {
-                WalletDiagnostics.begin()
-                val submitter = TxSubmitter(
-                    signAndSend = { bytes, kind, sim ->
-                        c.wallet.signAndSend(bytes, kind, sim) {
-                            // nothing has answered for a few seconds: say so, with Try again (never a silent second wallet launch)
-                            if (_state.value.flow is TxFlow.Working) {
-                                setFlow(TxFlow.Working("Waiting for your wallet…", stalled = true, signing = true))
-                                // a few seconds later the screen also offers Details and Copy diagnostics
-                                viewModelScope.launch {
-                                    delay(7_000)
-                                    val f = _state.value.flow
-                                    if (f is TxFlow.Working && f.stalled) setFlow(f.copy(slow = true))
-                                }
+                if (methodOverride == null) WalletDiagnostics.begin()
+                val hooks = VisitHooks(
+                    walletKnown = { _, label ->
+                        walletName = label
+                        if (_state.value.flow is TxFlow.Working) setFlow(TxFlow.Working("Waiting for ${label ?: "your wallet"}…", signing = true, wallet = label))
+                    },
+                    methodChosen = { m -> lastVisitMethod = m },
+                    stalled = { info ->
+                        lastRequestSent = info.requestSent
+                        // nothing has answered for a while: say which wallet app, and offer Try again (never a silent second wallet launch)
+                        if (_state.value.flow is TxFlow.Working) {
+                            setFlow(TxFlow.Working("Waiting for ${info.walletLabel ?: "your wallet"}…", stalled = true, signing = true, wallet = info.walletLabel, method = info.method?.plain))
+                            // a few seconds later the screen also offers Details and Copy diagnostics
+                            viewModelScope.launch {
+                                delay(7_000)
+                                val f = _state.value.flow
+                                if (f is TxFlow.Working && f.stalled) setFlow(f.copy(slow = true))
                             }
                         }
+                    },
+                )
+                val submitter = TxSubmitter(
+                    sign = { bytes, kind, sim -> c.wallet.sign(bytes, kind, sim, methodOverride, hooks) },
+                    submitSigned = { signed ->
+                        submitAttempted = true
+                        c.api.submitSigned(Base64.encodeToString(signed, Base64.NO_WRAP)).signature
                     },
                     // some wallets stay on their own screen afterwards; the network calls that follow must wait until Vowed is in front
                     backOnScreen = { AppForeground.ensureOnScreen(WalletDiagnostics.current, { c.wallet.tryBringToFront() }, { setFlow(TxFlow.Working("Approved. Switch back to Vowed to continue…")) }); Unit },
                     sync = { signature -> c.api.sync(signature) },
                 )
-                val signature = submitter.submit(tx) { setFlow(TxFlow.Working(it)) }
-                val next = tx.after
-                if (next != null) {
-                    next(signature)
-                } else {
-                    val msg = when (tx.kind) {
-                        "join" -> "You're in. Your stake is held by the program."
-                        "claim" -> "Payout sent to your wallet."
-                        else -> "Done."
-                    }
-                    setFlow(TxFlow.Done(tx.pool, msg))
-                    refreshList()
-                }
+                val signature = submitter.submit(tx) { setFlow(TxFlow.Working(it, wallet = walletName)) }
+                completeSuccess(tx, signature)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                setFlow(failure(e))
+                if (e is WalletException) lastRequestSent = e.requestSent
+                // The wallet closed or never answered AFTER the request was sent, or the signed copy was handed to the server: the outcome is UNKNOWN until the chain
+                // has been read. Only a clear "no" from the person (Reject) is a definite failure.
+                val unknown = tx.landable && ((e is WalletException && e.requestSent && e.kind != WalletErrors.Kind.Declined) || submitAttempted)
+                if (unknown) {
+                    diag("outcome unknown", "${e.javaClass.simpleName}: ${(e as? WalletException)?.kind ?: e.message}; reading the chain before showing a failure")
+                    val landing = pollLanding(tx, 20_000)
+                    if (landing is Landing.Landed) { completeSuccess(tx, landing.signature ?: ""); return@launch }
+                    setFlow(failure(e, canCheck = true, note = landingNote(landing)))
+                } else {
+                    setFlow(failure(e))
+                }
             }
         }
     }
 
+    private suspend fun completeSuccess(tx: PendingTx, signature: String) {
+        val next = tx.after
+        if (next != null) {
+            next(signature)
+        } else {
+            val msg = when (tx.kind) {
+                "join" -> "You're in. Your stake is held by the program."
+                "claim" -> "Payout sent to your wallet."
+                else -> "Done."
+            }
+            setFlow(TxFlow.Done(tx.pool, msg))
+            refreshList()
+        }
+    }
+
+    /** Reads the chain (through the server) every 2 s for up to [totalMs]: did the step land? The progress is written to the diagnostics. */
+    private suspend fun pollLanding(tx: PendingTx, totalMs: Long): Landing {
+        setFlow(TxFlow.Working("Checking whether it went through…", wallet = walletName))
+        val l = LandingCheck({ c.api.check(tx.pool, tx.kind) }, totalMs = totalMs, log = { diag("landing check", it) }).poll()
+        diag(
+            "landing result",
+            when (l) {
+                is Landing.Landed -> "FOUND ON CHAIN: ${l.detail}${l.signature?.let { "; signature $it" } ?: ""}"
+                is Landing.NotLanded -> "not on chain: ${l.detail}"
+                is Landing.Unknown -> "could not read the chain: ${l.reason}"
+            },
+        )
+        return l
+    }
+
+    private fun landingNote(l: Landing): String = when (l) {
+        is Landing.NotLanded -> "Vowed read the chain and it is not there (${l.detail}), so nothing was staked. It is safe to try again."
+        is Landing.Unknown -> "Vowed could not read the chain to check (${l.reason}). Tap Check my last attempt before you try again, so nothing is staked twice."
+        is Landing.Landed -> ""
+    }
+
     /**
-     * "Try again" while waiting for the wallet (a person's tap, never automatic): ends the wallet request in flight (its session is closed) and builds a
-     * fresh transaction, because the old one expires after about a minute. The person then taps Sign again.
+     * "Try again" while waiting for the wallet or after a failure (a person's tap, never automatic): ends the wallet request in flight (its session is closed),
+     * FIRST reads the chain if a request had been sent (so nothing is staked twice), then builds a fresh transaction (the old one expires after about a
+     * minute). After a request that got no answer the next visit asks the wallet the OTHER way. The person then taps Sign again.
      */
     fun retrySigning() {
         val tx = lastReviewed
         signingJob?.cancel()
         signingJob = null
-        WalletDiagnostics.current.add("Try again tapped", "the wallet request was ended by the person")
-        val rebuild = tx?.rebuild
-        if (rebuild != null) { setFlow(TxFlow.Working("Preparing a fresh transaction…")); rebuild() } else setFlow(TxFlow.Idle)
+        diag("Try again tapped", "the wallet request was ended by the person")
+        viewModelScope.launch {
+            if (tx != null && tx.landable && lastRequestSent) {
+                val l = pollLanding(tx, 6_000)
+                if (l is Landing.Landed) { completeSuccess(tx, l.signature ?: ""); return@launch }
+            }
+            nextMethod = if (lastRequestSent) lastVisitMethod?.other() else lastVisitMethod
+            nextMethod?.let { diag("next visit", "will ask the wallet in the other way: ${it.wire}") }
+            val rebuild = tx?.rebuild
+            if (rebuild != null) {
+                setFlow(TxFlow.Working("Preparing a fresh transaction…"))
+                if (lastRequestSent) _state.update { it.copy(notice = "${walletName ?: "The wallet"} did not answer, so this time Vowed asks in a different way (${nextMethod?.plain ?: "as before"}). Check it and tap Sign again.") }
+                rebuild()
+            } else {
+                setFlow(TxFlow.Idle)
+            }
+        }
+    }
+
+    /** "Check my last attempt": reads the chain for up to 20 s and says whether the step is there. */
+    fun checkLastAttempt() {
+        val tx = lastReviewed ?: return
+        if (signingJob?.isActive == true) return
+        signingJob = viewModelScope.launch {
+            val l = pollLanding(tx, 20_000)
+            if (l is Landing.Landed) completeSuccess(tx, l.signature ?: "") else setFlow(failure(TxRejected(landingNote(l)), canCheck = true, note = null))
+        }
     }
 
     private var lastReviewed: PendingTx? = null
 
-    /** "Cancel" while the wallet is open: ends the request (the session is closed) and goes back to the review screen. Never automatic. */
+    /** "Cancel" while the wallet is open: ends the request (the session is closed) and goes back to the review screen, after the chain was read if a request had been sent. */
     fun cancelSigning() {
         val tx = lastReviewed
         signingJob?.cancel()
         signingJob = null
-        WalletDiagnostics.current.add("Cancel tapped", "the wallet request was ended by the person")
-        if (tx != null) setFlow(TxFlow.Review(tx)) else setFlow(TxFlow.Idle)
+        diag("Cancel tapped", "the wallet request was ended by the person")
+        viewModelScope.launch {
+            if (tx != null && tx.landable && lastRequestSent) {
+                val l = pollLanding(tx, 4_000)
+                if (l is Landing.Landed) { completeSuccess(tx, l.signature ?: ""); return@launch }
+            }
+            if (tx != null) setFlow(TxFlow.Review(tx)) else setFlow(TxFlow.Idle)
+        }
     }
 
     /**

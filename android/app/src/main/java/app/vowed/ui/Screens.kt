@@ -404,6 +404,9 @@ private fun PlanPreview(result: app.vowed.data.ParseResult, ctx: android.content
 /** "Cancel" on the waiting screen: ends the wallet request in flight and goes back to the review screen. */
 val LocalCancelSigning = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
 
+/** "Check my last attempt" on the failure card: reads the chain again and says whether the step is there. */
+val LocalCheckAttempt = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
+
 val LocalRetryWallet = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
 
 val LocalGetTestTokens = androidx.compose.runtime.staticCompositionLocalOf<() -> Unit> { {} }
@@ -419,8 +422,10 @@ fun FlowStatus(flow: TxFlow) {
             if (flow.stalled) {
                 val retry = LocalRetryWallet.current
                 // no silent waiting: say what is going on, and let the person decide (Try again never happens by itself)
+                val w = flow.wallet ?: "your wallet"
                 Text(
-                    "Waiting for your wallet to ask you to approve. If it does not show a prompt, open your wallet app, or tap Try again.",
+                    "Waiting for $w to ask you to approve. If $w does not show a prompt, open $w, or tap Try again." +
+                        (flow.method?.let { " Vowed asked it this way: $it. Try again asks in a different way." } ?: ""),
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
                 )
                 app.vowed.ui.components.SoftButton("Try again", retry)
@@ -436,6 +441,7 @@ fun FlowStatus(flow: TxFlow) {
         // A problem found BEFORE the wallet opens must not hide below the fold: it is a framed card that scrolls itself into view
         is TxFlow.Failed -> StatusCard(flow, "That did not go through") {
             Text(flow.message, color = MaterialTheme.colorScheme.onSurface)
+            if (flow.canCheck) app.vowed.ui.components.SoftButton("Check my last attempt", LocalCheckAttempt.current)
             if (flow.canRetry) app.vowed.ui.components.SoftButton("Try again", LocalRetryWallet.current)
             ErrorDetails(flow.detail)
         }
@@ -754,6 +760,13 @@ fun SettingsScreen(
                             app.vowed.ui.components.SoftButton("Show hidden", onShowHiddenPools, Modifier.weight(1f))
                         }
                         app.vowed.ui.components.SoftButton("Wallet test visit (moves nothing)", onDebugWalletTest, Modifier.fillMaxWidth())
+                        var forced by remember { mutableStateOf(prefs.debugForcedMethod) }
+                        Text("Debug: wallet method now: ${forced ?: "automatic"}", style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            app.vowed.ui.components.SoftButton("Auto", { prefs.debugForcedMethod = null; forced = null }, Modifier.weight(1f))
+                            app.vowed.ui.components.SoftButton("Send", { prefs.debugForcedMethod = "sign_and_send_transactions"; forced = prefs.debugForcedMethod }, Modifier.weight(1f))
+                            app.vowed.ui.components.SoftButton("Sign only", { prefs.debugForcedMethod = "sign_transactions"; forced = prefs.debugForcedMethod }, Modifier.weight(1f))
+                        }
                     }
                 }
             }

@@ -11,7 +11,10 @@ import com.solana.mobilewalletadapter.clientlib.protocol.JsonRpc20Client
 import com.solana.mobilewalletadapter.common.signin.SignInWithSolana
 
 /** The wallet said no, was not installed, or the connection failed. The message is safe to show; [raw] is the technical text for "Details". */
-class WalletException(message: String, val kind: WalletErrors.Kind = WalletErrors.Kind.Other, val code: Int? = null, val raw: String? = null) : Exception(message)
+class WalletException(message: String, val kind: WalletErrors.Kind = WalletErrors.Kind.Other, val code: Int? = null, val raw: String? = null) : Exception(message) {
+    /** set by the wallet visit: the transaction request had already been sent to the wallet when this failure happened (so the chain must be checked before asking again) */
+    var requestSent: Boolean = false
+}
 
 /**
  * What the wallet returned for the sign-in. [viaPayload] is true when the wallet signed the sign-in text as part of connecting (ONE prompt) and
@@ -153,23 +156,25 @@ class WalletManager(
     @Volatile var launcher: WalletLauncher? = null
 
     /**
-     * Signs and submits [tx] (an unsigned legacy transaction) with `sign_and_send_transactions` in ONE wallet visit: the wallet is opened once,
-     * authorizes (silently when it still knows the saved authorization), asks for the one approval and is closed again. See [WalletVisit] for the
-     * rules; nothing here retries by itself, a failure ends the visit and the person decides (Try again). [onStalled] is called when the wallet has
-     * not answered after a few seconds, so the screen can show the waiting hint. [kind] and [simulation] only describe the transaction in the trace.
+     * One visit to the wallet for ONE transaction: the wallet is opened once, authorizes, is asked by one of the two methods (it signs and sends, or it only
+     * signs and Vowed's server sends) and is closed again. See [WalletVisit] for the rules; nothing here retries by itself, a failure ends the visit and the
+     * person decides (Try again, which uses [methodOverride] = the other method). [kind] and [simulation] only describe the transaction in the trace.
      */
-    suspend fun signAndSend(tx: ByteArray, kind: String = "transaction", simulation: String? = null, onStalled: () -> Unit = {}): ByteArray {
+    suspend fun sign(tx: ByteArray, kind: String = "transaction", simulation: String? = null, methodOverride: SignMethod? = null, hooks: VisitHooks = VisitHooks()): VisitResult {
         val t = trace()
         val l = launcher ?: throw WalletException("Vowed could not open the wallet right now. Close and reopen the app, then try again.")
-        t.add("transaction", "kind=$kind, ${tx.size} bytes, wallet method sign_and_send_transactions, server simulation: ${simulation ?: "not reported"}")
+        t.add("transaction", "kind=$kind, ${tx.size} bytes, server simulation: ${simulation ?: "not reported"}${if (methodOverride != null) ", method asked for: ${methodOverride.wire}" else ""}")
         val transport = MwaTransport(l, identityUri, iconUri, identityName, adapter.blockchain.fullName, WALLET_REQUEST_TIMEOUT_MS, t)
-        val visit = WalletVisit(transport, t, onStalled = onStalled)
-        return gate.run({ _: ByteArray -> false }) {
+        val withToken = VisitHooks(
+            saveToken = { token -> prefs.mwaAuthToken = token; adapter.authToken = token; hooks.saveToken(token) },
+            walletKnown = hooks.walletKnown, methodChosen = hooks.methodChosen, stalled = hooks.stalled,
+        )
+        val visit = WalletVisit(transport, t, memory = prefs.walletMemory, hooks = withToken)
+        val forced = SignMethod.fromWire(prefs.debugForcedMethod)
+        if (forced != null) t.add("debug", "method forced to ${forced.wire}")
+        return gate.run({ _: VisitResult -> false }) {
             launches.incrementAndGet()
-            visit.signAndSend(tx, prefs.mwaAuthToken) { token ->
-                prefs.mwaAuthToken = token
-                adapter.authToken = token
-            }
+            visit.run(tx, prefs.mwaAuthToken, methodOverride ?: forced)
         }
     }
 

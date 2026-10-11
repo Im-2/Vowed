@@ -67,6 +67,11 @@ class MwaTransport(
     private val requestTimeoutMs: Int,
     private val trace: WalletTrace,
 ) : WalletTransport {
+    override var walletPackage: String? = null
+        private set
+    override var walletLabel: String? = null
+        private set
+
     private suspend fun <T> await(f: NotifyOnCompleteFuture<T>): T = awaitFuture(f)
 
     /**
@@ -116,6 +121,13 @@ class MwaTransport(
             throw WalletException("No Solana wallet app was found on this phone. Install a Mobile Wallet Adapter wallet first.")
         }
         val intent = LocalAssociationIntentCreator.createAssociationIntent(null, sc.port, sc.session)
+        // which wallet app answers the link: the one Vowed is waiting on (shown on the waiting screen and used to remember what works with it)
+        runCatching {
+            val pm = launcher.context.packageManager
+            val ri = pm.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+            walletPackage = ri?.activityInfo?.packageName
+            walletLabel = ri?.loadLabel(pm)?.toString()
+        }
         trace.add("association intent ready", "local port ${sc.port}, task: ${WalletEnvironment.taskSummary(launcher.context)}")
         launcher.launch(intent) { code ->
             trace.add("wallet screen returned a result", "result code $code (${if (code == -1) "OK" else if (code == 0) "cancelled" else "other"}); Vowed does NOT close the session because of it; task: ${WalletEnvironment.taskSummary(launcher.context)}")
@@ -152,6 +164,33 @@ class MwaTransport(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             throw failure("authorize", e)
+        }
+    }
+
+    override suspend fun capabilities(): WalletCaps? {
+        val c = client ?: return null
+        return try {
+            val r = await(onIo { c.getCapabilities() })
+            WalletCaps(
+                supportsSignAndSend = r.supportsSignAndSendTransactions,
+                maxTransactionsPerRequest = r.maxTransactionsPerSigningRequest.takeIf { it > 0 },
+                transactionVersions = r.supportedTransactionVersions?.joinToString(",") { it.toString() }.orEmpty(),
+                optionalFeatures = r.supportedOptionalFeatures?.joinToString(",").orEmpty(),
+            )
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            trace.add("get_capabilities: failed", WalletErrors.flatten(e).take(160))
+            null
+        }
+    }
+
+    override suspend fun signOnly(tx: ByteArray): ByteArray {
+        val c = client ?: error("connect first")
+        try {
+            return await(onIo { c.signTransactions(arrayOf(tx)) }).signedPayloads.first()
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            throw failure("sign_transactions", e)
         }
     }
 

@@ -50,6 +50,17 @@ class Prefs(context: Context) {
     fun deviceTrustCap(wallet: String): String? = sp.getString("trust_$wallet", null)
     fun setDeviceTrustCap(wallet: String, cap: String?) = sp.edit().apply { if (cap == null) remove("trust_$wallet") else putString("trust_$wallet", cap) }.apply()
 
+    /** What Vowed has learned about each wallet app: which signing method got an answer, and whether it honours a saved authorization. */
+    val walletMemory: app.vowed.wallet.WalletMemory = app.vowed.wallet.WalletMemory(object : KeyValue {
+        override fun get(key: String): String? = sp.getString(key, null)
+        override fun put(key: String, value: String?) = sp.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()
+    })
+
+    /** Debug builds only: ask every wallet visit for one method ("sign_and_send_transactions" or "sign_transactions"); null = Vowed chooses. */
+    var debugForcedMethod: String?
+        get() = if (BuildConfig.DEBUG) sp.getString("debug_forced_method", null) else null
+        set(v) = sp.edit().apply { if (v == null) remove("debug_forced_method") else putString("debug_forced_method", v) }.apply()
+
     /** The timeline of the last wallet attempt (scrubbed: no keys, signatures or tokens), kept so it can be read after returning from the wallet. */
     var lastDiagnostics: String?
         get() = sp.getString("last_diagnostics", null)

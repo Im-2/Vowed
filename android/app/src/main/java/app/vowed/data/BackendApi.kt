@@ -123,6 +123,10 @@ class BackendApi(private val baseUrl: () -> String, private val client: OkHttpCl
         call("POST", "/v1/providers/sample/register", """{"keyId":"$keyId","publicKey":"$publicKeyBase64","algorithm":"ES256"}""") { }
     /** Hands a signed provider statement (JSON) to the backend; returns the server's one-line note. */
     suspend fun submitAttestation(json: String): String = call("POST", "/v1/attestations", json) { text -> AppJson.parseToJsonElement(text).let { (it as? JsonObject)?.get("note")?.toString()?.trim('"') ?: "accepted" } }
+    /** The wallet only signed: the server checks it is a transaction it built for this wallet, simulates it again and sends it at most once. */
+    suspend fun submitSigned(base64: String): SubmitResponse = post("/v1/tx/submit", SubmitRequest(base64))
+    /** Did the create / join / claim land on chain? Read from the chain by the server, not asked of the wallet. */
+    suspend fun check(pool: String, kind: String): CheckResponse = post("/v1/challenges/check", CheckRequest(pool, kind))
     suspend fun sync(signature: String): Unit = call("POST", "/v1/challenges/sync", AppJson.encodeToString(SyncRequest(signature))) { }
 
     companion object {
