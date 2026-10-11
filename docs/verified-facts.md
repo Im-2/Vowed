@@ -425,3 +425,41 @@ wallet screen returned a result: result code 0 (cancelled); Vowed does NOT close
 - The Mock wallet runs in its OWN task (`t339`, Vowed `t337`), unlike Phantom in the recording; so the back-stack fix could only be checked for "Vowed comes back to the front after the visit" ("Vowed's screen reordered to the top of its task; task moved to the front", then "Vowed is on screen"). Phantom inside Vowed's task is not reproducible here.
 - The wallet's launching screen returned its result (cancelled) while the session was still open and the app did NOT close it: the behaviour that differs from the library wrapper (which would have closed the session 5 s later).
 - "Try again" (a tap): the request in flight was ended, the session closed ("Try again tapped ... JobCancellationException"), a fresh review screen appeared, the wallet was not opened again.
+
+## Round 7 (2026-10-11): SOL for a stake, the silent pass of the pre-flight, the gift
+
+### Exact SOL a stake needs on devnet (lamports; 1 SOL = 1,000,000,000)
+Measured on devnet on 2026-10-10 (`getMinimumBalanceForRentExemption`) and confirmed on a real wallet: the Mock-wallet account `2YePEWRp8aTfqQnJHK2EBt4YkXRXWetzdmL8dDG7UFZf` shows, on chain, every `create_pool` transaction costing exactly 3,464,480 (pool 1,971,040 + vault token account 1,488,440 + fee 5,000) and every `join_pool` exactly 1,290,240 (participation record 1,285,240 + fee 5,000), read with `backend/scripts/wallet-spend.ts`.
+| Item | Lamports | SOL |
+|---|---|---|
+| Network fee (one signature) | 5,000 | 0.000005 |
+| Pool account (260 bytes) rent | 1,971,040 | 0.00197 |
+| Vault token account (165 bytes) rent | 1,488,440 | 0.00149 |
+| Participation record (125 bytes) rent | 1,285,240 | 0.00129 |
+| Balance a wallet must keep (empty system account) | 650,240 | 0.00065 |
+| **Create and stake** (one transaction): fee + pool + vault + participation, spent | 4,749,720 | 0.00475 |
+| **Create and stake, needed in the wallet** (the same plus the balance to keep) | **5,399,960** | **0.0054** |
+| **Join**, spent | 1,290,240 | 0.00129 |
+| **Join, needed in the wallet** | **1,940,480** | **0.0019** |
+| Claim (token account exists) | 5,000 (+650,240 to keep) | |
+| Claim, token account missing | 1,493,440 (+650,240 to keep) | |
+- **Rent is not refunded in this version:** the program has no instruction that closes the pool, vault or participation accounts (searched `programs/vowed`), so the rent of those accounts stays locked. The review screen says so. The staked tokens come back at settlement; the SOL rent does not.
+- **The tester's wallet (0.00158 SOL = 1,580,000 lamports) could never have paid:** a create-and-stake needs 5,399,960, a join 1,940,480. The wallet could not even pay a join.
+
+### Why the pre-flight did not stop it (found in the code; the exact path on that phone is not provable from here)
+- `MainViewModel.affordable()` ended with `catch (e: Throwable) { return true }`: **any failure of the pre-flight request let the step go on silently** (a server that was asleep, a time-out, a 401 from an expired session, a rate limit). That is a real defect and it is the best-supported reason: with the check skipped, the transaction was built and shown. It is not confirmed that this request failed on that phone (there is no log of it).
+- The server did not catch it either, which is the second defect: the server's test run of the transaction (`simulateTransaction`) is the only other guard and cannot be relied on, because it depends on the public RPC answering and on the error text.
+- **Fixed in three independent places:** (1) the server checks SOL itself before it builds or simulates any create, join or claim (`requireSol`, 422 `insufficient_sol` with the exact numbers, tested against the real program at 1,575,000 lamports), (2) every transaction response carries `costs` (fee, rent, balance to keep, total, the wallet's balance) which the review screen shows and which disables Sign when the wallet is short, (3) a failed pre-flight request is written to the trace and the step then needs the server's `costs` to go on; without them the wallet is not opened.
+- **Simulation:** the server already simulates the exact transaction (`sigVerify: false`, fresh blockhash) and refuses a failing one with a plain reason; the raw reason (cluster error and the last log lines) now travels in the error `details` and the app shows it under Details.
+
+### Where the 0.01 SOL gift goes
+- The faucet claim creates the two token accounts (tUSDC, tSKR) with the FAUCET's wallet as payer (`ixCreateAtaIdempotent(authority.publicKey, owner, mint)` in `backend/src/faucet/service.ts`), so the tester does not pay token-account rent: nothing to change there.
+- What the tester's own wallet pays: 5,000 per transaction and the rent of the accounts its own transactions create (table above). One create (3,464,480) + one join (1,290,240) of the old two-step flow already took 4,754,720 of the 10,000,000 gift; a create that succeeded and then never got its join approved (the failure in the recordings) leaves a pool and its vault behind and still costs 3,464,480. 8,420,000 lamports are missing from 10,000,000 in the tester's wallet: one full create-and-join plus one more create is 8,219,200 plus a few fees, which fits, but only the wallet's address can prove it. `npx tsx backend/scripts/wallet-spend.ts <address>` lists every transaction with its fee and SOL change (read-only, public data); send it the tester's address to get the exact answer.
+- **A gift of 0.01 SOL is too small:** after one create-and-stake (4,749,720) the wallet holds 5,250,280; it can then do 2 joins (2,580,480) and is left with 2,669,800, but a second create-and-stake (needs 5,399,960) is out of reach. It covers fewer than 2 create-and-stake actions.
+
+### The new gift (approved by the project owner: gift at most 0.03 SOL, per wallet at most 0.06 SOL, other caps unchanged)
+- Gift 0.03 SOL (30,000,000). Five create-and-stake actions cost 5 x 4,749,720 = 23,748,600 plus the 650,240 kept = 24,398,840, which fits with 5,601,160 to spare; six cost 29,148,560 and still fit. Five joins cost 5 x 1,290,240 + 650,240 = 7,101,440.
+- A wallet may be topped up once more (another 0.03 SOL) when it holds less than 0.01 SOL, at least one hour after the last gift, never beyond 0.06 SOL in total. A wallet that already holds 0.05 SOL or more gets nothing. These limits are also fixed in the code (`GIFT_LIMIT`, `PER_WALLET_LIMIT`): a settings value above them is ignored.
+- Caps unchanged: 30 gifts per UTC day and 0.5 SOL in total (`FAUCET_SOL_TOTAL_CAP_LAMPORTS`). At 0.03 SOL a gift, 0.5 SOL is about 16 first gifts (8 wallets topped up twice). If that is too few testers, the total cap is the setting to raise (it needs the owner approval).
+- **Moved from the deployer to the SOL faucet wallet (devnet, with the owner approval):** 0.43 SOL, signature `cEHYYYbJu8y3Qb4UGao6GBFHy5BgxuJF8XMz3LoKcUd2Ec2g5mnpSqnRe6uhuVYXTHacMBqBcacDXCSpgq8jUTX`. Deployer `Est16oNPGu3zQRvaZ9s13UBzH6HrSiofFA15maw86eYz`: 2.51170676 to 2.08170176 SOL. SOL faucet wallet `Fmdh1ngUaoYqTpUkCksRXQX9zz9E9bgF1M5e7vmJXsu7`: 0.069985 to 0.499985 SOL. No public faucet or airdrop was used.
+- The hosted database lives in `/tmp` on the free plan, so the per-wallet gift records and the gift counters start again after every redeploy; the faucet wallet balance is the real limit.

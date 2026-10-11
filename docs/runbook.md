@@ -100,3 +100,6 @@ Amounts and limits: `FAUCET_USDC_AMOUNT`, `FAUCET_SKR_AMOUNT` (base units), `FAU
 - The authority wallet pays the token-account rent for new wallets (about 0.004 SOL for two accounts) and must keep at least 0.01 SOL; below that the faucet answers 503 `faucet_unfunded`.
 - Every claim is a row in `faucet_claims` (status pending, sent or failed; only pending and sent count toward limits).
 - Tests: `cd backend; npx vitest run test/faucet.test.ts`.
+
+### Devnet SOL gift (updated 2026-10-11)
+Gift 0.03 SOL (`FAUCET_SOL_LAMPORTS`, never above 0.03 in code), a top-up of another 0.03 SOL for a wallet holding less than `FAUCET_SOL_TOPUP_BELOW_LAMPORTS` (0.01 SOL) at least `FAUCET_SOL_TOPUP_WAIT_SECS` (1 hour) after the last gift, at most `FAUCET_SOL_PER_WALLET_MAX_LAMPORTS` (0.06 SOL, never above 0.06 in code) per wallet. Unchanged: `FAUCET_SOL_DAILY_CAP` 30, `FAUCET_SOL_TOTAL_CAP_LAMPORTS` 0.5 SOL, `FAUCET_SOL_SKIP_ABOVE_LAMPORTS` 0.05 SOL. If the Render dashboard sets `FAUCET_SOL_LAMPORTS` explicitly, change it there (the code default is 0.03). The records live in the sqlite file in `/tmp` and start again at every redeploy; the faucet wallet balance is the real limit. Where did a wallet's SOL go: `cd backend; npx tsx scripts/wallet-spend.ts <address>`.

@@ -239,3 +239,14 @@ Phantom, Testnet Mode, Solana Devnet, a signed-in Vowed. After any failure: Deta
 | S4 | Tap Try again | A fresh review screen appears; tap Sign with wallet again for a new visit | |
 | S5 | After approving or cancelling in Phantom | Vowed is on screen. Open recent apps: the Vowed card shows Vowed | |
 | S6 | Create a new challenge and stake | One visit, one approval | |
+
+## SOL, review screen and diagnostics (round 7)
+| # | Test | Expected | Result |
+|---|---|---|---|
+| D1 | You > bottom of the screen | "Vowed 0.1.0-rc1.6 (build 7), built <date time>": say these when you report a problem. The SHA-256 of the file is in the release notes (`Get-FileHash`) | |
+| D2 | Wallet with almost no SOL (under 0.0054 for a create, 0.0019 for a join): New challenge > Review | A card "Not sent to your wallet yet": "Your wallet needs about 0.0054 SOL on devnet for fees and rent. You have X SOL. Tap Get test SOL." with the button. Phantom does NOT open | |
+| D3 | Tap Get test SOL | 0.03 SOL arrives (once, and a top-up once more while under 0.01 SOL, at most 0.06 in total); a message says what happened or why not | |
+| D4 | Wallet with enough SOL: Check before you sign | The cost lines: network fee, account rent (not refunded), the balance the wallet must keep, total needed and what the wallet has | |
+| D5 | Sign with wallet, then leave Phantom open without approving | After 8 s: the waiting hint, Try again and Cancel; after about 15 s also Details and Copy diagnostics, readable while Phantom is open or after you switch back | |
+| D6 | After 90 s without approval | "Your wallet did not ask you to approve. Open your wallet app, or tap Try again." with Try again and Details | |
+| D7 | You > Wallet diagnostics | The timeline of the last attempt, kept after returning from the wallet, with Copy diagnostics | |
