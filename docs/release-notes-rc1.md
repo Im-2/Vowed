@@ -1,24 +1,26 @@
-Release candidate 1 (update 6, version 0.1.0-rc1.6, build 7) of Vowed for the Solana Mobile "CLOCK IN" hackathon. **Solana devnet only, test tokens with no value. The program is unaudited.**
+# Vowed 0.1.0-rc1.7 (build 8), pre-release
 
-**APK:** `vowed-v0.1.0-rc1.apk` (95.99 MB, signed with the same demo key as the earlier uploads, so it installs over them as an update)
-**SHA-256:** `3afa21915f83f1c7b5a3da92df41950391ace2f5ca2966c9b4c3eb4a127c8167`
-**Version:** 0.1.0-rc1.6 (build 7). You > bottom of the screen shows the version and the build time, and every diagnostics text starts with them.
+Android APK for the Solana Mobile hackathon. **Solana devnet only: test tokens, no real money.** Debug-style demo signing key (the same key as every earlier rc1 build, so it updates in place).
 
-Check it after downloading: `sha256sum vowed-v0.1.0-rc1.apk` (Linux, Git Bash) or `Get-FileHash vowed-v0.1.0-rc1.apk -Algorithm SHA256` (PowerShell).
+- File: `vowed-v0.1.0-rc1.apk`, 100,705,938 bytes (96 MB)
+- SHA-256: `35ed86398fe0a7efa1e24229bd9bdc958fd875007c68b2ccb5343e0aee7cd0ea`
+- Signing certificate SHA-256: `2811c2292bdd7772282b39c1c37765da9d8da42b1018fcff4f374c987305e7b8`
+- Backend: https://vowed-backend.onrender.com (free tier; the first request after a pause can take up to a minute; a server redeploy resets sessions, so the app asks you to sign in again)
 
-**What changed in this update (real-phone bug: staking opened Phantom's Connect sheet, then nothing, with 0.00158 SOL in the wallet):**
-- **SOL is checked three times before the wallet opens.** A create-and-stake needs about 0.0054 SOL on devnet and a join about 0.0019 (fee 0.000005, account rent, and the 0.00065 a wallet must keep). The server refuses a short wallet before it builds the transaction, the review screen shows what the step costs in SOL (rent is not refunded in this test version) and disables Sign when the wallet is short, and a failed pre-flight check no longer lets the step through. The message says the numbers and has a **Get test SOL** button.
-- **More test SOL:** a gift is now 0.03 SOL (was 0.01), a wallet that is nearly empty again can be topped up once more, never more than 0.06 SOL per wallet.
-- **A wallet that dies or closes mid-request no longer leaves the app waiting for ever** (this was a silent end in the code): you get "The wallet closed the connection before it finished" with Try again, and any wait is bounded at 90 s with "Your wallet did not ask you to approve. Open your wallet app, or tap Try again."
-- **The waiting screen has Cancel**, Try again after 8 s, and Details with Copy diagnostics after 15 s. **You > Wallet diagnostics** keeps the last wallet attempt so it can be read after returning from the wallet.
-- A review that has been open for more than 40 s is rebuilt before the wallet opens (a stale transaction is dropped by wallets).
-- **The official USDC logo** now shows for tUSDC everywhere the blue dollar icon was, always with a small "t" test badge and the TEST wording.
-- The wallet visit for stake, join and claim is Vowed's own code: one launch, the saved authorization first (no Connect screen when the wallet honours it), no timer that closes the wallet session, a timestamped trace.
+## What changed since rc1.6 (Phantom fix)
+- **Phantom 26 never showed the approval screen** because it does not support `sign_and_send_transactions`. Vowed now asks the wallet what it supports (`get_capabilities`), uses `sign_transactions` when needed, and its server sends the signed transaction exactly once. The method that answered is remembered per wallet app.
+- **Phantom drops a request that arrives right after its Connect screen closes.** Vowed now waits 3 s after any wallet screen (sign-in and transactions).
+- **Phantom adds a priority fee to the transaction.** The server now recognises a signed transaction by what it does (fee payer and every non-Compute-Budget instruction) and accepts a priority fee up to 0.001 SOL.
+- A refused saved authorization is remembered per wallet and not sent again. "Try again" opens a fresh request with the method that wallet answers to.
+- "Session closed or no answer" is treated as unknown: Vowed reads the chain for up to 20 s before saying it failed, and offers **Check my last attempt**. It never asks for a second signature without checking the chain first.
+- Wallet diagnostics: wallet app, capabilities, method, timings, chain checks.
+- App Link for the identity host (Android reports it verified).
 
-Kept: one-approval sign-in, zero wallet screens for a returning user, create-and-stake in one transaction, the full-screen camera and rep counter, test USDC or test SKR as the stake token.
+## Verified with real Phantom (emulator, 2026-10-11)
+Phantom 26.32.0 from Google Play, throwaway devnet wallet, Testnet Mode: sign in (Connect, Sign message) and create-and-stake. The create-and-stake is on devnet: `4h8b6oYKSpV8x8m2E18KbxFNmF9ZBkh5cFZy7npVwtNCqf36vpo9qamJwBya3Sr5xcfatjWE8zn4sHbUrvMTrXde` (CreatePool + JoinPool, no error). Screenshots: `docs/ui/phantom-real-*.png`, `docs/ui/vowed-real-phantom-stake-landed.png`. Details and Phantom's own log lines: `docs/verified-facts.md`.
 
-The app talks to the hosted devnet backend `https://vowed-backend.onrender.com`. It runs on a free plan, so the first request after a pause can take up to a minute.
-
-**Not verified yet (needs a real phone):** whether Phantom still shows Connect for a stake, what Phantom shows after it, the approval sheet itself, camera counting accuracy and hardware key attestation. Tested on the emulator with the Mock wallet only. See `docs/verified-facts.md` and `docs/device-tests.md`.
-
-Built from commit 5b2288b; see `docs/progress.md`.
+## Known limits (read before the demo)
+- **Phantom sometimes does not draw its approval sheet** on the emulator (it logs the request and shows nothing). Tap **Try again**; a fresh request has worked. Not seen on a real phone yet.
+- **Phantom still shows "This app's identity could not be verified"** (red banner) although Android reports the domain verified. Phantom's own check fails and cannot be fixed from the app. Connecting still works.
+- **Not tested with real Phantom:** a physical Samsung phone, a Seeker, rejecting a request, closing Phantom mid-request, a wallet with too little SOL, joining a challenge (create-and-stake was tested), and Solflare. These were tested with the Mock wallet and unit tests only.
+- Test tokens (tUSDC, tSKR) and the yield figures are test or simulated and are labelled in the app.

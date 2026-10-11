@@ -424,8 +424,9 @@ fun FlowStatus(flow: TxFlow) {
                 // no silent waiting: say what is going on, and let the person decide (Try again never happens by itself)
                 val w = flow.wallet ?: "your wallet"
                 Text(
-                    "Waiting for $w to ask you to approve. If $w does not show a prompt, open $w, or tap Try again." +
-                        (flow.method?.let { " Vowed asked it this way: $it. Try again asks in a different way." } ?: ""),
+                    "Waiting for $w to show its approval screen. $w can take up to a minute to show it on a slow phone, so please keep waiting. " +
+                        "If nothing has appeared after a minute, open $w, or tap Try again to send a fresh request." +
+                        (flow.method?.let { " (Vowed asked it this way: $it.)" } ?: ""),
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
                 )
                 app.vowed.ui.components.SoftButton("Try again", retry)
