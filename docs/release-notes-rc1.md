@@ -1,9 +1,9 @@
-# Vowed 0.1.0-rc1.7 (build 8), pre-release
+﻿# Vowed 0.1.0-rc1.7 (build 8), pre-release
 
 Android APK for the Solana Mobile hackathon. **Solana devnet only: test tokens, no real money.** Debug-style demo signing key (the same key as every earlier rc1 build, so it updates in place).
 
 - File: `vowed-v0.1.0-rc1.apk`, 100,705,938 bytes (96 MB)
-- SHA-256: `35ed86398fe0a7efa1e24229bd9bdc958fd875007c68b2ccb5343e0aee7cd0ea`
+- SHA-256: `494d0b4e67102acbb180ba0f655b712850b6c863f26cabaee5d1f50ffbb181a8`
 - Signing certificate SHA-256: `2811c2292bdd7772282b39c1c37765da9d8da42b1018fcff4f374c987305e7b8`
 - Backend: https://vowed-backend.onrender.com (free tier; the first request after a pause can take up to a minute; a server redeploy resets sessions, so the app asks you to sign in again)
 
@@ -20,7 +20,9 @@ Android APK for the Solana Mobile hackathon. **Solana devnet only: test tokens, 
 Phantom 26.32.0 from Google Play, throwaway devnet wallet, Testnet Mode: sign in (Connect, Sign message) and create-and-stake. The create-and-stake is on devnet: `4h8b6oYKSpV8x8m2E18KbxFNmF9ZBkh5cFZy7npVwtNCqf36vpo9qamJwBya3Sr5xcfatjWE8zn4sHbUrvMTrXde` (CreatePool + JoinPool, no error). Screenshots: `docs/ui/phantom-real-*.png`, `docs/ui/vowed-real-phantom-stake-landed.png`. Details and Phantom's own log lines: `docs/verified-facts.md`.
 
 ## Known limits (read before the demo)
-- **Phantom sometimes does not draw its approval sheet** on the emulator (it logs the request and shows nothing). Tap **Try again**; a fresh request has worked. Not seen on a real phone yet.
+- **Phantom sometimes does not draw its approval sheet** on the emulator (it logs the request and shows nothing). It can take 20 to 50 seconds on a slow emulator: wait about a minute, then tap **Try again** (a fresh request has worked). Not seen on a real phone yet.
 - **Phantom still shows "This app's identity could not be verified"** (red banner) although Android reports the domain verified. Phantom's own check fails and cannot be fixed from the app. Connecting still works.
 - **Not tested with real Phantom:** a physical Samsung phone, a Seeker, rejecting a request, closing Phantom mid-request, a wallet with too little SOL, joining a challenge (create-and-stake was tested), and Solflare. These were tested with the Mock wallet and unit tests only.
 - Test tokens (tUSDC, tSKR) and the yield figures are test or simulated and are labelled in the app.
+
+
