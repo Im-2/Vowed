@@ -1,0 +1,61 @@
+﻿{
+  "voice_name": "Bill - Wise, Mature, Balanced",
+  "model_id": "eleven_multilingual_v2",
+  "voice_settings": { "stability": 0.55, "similarity_boost": 0.75, "style": 0.0, "use_speaker_boost": true, "speed": 1.0 },
+  "acts": [
+    {
+      "id": "act1",
+      "sentences": [
+        { "scene": "s1_goal", "text": "This is Vowed. You type any goal in your own words, put a small stake behind it, and prove it each day with your phone." },
+        { "scene": "s1_goal", "text": "Everything here runs on Solana devnet, with test tokens that have no value." },
+        { "scene": "s2_setup", "text": "Your Solana wallet is your account. Vowed first shows how to switch Phantom to its practice network." },
+        { "scene": "s3_connect", "text": "Then it asks once, through the Mobile Wallet Adapter: Phantom asks me to connect, and to sign one message that proves the wallet is mine." },
+        { "scene": "s3_connect", "text": "No funds move, and there is no password." }
+      ]
+    },
+    {
+      "id": "act2",
+      "sentences": [
+        { "scene": "s4_tokens", "text": "I claim free test tokens: twenty test USDC and twenty test SKR, sent on devnet." },
+        { "scene": "s5_goal", "text": "Now a goal. I type: do twenty squats every day for a week." },
+        { "scene": "s6_plan", "text": "Vowed turns the words into a plan, and says how the goal will be proved. Here the camera counts the reps, so the plan is marked high trust." },
+        { "scene": "s7_stake", "text": "I keep it as a demo pool, where a day lasts two minutes, and I stake one test USDC." }
+      ]
+    },
+    {
+      "id": "act3",
+      "sentences": [
+        { "scene": "s8_review", "text": "Before anything is signed, Vowed decodes the transaction on the phone and checks every address." },
+        { "scene": "s8_review", "text": "It shows what I pay in devnet SOL: the network fee, the account rent, and the total." },
+        { "scene": "s9_sign", "text": "One approval in Phantom covers creating the pool and staking in it." },
+        { "scene": "s10_countdown", "text": "The stake is now held by the program on Solana, and the challenge page counts down to the moment check-ins open." }
+      ]
+    },
+    {
+      "id": "act4",
+      "sentences": [
+        { "scene": "s11_checkin", "text": "Check-in time. For this goal, the proof is the camera." },
+        { "scene": "s12_camera", "text": "It maps my body on the phone and coaches me into frame. Then it counts the squats as I do them: one, two, three." },
+        { "scene": "s12_camera", "text": "The picture is analysed on the phone and never leaves it. Only the number of reps is sent." },
+        { "scene": "s13_recorded", "text": "The day is recorded, and the streak is written to Solana." }
+      ]
+    },
+    {
+      "id": "act5",
+      "sentences": [
+        { "scene": "s14_other", "text": "Not every goal needs a camera. For less than thirty minutes a day on Instagram, Vowed proposes the phone's own usage data instead." },
+        { "scene": "s15_explore", "text": "In Explore, public challenges can be filtered by kind and by token. The ones marked sample are example data." },
+        { "scene": "s16_join", "text": "Joining one works the same way: a review with the costs, one approval in Phantom, and Vowed confirms it on Solana." }
+      ]
+    },
+    {
+      "id": "act6",
+      "sentences": [
+        { "scene": "s17_squads", "text": "Squads are for friends. I create one, and get an invite code to share and a leaderboard for the group." },
+        { "scene": "s18_you", "text": "The You screen holds the rest: a coach, test SKR rewards and streak freezes, letters to my future self, and a home screen widget." },
+        { "scene": "s18_you", "text": "Vowed. Put something on the line for your goals." }
+      ]
+    }
+  ]
+}
+

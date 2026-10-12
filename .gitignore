@@ -23,3 +23,14 @@ backend/.devnet/
 *.sqlite-shm
 scripts/.shot.png
 scripts/.*.log
+
+# demo video: secrets, footage and renders stay local
+demo-video/.env
+demo-video/*.mp4
+demo-video/build/cache/
+demo-video/build/out/
+demo-video/poster.png
+!demo-video/build/
+demo-video/build/cache/
+demo-video/build/out/
+demo-video/build/__pycache__/
