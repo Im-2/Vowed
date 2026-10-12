@@ -588,7 +588,18 @@ fun DetailScreen(
                         if (c.status == "Open") {
                             if (dv.done) app.vowed.ui.components.StatusBadge("Today is recorded.", app.vowed.ui.components.Tone.Success)
                             else if (dv.dayOpen) app.vowed.ui.components.PrimaryButton("Check in for today", onCheckIn)
-                            else Text("Check-ins are not open right now.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            else if (now < c.startTs) {
+                                // the challenge has not started yet (a demo challenge starts 2 minutes after it is created): say when, and open by itself
+                                val left = (c.startTs - now).coerceAtLeast(0)
+                                Text(
+                                    "Your stake is in. Check-ins open when the challenge starts, in ${left / 60}:${"%02d".format(left % 60)}.",
+                                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                LaunchedEffect(c.pool, c.startTs) {
+                                    kotlinx.coroutines.delay(((c.startTs - System.currentTimeMillis() / 1000).coerceAtLeast(0) + 2) * 1000)
+                                    onLoad()
+                                }
+                            } else Text("Check-ins are not open right now. Tap Refresh in a moment.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
